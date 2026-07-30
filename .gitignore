@@ -1,1 +1,12 @@
 Nilum_DesignDocument.md
+
+# Gradle / Java
+.gradle/
+build/
+out/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/

@@ -13,8 +13,6 @@
 
 If you find any issues, please report them [here](https://github.com/RATR2/nilum/issues)
 
-Thanks, R4T Out.
-
 </div>
 
 ---
@@ -56,3 +54,11 @@ Still pre-implementation. Foundation (protocol, TCP side-channel, asset cache) c
 ## License
 
 See [LICENSE.md](LICENSE.md). Source-available: you may read, build, and modify for personal use. Resale of the Software, Modifications, or Forks is reserved exclusively to the Owner.
+
+---
+
+<div align="center">
+
+Thanks, R4T Out.
+
+</div>
