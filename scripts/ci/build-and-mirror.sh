@@ -13,7 +13,7 @@ checkout_matching_branch "${CHECKOUT_DIR}" "${BRANCH_NAME}"
 
 mkdir -p "${CHECKOUT_DIR}/builds/${COMMIT_SHA}"
 cp -r "${OUT_DIR}"/. "${CHECKOUT_DIR}/builds/${COMMIT_SHA}/"
-update_readme "${CHECKOUT_DIR}" "${COMMIT_SHA}" "${COMMIT_MESSAGE}"
+update_readme "${CHECKOUT_DIR}" "${COMMIT_SHA}" "$(echo "${COMMIT_MESSAGE}" | head -1)" "true"
 
 cd "${CHECKOUT_DIR}"
 git add builds README.md

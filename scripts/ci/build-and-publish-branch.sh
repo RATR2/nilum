@@ -16,7 +16,7 @@ cd "${CHECKOUT_DIR}"
 git checkout -b "release/${VERSION}"
 mkdir -p "builds/${COMMIT_SHA}"
 cp -r "${OUT_DIR}"/. "builds/${COMMIT_SHA}/"
-update_readme "${CHECKOUT_DIR}" "${COMMIT_SHA}" "release: nilum ${VERSION} (${COMMIT_SHA})"
+update_readme "${CHECKOUT_DIR}" "${COMMIT_SHA}" "release: nilum ${VERSION} (${COMMIT_SHA})" "true"
 git add builds README.md
 git commit -m "release: nilum ${VERSION} (${COMMIT_SHA})"
 git push -u origin "release/${VERSION}"

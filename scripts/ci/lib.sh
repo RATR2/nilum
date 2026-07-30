@@ -26,9 +26,24 @@ build_and_collect_jars() {
   fi
 }
 
+# Rewrites README.md with the last actually-built commit and the given commit.
+# $4 (is_build) records $2/$3 as the new "last build" first when "true" - when
+# "false" (an ignored commit), the existing last-build record is left alone, so
+# "Last Build" and "Last Commit" can legitimately point at different commits.
 update_readme() {
-  local dir="$1" sha="$2" subject
-  subject="$(echo "$3" | head -1)"
+  local dir="$1" sha="$2" subject="$3" is_build="$4"
+  local state_file="${dir}/builds/.last-build"
+
+  if [ "${is_build}" = "true" ]; then
+    mkdir -p "${dir}/builds"
+    printf '%s\n%s\n' "${sha}" "${subject}" > "${state_file}"
+  fi
+
+  local build_sha="" build_subject=""
+  if [ -f "${state_file}" ]; then
+    build_sha="$(sed -n '1p' "${state_file}")"
+    build_subject="$(sed -n '2p' "${state_file}")"
+  fi
 
   cat > "${dir}/README.md" <<EOF
 ---
@@ -38,7 +53,7 @@ update_readme() {
 
 Builds for https://github.com/RATR2/nilum
 
-  Last updated build: $(date -u +'%Y-%m-%d %H:%M UTC')
+  Last Build: [${build_subject}](https://github.com/RATR2/nilum/commit/${build_sha})
 
   Last Commit: [${subject}](https://github.com/RATR2/nilum/commit/${sha})
 </div>

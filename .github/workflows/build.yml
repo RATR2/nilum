@@ -63,6 +63,18 @@ jobs:
           BRANCH_NAME: ${{ github.ref_name }}
         run: scripts/ci/build-and-mirror.sh
 
+      # Doesn't build anything - just records that this commit exists, so
+      # nilum-builds' "Last Commit" can outpace "Last Build" when a commit
+      # is intentionally skipped.
+      - name: Record ignored commit in nilum-builds
+        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.ignore == 'true'
+        env:
+          NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
+          COMMIT_SHA: ${{ steps.classify.outputs.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: scripts/ci/record-ignored-commit.sh
+
       - name: Build and publish release branch to nilum-builds
         if: steps.classify.outputs.is_bot == 'true'
         env:
