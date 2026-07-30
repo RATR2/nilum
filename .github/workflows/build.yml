@@ -34,14 +34,18 @@ jobs:
             IS_BOT="true"
           fi
 
+          # Both flags must be their own line (like a git trailer), not just a
+          # substring anywhere in the message - otherwise a commit that merely
+          # *talks about* "version=X.Y.Z" or "workflows.ignore=true" in prose
+          # (e.g. this very line) would trigger itself by accident.
           MSG=$(git log -1 --pretty=%B)
           VERSION=""
-          if echo "$MSG" | grep -qE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?'; then
-            VERSION=$(echo "$MSG" | grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?' | head -1 | cut -d= -f2)
+          if echo "$MSG" | grep -qxE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?'; then
+            VERSION=$(echo "$MSG" | grep -oxE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?' | head -1 | cut -d= -f2)
           fi
 
           IGNORE="false"
-          if echo "$MSG" | grep -qE 'workflows\.ignore=true'; then
+          if echo "$MSG" | grep -qxE 'workflows\.ignore=true'; then
             IGNORE="true"
           fi
 
