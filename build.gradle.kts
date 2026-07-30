@@ -10,7 +10,7 @@ allprojects {
 subprojects {
     apply(plugin = "java")
 
-    java {
+    extensions.configure<JavaPluginExtension> {
         toolchain {
             languageVersion.set(JavaLanguageVersion.of(21))
         }
