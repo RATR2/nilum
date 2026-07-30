@@ -4,7 +4,6 @@
 
 [![Release](https://img.shields.io/github/v/release/RATR2/nilum?display_name=release&style=for-the-badge&logo=github)](https://github.com/RATR2/nilum/releases/latest)
 [![Issues](https://img.shields.io/github/issues/RATR2/nilum?style=for-the-badge&logo=github)](https://github.com/RATR2/nilum/issues)
-[![License](https://img.shields.io/github/license/RATR2/nilum?style=for-the-badge)](https://github.com/RATR2/nilum/blob/main/LICENSE.md)
 [![Loaders](https://img.shields.io/badge/loaders-paper%20%7C%20fabric%20%7C%20forge-blue?style=for-the-badge)](#project-structure)
 [![Stars](https://img.shields.io/github/stars/RATR2/nilum?style=for-the-badge&logo=github)](https://github.com/RATR2/nilum/stargazers)
 [![Status](https://img.shields.io/badge/status-pre--implementation-yellow?style=for-the-badge)](#roadmap)
