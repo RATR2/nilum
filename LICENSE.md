@@ -48,7 +48,7 @@ c. Modify the Software for your own personal, non-commercial use and for the
 You may **not**, under any circumstance:
 
 a. Sell, resell, sublicense, or otherwise distribute the Software, any
-   Modification, or any Fork — in source or compiled form — to any third
+   Modification, or any Fork, in source or compiled form, to any third
    party for money or other consideration (**"Resale"**), regardless of
    whether the code has been modified;
 
