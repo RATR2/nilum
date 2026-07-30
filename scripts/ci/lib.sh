@@ -26,6 +26,25 @@ build_and_collect_jars() {
   fi
 }
 
+update_readme() {
+  local dir="$1" sha="$2" subject
+  subject="$(echo "$3" | head -1)"
+
+  cat > "${dir}/README.md" <<EOF
+---
+<div align="center">
+
+  # Nilum-Builds
+
+Builds for https://github.com/RATR2/nilum
+
+  Last updated build: $(date -u +'%Y-%m-%d %H:%M UTC')
+
+  Last Commit: [${subject}](https://github.com/RATR2/nilum/commit/${sha})
+</div>
+EOF
+}
+
 clone_nilum_builds() {
   local dest="$1"
   git clone "https://x-access-token:${NILUM_BUILDS_TOKEN}@github.com/RATR2/nilum-builds.git" "${dest}"

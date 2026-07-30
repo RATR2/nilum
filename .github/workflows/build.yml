@@ -23,8 +23,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Detects a bot version-bump commit (avoids an infinite loop) and whether
-      # this commit requested a version bump via "version=X.Y.Z".
+      # Detects a bot version-bump commit (avoids an infinite loop), whether this
+      # commit requested a version bump via "version=X.Y.Z", and whether it opted
+      # out of mirroring via "workflows.ignore=true".
       - name: Classify commit
         id: classify
         run: |
@@ -39,16 +40,22 @@ jobs:
             VERSION=$(echo "$MSG" | grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?' | head -1 | cut -d= -f2)
           fi
 
+          IGNORE="false"
+          if echo "$MSG" | grep -qE 'workflows\.ignore=true'; then
+            IGNORE="true"
+          fi
+
           echo "is_bot=$IS_BOT" >> "$GITHUB_OUTPUT"
           echo "requested_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "ignore=$IGNORE" >> "$GITHUB_OUTPUT"
           echo "sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Bump version
-        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.requested_version != ''
+        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.requested_version != '' && steps.classify.outputs.ignore != 'true'
         run: scripts/ci/bump-version.sh "${{ steps.classify.outputs.requested_version }}"
 
       - name: Build and mirror commit to nilum-builds
-        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.requested_version == ''
+        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.requested_version == '' && steps.classify.outputs.ignore != 'true'
         env:
           NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
           COMMIT_SHA: ${{ steps.classify.outputs.sha }}
