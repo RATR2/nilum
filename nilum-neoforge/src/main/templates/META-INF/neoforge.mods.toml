@@ -1,0 +1,23 @@
+license="See LICENSE.md"
+
+[[mods]]
+modId="nilum"
+version="${version}"
+displayName="Nilum"
+description='''
+Live, per-player asset streaming client mod.
+'''
+
+[[dependencies.nilum]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.11,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.nilum]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.11,1.22)"
+    ordering="NONE"
+    side="BOTH"

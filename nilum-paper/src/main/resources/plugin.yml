@@ -1,0 +1,15 @@
+name: Nilum
+version: '${version}'
+main: io.github.r4t2.nilum.paper.NilumPlugin
+api-version: '1.21'
+description: Live, per-player asset streaming server plugin.
+authors: [r4t2]
+commands:
+  nilum:
+    description: Nilum admin commands.
+    usage: /nilum <reload|placemodel>
+    permission: nilum.admin
+permissions:
+  nilum.admin:
+    description: Access to Nilum admin commands.
+    default: op

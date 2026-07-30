@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "nilum",
+  "version": "${version}",
+  "name": "Nilum",
+  "description": "Live, per-player asset streaming client mod.",
+  "authors": ["r4t2"],
+  "license": "See LICENSE.md",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.r4t2.nilum.fabric.NilumFabricMod"],
+    "client": ["io.github.r4t2.nilum.fabric.NilumFabricClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.0",
+    "minecraft": "1.21.11",
+    "java": ">=21"
+  }
+}

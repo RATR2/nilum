@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
 
 permissions:
   contents: write
@@ -20,9 +20,11 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # Figures out whether this run was triggered by the bot's own version-bump
-      # commit (avoids an infinite loop) and whether the human commit that
-      # triggered this run asked for a version bump via "version=X.Y.Z".
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Detects a bot version-bump commit (avoids an infinite loop) and whether
+      # this commit requested a version bump via "version=X.Y.Z".
       - name: Classify commit
         id: classify
         run: |
@@ -51,6 +53,7 @@ jobs:
           NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
           COMMIT_SHA: ${{ steps.classify.outputs.sha }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          BRANCH_NAME: ${{ github.ref_name }}
         run: scripts/ci/build-and-mirror.sh
 
       - name: Build and publish release branch to nilum-builds
