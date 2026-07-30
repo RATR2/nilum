@@ -1,7 +1,3 @@
-plugins {
-    java
-}
-
 allprojects {
     group = "io.github.r4t2.nilum"
     version = "0.1.0-SNAPSHOT"

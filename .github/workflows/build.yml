@@ -1,0 +1,61 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout nilum
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Figures out whether this run was triggered by the bot's own version-bump
+      # commit (avoids an infinite loop) and whether the human commit that
+      # triggered this run asked for a version bump via "version=X.Y.Z".
+      - name: Classify commit
+        id: classify
+        run: |
+          IS_BOT="false"
+          if [ "${{ github.actor }}" = "github-actions[bot]" ]; then
+            IS_BOT="true"
+          fi
+
+          MSG=$(git log -1 --pretty=%B)
+          VERSION=""
+          if echo "$MSG" | grep -qE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?'; then
+            VERSION=$(echo "$MSG" | grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?' | head -1 | cut -d= -f2)
+          fi
+
+          echo "is_bot=$IS_BOT" >> "$GITHUB_OUTPUT"
+          echo "requested_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version
+        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.requested_version != ''
+        run: scripts/ci/bump-version.sh "${{ steps.classify.outputs.requested_version }}"
+
+      - name: Build and mirror commit to nilum-builds
+        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.requested_version == ''
+        env:
+          NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
+          COMMIT_SHA: ${{ steps.classify.outputs.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: scripts/ci/build-and-mirror.sh
+
+      - name: Build and publish release branch to nilum-builds
+        if: steps.classify.outputs.is_bot == 'true'
+        env:
+          NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
+          COMMIT_SHA: ${{ steps.classify.outputs.sha }}
+        run: scripts/ci/build-and-publish-branch.sh
