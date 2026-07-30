@@ -4,7 +4,9 @@ import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.common.model.BbCollisionParser;
 import io.github.r4t2.nilum.common.model.BbCollisionResult;
 import io.github.r4t2.nilum.common.model.BbModel;
+import io.github.r4t2.nilum.common.model.BbProxyShape;
 import io.github.r4t2.nilum.common.model.ModelRegistry;
+import io.github.r4t2.nilum.common.model.ProxyMaterialClassifier;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.paper.NilumPlugin;
@@ -37,6 +39,7 @@ public final class ModelDisplayService {
 
     private final Map<UUID, String> placements = new ConcurrentHashMap<>();
     private final Map<UUID, List<BoundingBox>> collisionBoxes = new ConcurrentHashMap<>();
+    private final Map<UUID, BbProxyShape> proxyShapes = new ConcurrentHashMap<>();
 
     public ModelDisplayService(NilumPlugin plugin, NilumLogger logger, ModelRegistry modelRegistry) {
         this.plugin = plugin;
@@ -71,6 +74,11 @@ public final class ModelDisplayService {
         return collisionBoxes.getOrDefault(entityId, List.of());
     }
 
+    /** The classified proxy shape for a placement, if it has a collision group. */
+    public Optional<BbProxyShape> proxyShapeOf(UUID entityId) {
+        return Optional.ofNullable(proxyShapes.get(entityId));
+    }
+
     private void resolveCollision(UUID entityId, String modelId, Location location, BbModel model) {
         BbCollisionResult result = BbCollisionParser.resolve(model);
 
@@ -78,7 +86,11 @@ public final class ModelDisplayService {
             case BbCollisionResult.Found found -> {
                 List<BoundingBox> worldBoxes = CollisionShapes.toWorldBoundingBoxes(location, found.boxes());
                 collisionBoxes.put(entityId, worldBoxes);
-                logger.info("Model '" + modelId + "' has " + worldBoxes.size() + " collision box(es).");
+
+                BbProxyShape shape = ProxyMaterialClassifier.classify(found.boxes());
+                proxyShapes.put(entityId, shape);
+                logger.info("Model '" + modelId + "' has " + worldBoxes.size()
+                        + " collision box(es), classified as " + shape + ".");
             }
             case BbCollisionResult.IntentionallyNonSolid ignored -> {
                 // collision_intent: none - deliberate, no warning per the design doc.
