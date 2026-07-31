@@ -12,7 +12,8 @@ public record BbModel(
         Map<String, BbElement> elementsByUuid,
         List<BbOutlinerNode> outliner,
         List<BbTexture> textures,
-        Optional<String> collisionIntent
+        Optional<String> collisionIntent,
+        Map<String, BbDisplayTransform> display
 ) {
 
     public Optional<BbOutlinerGroup> findGroup(String name) {

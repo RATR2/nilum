@@ -42,13 +42,32 @@ public final class BbModelParser {
         Map<String, GroupMeta> groupMeta = parseGroupMeta(root.getAsJsonArray("groups"));
         List<BbOutlinerNode> outliner = parseOutliner(root.getAsJsonArray("outliner"), groupMeta);
         List<BbTexture> textures = parseTextures(root.getAsJsonArray("textures"));
+        Map<String, BbDisplayTransform> display = root.has("display")
+                ? parseDisplay(root.getAsJsonObject("display"))
+                : Map.of();
 
         // Nilum-specific convention
         Optional<String> collisionIntent = root.has("collision_intent")
                 ? Optional.of(root.get("collision_intent").getAsString())
                 : Optional.empty();
 
-        return new BbModel(formatVersion, resolutionWidth, resolutionHeight, elements, outliner, textures, collisionIntent);
+        return new BbModel(formatVersion, resolutionWidth, resolutionHeight, elements, outliner, textures, collisionIntent, display);
+    }
+
+    /** Blockbench's "Display" panel - one entry per {@code ItemDisplayContext}, e.g. "gui", "thirdperson_righthand". */
+    private static Map<String, BbDisplayTransform> parseDisplay(JsonObject displayJson) {
+        Map<String, BbDisplayTransform> display = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : displayJson.entrySet()) {
+            JsonObject context = entry.getValue().getAsJsonObject();
+            Optional<BbVector3> rotation = context.has("rotation")
+                    ? Optional.of(parseVector3(context.getAsJsonArray("rotation"))) : Optional.empty();
+            Optional<BbVector3> translation = context.has("translation")
+                    ? Optional.of(parseVector3(context.getAsJsonArray("translation"))) : Optional.empty();
+            Optional<BbVector3> scale = context.has("scale")
+                    ? Optional.of(parseVector3(context.getAsJsonArray("scale"))) : Optional.empty();
+            display.put(entry.getKey(), new BbDisplayTransform(rotation, translation, scale));
+        }
+        return display;
     }
 
     private static Map<String, BbElement> parseElements(JsonArray elementsJson) {
