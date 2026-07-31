@@ -18,4 +18,10 @@ git commit --allow-empty -m "chore: bump version to ${NEW_VERSION} [ci-bump]"
 # A real PAT doesn't have that restriction, so the bot commit's own push here
 # fires the workflow again - that second run is what actually builds and
 # publishes to nilum-builds (see build.yml's "is_bot == true" step).
-git push "https://x-access-token:${NILUM_BUILDS_TOKEN}@github.com/RATR2/nilum.git" HEAD:main
+REMOTE="https://x-access-token:${NILUM_BUILDS_TOKEN}@github.com/RATR2/nilum.git"
+git push "${REMOTE}" HEAD:main
+
+# Source-code versioning, separate from nilum-builds' own release/<version>
+# branch of built artifacts: release/<version> here marks the exact nilum
+# source commit that version was cut from.
+git push "${REMOTE}" "HEAD:refs/heads/release/${NEW_VERSION}"
