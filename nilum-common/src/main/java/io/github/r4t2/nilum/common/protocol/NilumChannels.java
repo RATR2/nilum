@@ -28,6 +28,24 @@ public final class NilumChannels {
     public static final String MOD_LIST = "mod_list";
     public static final String MOD_LIST_QUALIFIED = NAMESPACE + ":" + MOD_LIST;
 
+    public static final String HUD_FRAME = "hud_frame";
+    public static final String HUD_FRAME_QUALIFIED = NAMESPACE + ":" + HUD_FRAME;
+
+    public static final String ATLAS_PATCH = "atlas_patch";
+    public static final String ATLAS_PATCH_QUALIFIED = NAMESPACE + ":" + ATLAS_PATCH;
+
+    public static final String HUD_FRAME_OVERRIDE = "hud_frame_override";
+    public static final String HUD_FRAME_OVERRIDE_QUALIFIED = NAMESPACE + ":" + HUD_FRAME_OVERRIDE;
+
+    public static final String HUD_FRAME_RELEASE = "hud_frame_release";
+    public static final String HUD_FRAME_RELEASE_QUALIFIED = NAMESPACE + ":" + HUD_FRAME_RELEASE;
+
+    public static final String REGISTER_CLIENT_VAR = "register_client_var";
+    public static final String REGISTER_CLIENT_VAR_QUALIFIED = NAMESPACE + ":" + REGISTER_CLIENT_VAR;
+
+    public static final String SET_CLIENT_VAR = "set_client_var";
+    public static final String SET_CLIENT_VAR_QUALIFIED = NAMESPACE + ":" + SET_CLIENT_VAR;
+
     private NilumChannels() {
     }
 }
