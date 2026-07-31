@@ -6,6 +6,7 @@ import org.bukkit.NamespacedKey;
 public final class NilumKeys {
 
     public static final NamespacedKey MODEL_ID = new NamespacedKey("nilum", "model_id");
+    public static final NamespacedKey ICON_ID = new NamespacedKey("nilum", "icon_id");
 
     private NilumKeys() {
     }

@@ -7,12 +7,16 @@ import io.github.r4t2.nilum.common.config.ModerationConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.NilumConfigVersion;
 import io.github.r4t2.nilum.common.config.TcpConfig;
+import io.github.r4t2.nilum.common.icon.IconDisplay;
+import io.github.r4t2.nilum.common.icon.IconRegistry;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.common.model.ModelLoadError;
 import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.paper.handshake.HandshakeListener;
+import io.github.r4t2.nilum.paper.icon.IconsYamlManager;
 import io.github.r4t2.nilum.paper.item.CustomItemService;
+import io.github.r4t2.nilum.paper.item.IconItemService;
 import io.github.r4t2.nilum.paper.logging.PaperConsoleSink;
 import io.github.r4t2.nilum.paper.model.ModelDisplayService;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -20,6 +24,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 public final class NilumPlugin extends JavaPlugin {
@@ -28,8 +33,11 @@ public final class NilumPlugin extends JavaPlugin {
     private NilumLogger logger;
     private HandshakeListener handshakeListener;
     private ModelRegistry modelRegistry;
+    private IconRegistry iconRegistry;
+    private IconsYamlManager iconsYamlManager;
     private ModelDisplayService modelDisplayService;
     private CustomItemService customItemService;
+    private IconItemService iconItemService;
     private String buildCommit = "unknown";
 
     @Override
@@ -63,9 +71,13 @@ public final class NilumPlugin extends JavaPlugin {
         handshakeListener = new HandshakeListener(this, logger, configManager);
 
         modelRegistry = new ModelRegistry();
+        iconRegistry = new IconRegistry();
+        iconsYamlManager = new IconsYamlManager(getDataFolder().toPath().resolve("icons"), logger);
         reloadModels();
+        reloadIcons();
         modelDisplayService = new ModelDisplayService(this, logger, modelRegistry);
         customItemService = new CustomItemService(modelRegistry);
+        iconItemService = new IconItemService(iconRegistry);
 
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.HELLO_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.TCP_OFFER_QUALIFIED);
@@ -138,6 +150,23 @@ public final class NilumPlugin extends JavaPlugin {
         }
     }
 
+    /** @return true if the reload succeeded. */
+    public boolean reloadIcons() {
+        try {
+            iconRegistry.loadDirectory(getDataFolder().toPath().resolve("icons"));
+            Map<String, IconDisplay> resolved = iconsYamlManager.reload(iconRegistry.iconIds(), modelRegistry);
+            for (Map.Entry<String, IconDisplay> entry : resolved.entrySet()) {
+                iconRegistry.applyDisplay(entry.getKey(), entry.getValue());
+            }
+            logger.info("Loaded " + iconRegistry.iconIds().size() + " icon(s) from the icons folder.");
+            handshakeListener.broadcastAssetManifest();
+            return true;
+        } catch (IOException e) {
+            logger.error("Failed to reload the icons folder", e);
+            return false;
+        }
+    }
+
     public String buildCommit() {
         return buildCommit;
     }
@@ -163,11 +192,19 @@ public final class NilumPlugin extends JavaPlugin {
         return modelRegistry;
     }
 
+    public IconRegistry icons() {
+        return iconRegistry;
+    }
+
     public ModelDisplayService modelDisplays() {
         return modelDisplayService;
     }
 
     public CustomItemService customItems() {
         return customItemService;
+    }
+
+    public IconItemService iconItems() {
+        return iconItemService;
     }
 }

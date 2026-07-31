@@ -5,6 +5,8 @@ import io.github.r4t2.nilum.common.config.ModerationConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
+import io.github.r4t2.nilum.common.protocol.AssetKind;
+import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
 import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
@@ -31,6 +33,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -77,14 +80,20 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         return acknowledged.get(playerId);
     }
 
-    /** Re-sends the current asset manifest to every handshaked player, so a model reload reaches them live. */
+    /** Re-sends the current asset manifest to every handshaked player, so a model/icon reload reaches them live. */
     public void broadcastAssetManifest() {
-        byte[] data = new AssetManifestPacket(plugin.models().manifest()).encode();
+        byte[] data = new AssetManifestPacket(combinedManifest()).encode();
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             if (hasClient(player.getUniqueId())) {
                 player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED, data);
             }
         }
+    }
+
+    private List<AssetManifestEntry> combinedManifest() {
+        List<AssetManifestEntry> entries = new ArrayList<>(plugin.models().manifest());
+        entries.addAll(plugin.icons().manifest());
+        return entries;
     }
 
     /**
@@ -234,7 +243,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         plugin.modelDisplays().sendAllTo(player);
 
         player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED,
-                new AssetManifestPacket(plugin.models().manifest()).encode());
+                new AssetManifestPacket(combinedManifest()).encode());
 
         if (configManager.get(ModerationConfig.LOG_CLIENT_MODS)) {
             player.sendPluginMessage(plugin, NilumChannels.MOD_LIST_REQUEST_QUALIFIED,
@@ -269,7 +278,10 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
     private void onTcpConnected(UUID playerId, Socket socket) {
         tcpConnections.put(playerId, socket);
         logger.info("TCP side-channel connected for " + playerId + ", serving asset requests.");
-        NilumTcpAssetServer.serve(socket, id -> plugin.models().rawBytes(id).orElse(null));
+        NilumTcpAssetServer.serve(socket, (kind, id) -> switch (kind) {
+            case MODEL -> plugin.models().rawBytes(id).orElse(null);
+            case ICON -> plugin.icons().assetBytes(id).orElse(null);
+        });
     }
 
     private static void closeQuietly(Socket socket) {
