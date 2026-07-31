@@ -7,7 +7,7 @@ read_version() {
 
 build_and_collect_jars() {
   local out_dir="$1"
-  local version sha jar module
+  local version sha jar module suffix
 
   version="$(read_version)"
   sha="${COMMIT_SHA}"
@@ -16,8 +16,9 @@ build_and_collect_jars() {
 
   while IFS= read -r jar; do
     module="$(basename "$(dirname "$(dirname "$(dirname "${jar}")")")")"
+    suffix="${module#nilum-}"
     mkdir -p "${out_dir}/${module}"
-    cp "${jar}" "${out_dir}/${module}/nilum-${version}-${sha}.jar"
+    cp "${jar}" "${out_dir}/${module}/nilum-${version}-${sha}-${suffix^^}.jar"
   done < <(find . -path '*/build/libs/*.jar' ! -name '*-slim.jar' | grep -v '^\./build/libs/')
 
   if [ -f "build/libs/nilum-client-${version}.jar" ]; then
@@ -53,9 +54,9 @@ update_readme() {
 
 Builds for https://github.com/RATR2/nilum
 
-  Last Build: [${build_subject}](https://github.com/RATR2/nilum/commit/${build_sha})
+  Last Build: [\`${build_sha}\`](https://github.com/RATR2/nilum/commit/${build_sha}) ${build_subject}
 
-  Last Commit: [${subject}](https://github.com/RATR2/nilum/commit/${sha})
+  Last Commit: [\`${sha}\`](https://github.com/RATR2/nilum/commit/${sha}) ${subject}
 </div>
 EOF
 }
