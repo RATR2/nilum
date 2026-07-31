@@ -65,7 +65,8 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/nilum ver - Show the plugin version."));
         sender.sendMessage(Component.text("/nilum help - Show this message."));
         sender.sendMessage(Component.text("/nilum reload <models|tcp|config> - Reload part of Nilum."));
-        sender.sendMessage(Component.text("/nilum placemodel <modelId> - Place a model at your location."));
+        sender.sendMessage(Component.text(
+                "/nilum placemodel <modelId> [x] [y] [z] - Place a model. Coordinates default to ~ (your position)."));
         sender.sendMessage(Component.text("/nilum giveitem <modelId> [material] - Give yourself a custom item."));
     }
 
@@ -100,12 +101,23 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /nilum placemodel <modelId>"));
+            sender.sendMessage(Component.text("Usage: /nilum placemodel <modelId> [x] [y] [z]"));
             return true;
         }
 
         String modelId = args[1];
-        Location location = player.getLocation();
+        Location base = player.getLocation();
+        Location location;
+        try {
+            double x = parseCoordinate(args.length > 2 ? args[2] : "~", base.getX());
+            double y = parseCoordinate(args.length > 3 ? args[3] : "~", base.getY());
+            double z = parseCoordinate(args.length > 4 ? args[4] : "~", base.getZ());
+            location = new Location(base.getWorld(), x, y, z, base.getYaw(), base.getPitch());
+        } catch (NumberFormatException e) {
+            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            return true;
+        }
+
         UUID entityId = plugin.modelDisplays().place(location, modelId).orElse(null);
 
         if (entityId == null) {
@@ -115,6 +127,15 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Placed '" + modelId + "' (entity " + entityId + ")."));
         }
         return true;
+    }
+
+    /** Standard Minecraft tilde notation: "~" or "~offset" is relative to base, anything else is absolute. */
+    private static double parseCoordinate(String arg, double base) {
+        if (arg.startsWith("~")) {
+            String offset = arg.substring(1);
+            return offset.isEmpty() ? base : base + Double.parseDouble(offset);
+        }
+        return Double.parseDouble(arg);
     }
 
     private boolean giveItem(CommandSender sender, String[] args) {
@@ -166,6 +187,10 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 3 && args[0].equalsIgnoreCase("giveitem")) {
             return filterByPrefix(Arrays.stream(Material.values()).map(Material::name).toList(), args[2]);
+        }
+
+        if (args.length <= 5 && args[0].equalsIgnoreCase("placemodel")) {
+            return filterByPrefix(List.of("~"), args[args.length - 1]);
         }
 
         return List.of();

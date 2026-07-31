@@ -164,6 +164,8 @@ public final class BbModelParser {
             String name = t.has("name") ? t.get("name").getAsString() : id;
             int width = t.has("width") ? t.get("width").getAsInt() : 0;
             int height = t.has("height") ? t.get("height").getAsInt() : 0;
+            int uvWidth = t.has("uv_width") ? t.get("uv_width").getAsInt() : width;
+            int uvHeight = t.has("uv_height") ? t.get("uv_height").getAsInt() : height;
 
             byte[] pngBytes = new byte[0];
             if (t.has("source")) {
@@ -174,7 +176,7 @@ public final class BbModelParser {
                 }
             }
 
-            textures.add(new BbTexture(id, name, width, height, pngBytes));
+            textures.add(new BbTexture(id, name, width, height, uvWidth, uvHeight, pngBytes));
         }
         return textures;
     }

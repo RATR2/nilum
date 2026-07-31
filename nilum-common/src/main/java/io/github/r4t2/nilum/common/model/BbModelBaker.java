@@ -67,10 +67,18 @@ public final class BbModelBaker {
             }
         }
 
-        float u1 = (float) (face.u1() / model.resolutionWidth());
-        float v1 = (float) (face.v1() / model.resolutionHeight());
-        float u2 = (float) (face.u2() / model.resolutionWidth());
-        float v2 = (float) (face.v2() / model.resolutionHeight());
+        int uvWidth = model.resolutionWidth();
+        int uvHeight = model.resolutionHeight();
+        if (face.textureIndex() != null && face.textureIndex() >= 0 && face.textureIndex() < model.textures().size()) {
+            BbTexture texture = model.textures().get(face.textureIndex());
+            uvWidth = texture.uvWidth();
+            uvHeight = texture.uvHeight();
+        }
+
+        float u1 = (float) (face.u1() / uvWidth);
+        float v1 = (float) (face.v1() / uvHeight);
+        float u2 = (float) (face.u2() / uvWidth);
+        float v2 = (float) (face.v2() / uvHeight);
 
         float[][] uvs = rotateUv(new float[][]{{u1, v1}, {u2, v1}, {u2, v2}, {u1, v2}}, face.rotation());
 

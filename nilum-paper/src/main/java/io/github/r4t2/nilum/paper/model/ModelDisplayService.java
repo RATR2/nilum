@@ -55,6 +55,14 @@ public final class ModelDisplayService {
         ItemDisplay display = location.getWorld().spawn(location, ItemDisplay.class, entity -> {
             entity.setItemStack(ItemStack.empty());
             entity.getPersistentDataContainer().set(NilumKeys.MODEL_ID, PersistentDataType.STRING, modelId);
+            // ItemStack.empty() is the vanilla default, so setItemStack() above never marks the
+            // entity's synced data dirty - the client's Display.renderState() (which vanilla's own
+            // DisplayRenderer.submit() requires to be non-null before it will render anything at
+            // all, custom geometry included) is then never computed and nothing ever draws. Forcing
+            // a real change to a tracked render-state field - shadow strength defaults to 1 - kicks
+            // that off. It's also the shadow we'd want removed anyway, since there's no vanilla item
+            // to cast it.
+            entity.setShadowStrength(0f);
         });
 
         UUID entityId = display.getUniqueId();
