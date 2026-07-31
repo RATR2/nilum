@@ -29,16 +29,22 @@ jobs:
       - name: Classify commit
         id: classify
         run: |
-          IS_BOT="false"
-          if [ "${{ github.actor }}" = "github-actions[bot]" ]; then
-            IS_BOT="true"
-          fi
-
           # Both flags must be their own line (like a git trailer), not just a
           # substring anywhere in the message - otherwise a commit that merely
           # *talks about* "version=X.Y.Z" or "workflows.ignore=true" in prose
           # (e.g. this very line) would trigger itself by accident.
           MSG=$(git log -1 --pretty=%B)
+
+          # Bot detection can't key off github.actor: bump-version.sh pushes with
+          # a real PAT (not the default GITHUB_TOKEN) so its commit actually
+          # retriggers a run, but that means GitHub attributes the push to the
+          # PAT's owner, not github-actions[bot]. The "[ci-bump]" marker
+          # bump-version.sh puts in its own commit message is what's reliable.
+          IS_BOT="false"
+          if echo "$MSG" | grep -q '\[ci-bump\]'; then
+            IS_BOT="true"
+          fi
+
           VERSION=""
           if echo "$MSG" | grep -qxE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?'; then
             VERSION=$(echo "$MSG" | grep -oxE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?' | head -1 | cut -d= -f2)
@@ -56,6 +62,8 @@ jobs:
 
       - name: Bump version
         if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.requested_version != '' && steps.classify.outputs.ignore != 'true'
+        env:
+          NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
         run: scripts/ci/bump-version.sh "${{ steps.classify.outputs.requested_version }}"
 
       - name: Build and mirror commit to nilum-builds
