@@ -10,6 +10,7 @@ import io.github.r4t2.nilum.common.model.ModelLoadError;
 import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.paper.handshake.HandshakeListener;
+import io.github.r4t2.nilum.paper.item.CustomItemService;
 import io.github.r4t2.nilum.paper.logging.PaperConsoleSink;
 import io.github.r4t2.nilum.paper.model.ModelDisplayService;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -24,6 +25,7 @@ public final class NilumPlugin extends JavaPlugin {
     private HandshakeListener handshakeListener;
     private ModelRegistry modelRegistry;
     private ModelDisplayService modelDisplayService;
+    private CustomItemService customItemService;
 
     @Override
     public void onEnable() {
@@ -60,6 +62,7 @@ public final class NilumPlugin extends JavaPlugin {
             logger.error("Failed to scan the models folder", e);
         }
         modelDisplayService = new ModelDisplayService(this, logger, modelRegistry);
+        customItemService = new CustomItemService(modelRegistry);
 
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.HELLO_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.TCP_OFFER_QUALIFIED);
@@ -110,5 +113,9 @@ public final class NilumPlugin extends JavaPlugin {
 
     public ModelDisplayService modelDisplays() {
         return modelDisplayService;
+    }
+
+    public CustomItemService customItems() {
+        return customItemService;
     }
 }
