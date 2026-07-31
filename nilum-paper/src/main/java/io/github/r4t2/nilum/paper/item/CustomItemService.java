@@ -1,28 +1,29 @@
 package io.github.r4t2.nilum.paper.item;
 
 import io.github.r4t2.nilum.common.model.ModelRegistry;
-import io.papermc.paper.datacomponent.DataComponentTypes;
-import io.papermc.paper.datacomponent.item.CustomModelData;
+import io.github.r4t2.nilum.paper.NilumKeys;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
  * Represents a Nilum custom item as a real vanilla ItemStack carrying its
- * model id in the item's {@code custom_model_data} strings list - a real,
- * network-synced Mojang data component, not Bukkit's item PersistentDataContainer
- * (which also reaches the client, but has no stable public format for a client
- * mod to read back without depending on Bukkit-specific internals).
+ * model id in the item's PersistentDataContainer - real per-item NBT (backed
+ * by the {@code custom_data} component's {@code PublicBukkitValues} compound,
+ * confirmed against Paper's own server source), not Minecraft's own item
+ * model / CustomModelData systems. Both of those exist to let a resourcepack
+ * pick which model to show, which needs a client resourcepack (re)load to
+ * update - the opposite of what Nilum is for. This tag is purely our own;
+ * updating a model's actual contents never touches it.
  * <p>
- * Client-side rendering of these items (intercepting item-in-hand/inventory
- * rendering) isn't built yet - that's a different, more invasive rendering
- * subsystem than the world-placed model renderer, and needs its own research pass.
+ * Client-side rendering of these items isn't built yet - that's a different,
+ * more invasive rendering subsystem than the world-placed model renderer,
+ * and needs its own research pass.
  */
 public final class CustomItemService {
-
-    private static final String ID_PREFIX = "nilum:";
 
     private final ModelRegistry modelRegistry;
 
@@ -37,22 +38,18 @@ public final class CustomItemService {
         }
 
         ItemStack item = new ItemStack(baseMaterial);
-        item.setData(DataComponentTypes.CUSTOM_MODEL_DATA, CustomModelData.customModelData().addString(ID_PREFIX + modelId));
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(NilumKeys.MODEL_ID, PersistentDataType.STRING, modelId);
+        item.setItemMeta(meta);
         return Optional.of(item);
     }
 
     /** The Nilum model id an item represents, or empty if it isn't a Nilum custom item. */
     public static Optional<String> modelIdOf(ItemStack item) {
-        CustomModelData data = item.getData(DataComponentTypes.CUSTOM_MODEL_DATA);
-        if (data == null) {
+        if (!item.hasItemMeta()) {
             return Optional.empty();
         }
-
-        List<String> strings = data.strings();
-        if (strings.isEmpty() || !strings.get(0).startsWith(ID_PREFIX)) {
-            return Optional.empty();
-        }
-
-        return Optional.of(strings.get(0).substring(ID_PREFIX.length()));
+        String modelId = item.getItemMeta().getPersistentDataContainer().get(NilumKeys.MODEL_ID, PersistentDataType.STRING);
+        return Optional.ofNullable(modelId);
     }
 }

@@ -9,9 +9,9 @@ import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.model.ProxyMaterialClassifier;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
+import io.github.r4t2.nilum.paper.NilumKeys;
 import io.github.r4t2.nilum.paper.NilumPlugin;
 import org.bukkit.Location;
-import org.bukkit.NamespacedKey;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -30,8 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * group into world-space bounding boxes at placement time.
  */
 public final class ModelDisplayService {
-
-    private static final NamespacedKey MODEL_ID_KEY = new NamespacedKey("nilum", "model_id");
 
     private final NilumPlugin plugin;
     private final NilumLogger logger;
@@ -56,7 +54,7 @@ public final class ModelDisplayService {
 
         ItemDisplay display = location.getWorld().spawn(location, ItemDisplay.class, entity -> {
             entity.setItemStack(ItemStack.empty());
-            entity.getPersistentDataContainer().set(MODEL_ID_KEY, PersistentDataType.STRING, modelId);
+            entity.getPersistentDataContainer().set(NilumKeys.MODEL_ID, PersistentDataType.STRING, modelId);
         });
 
         UUID entityId = display.getUniqueId();
