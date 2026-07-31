@@ -10,6 +10,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -45,6 +46,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             case "reload" -> reload(sender, args);
             case "placemodel" -> placeModel(sender, args);
             case "giveitem" -> giveItem(sender, args);
+            case "giveicon" -> giveIcon(sender, args);
             default -> {
                 sender.sendMessage(Component.text(
                         "Unknown subcommand '" + args[0] + "'. Run /nilum help for a list of commands."));
@@ -64,25 +66,28 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("Nilum commands:"));
         sender.sendMessage(Component.text("/nilum ver - Show the plugin version."));
         sender.sendMessage(Component.text("/nilum help - Show this message."));
-        sender.sendMessage(Component.text("/nilum reload <models|tcp|config> - Reload part of Nilum."));
+        sender.sendMessage(Component.text("/nilum reload <models|icons|tcp|config> - Reload part of Nilum."));
         sender.sendMessage(Component.text(
-                "/nilum placemodel <modelId> [x] [y] [z] - Place a model. Coordinates default to ~ (your position)."));
+                "/nilum placemodel <modelId> [x] [y] [z] [yaw] [pitch] - Place a model. "
+                        + "Coordinates and rotation default to ~ (your position/facing)."));
         sender.sendMessage(Component.text("/nilum giveitem <modelId> [material] - Give yourself a custom item."));
+        sender.sendMessage(Component.text("/nilum giveicon <iconId> [material] - Give yourself an icon-only custom item."));
     }
 
     private boolean reload(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /nilum reload <models|tcp|config>"));
+            sender.sendMessage(Component.text("Usage: /nilum reload <models|icons|tcp|config>"));
             return true;
         }
 
         return switch (args[1].toLowerCase(Locale.ROOT)) {
             case "models" -> reloadAndReport(sender, plugin.reloadModels(), "Models", "reload the models folder");
+            case "icons" -> reloadAndReport(sender, plugin.reloadIcons(), "Icons", "reload the icons folder");
             case "tcp" -> reloadAndReport(sender, plugin.reloadTcp(), "TCP side-channel", "reload the TCP side-channel");
             case "config" -> reloadAndReport(sender, plugin.reloadSettings(), "Config", "reload the config");
             default -> {
                 sender.sendMessage(Component.text(
-                        "Unknown reload target '" + args[1] + "'. Usage: /nilum reload <models|tcp|config>"));
+                        "Unknown reload target '" + args[1] + "'. Usage: /nilum reload <models|icons|tcp|config>"));
                 yield true;
             }
         };
@@ -101,7 +106,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /nilum placemodel <modelId> [x] [y] [z]"));
+            sender.sendMessage(Component.text("Usage: /nilum placemodel <modelId> [x] [y] [z] [yaw] [pitch]"));
             return true;
         }
 
@@ -112,7 +117,9 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             double x = parseCoordinate(args.length > 2 ? args[2] : "~", base.getX());
             double y = parseCoordinate(args.length > 3 ? args[3] : "~", base.getY());
             double z = parseCoordinate(args.length > 4 ? args[4] : "~", base.getZ());
-            location = new Location(base.getWorld(), x, y, z, base.getYaw(), base.getPitch());
+            float yaw = (float) parseCoordinate(args.length > 5 ? args[5] : "~", base.getYaw());
+            float pitch = (float) parseCoordinate(args.length > 6 ? args[6] : "~", base.getPitch());
+            location = new Location(base.getWorld(), x, y, z, yaw, pitch);
         } catch (NumberFormatException e) {
             sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
             return true;
@@ -171,26 +178,75 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean giveIcon(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can be given an item."));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /nilum giveicon <iconId> [material]"));
+            return true;
+        }
+
+        String iconId = args[1];
+        Material baseMaterial = Material.PAPER;
+        if (args.length >= 3) {
+            Material requested = Material.matchMaterial(args[2]);
+            if (requested == null) {
+                sender.sendMessage(Component.text("Unknown material '" + args[2] + "'."));
+                return true;
+            }
+            baseMaterial = requested;
+        }
+
+        Optional<ItemStack> item = plugin.iconItems().createItem(iconId, baseMaterial);
+        if (item.isEmpty()) {
+            sender.sendMessage(Component.text("No loaded icon named '" + iconId
+                    + "' (drop a matching .png file into the plugin's icons folder)."));
+            return true;
+        }
+
+        player.getInventory().addItem(item.get());
+        sender.sendMessage(Component.text("Gave you a '" + iconId + "' icon item (" + baseMaterial + ")."));
+        return true;
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filterByPrefix(List.of("ver", "help", "reload", "placemodel", "giveitem"), args[0]);
+            return filterByPrefix(List.of("ver", "help", "reload", "placemodel", "giveitem", "giveicon"), args[0]);
         }
 
         if (args.length == 2) {
             return switch (args[0].toLowerCase(Locale.ROOT)) {
-                case "reload" -> filterByPrefix(List.of("models", "tcp", "config"), args[1]);
+                case "reload" -> filterByPrefix(List.of("models", "icons", "tcp", "config"), args[1]);
                 case "placemodel", "giveitem" -> filterByPrefix(plugin.models().modelIds(), args[1]);
+                case "giveicon" -> filterByPrefix(plugin.icons().iconIds(), args[1]);
                 default -> List.of();
             };
         }
 
-        if (args.length == 3 && args[0].equalsIgnoreCase("giveitem")) {
+        if (args.length == 3 && (args[0].equalsIgnoreCase("giveitem") || args[0].equalsIgnoreCase("giveicon"))) {
             return filterByPrefix(Arrays.stream(Material.values()).map(Material::name).toList(), args[2]);
         }
 
-        if (args.length <= 5 && args[0].equalsIgnoreCase("placemodel")) {
-            return filterByPrefix(List.of("~"), args[args.length - 1]);
+        if (args.length <= 7 && args[0].equalsIgnoreCase("placemodel")) {
+            List<String> options = new ArrayList<>(List.of("~"));
+            if (sender instanceof Player player) {
+                Location location = player.getLocation();
+                Double rounded = switch (args.length - 1) {
+                    case 2 -> (double) Math.round(location.getX());
+                    case 3 -> (double) Math.round(location.getY());
+                    case 4 -> (double) Math.round(location.getZ());
+                    case 5 -> (double) Math.round(location.getYaw());
+                    case 6 -> (double) Math.round(location.getPitch());
+                    default -> null;
+                };
+                if (rounded != null) {
+                    options.add(String.valueOf(rounded.longValue()));
+                }
+            }
+            return filterByPrefix(options, args[args.length - 1]);
         }
 
         return List.of();
