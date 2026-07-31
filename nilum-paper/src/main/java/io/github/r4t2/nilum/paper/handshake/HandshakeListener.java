@@ -207,14 +207,20 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         NilumTcpServer server = tcpServer;
         if (server != null) {
             String token = server.offerConnection(playerId);
-            player.sendPluginMessage(plugin, NilumChannels.TCP_OFFER_QUALIFIED,
-                    new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode());
+            byte[] tcpOfferBytes = new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode();
+            logger.debug("Sending nilum:tcp_offer to " + player.getName() + " (" + tcpOfferBytes.length + " bytes).");
+            player.sendPluginMessage(plugin, NilumChannels.TCP_OFFER_QUALIFIED, tcpOfferBytes);
+            logger.debug("Sent nilum:tcp_offer to " + player.getName() + ".");
         }
 
+        logger.debug("Broadcasting model displays to " + player.getName() + ".");
         plugin.modelDisplays().sendAllTo(player);
+        logger.debug("Broadcast model displays to " + player.getName() + ".");
 
-        player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED,
-                new AssetManifestPacket(plugin.models().manifest()).encode());
+        byte[] manifestBytes = new AssetManifestPacket(plugin.models().manifest()).encode();
+        logger.debug("Sending nilum:asset_manifest to " + player.getName() + " (" + manifestBytes.length + " bytes).");
+        player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED, manifestBytes);
+        logger.debug("Sent nilum:asset_manifest to " + player.getName() + ".");
     }
 
     private void onTcpUnavailable(Player player) {
