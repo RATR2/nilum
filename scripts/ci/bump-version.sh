@@ -15,13 +15,16 @@ git commit --allow-empty -m "chore: bump version to ${NEW_VERSION} [ci-bump]"
 
 # Pushing with the default GITHUB_TOKEN would succeed but never trigger a new
 # workflow run (GitHub suppresses that specifically to prevent trigger loops).
-# A real PAT doesn't have that restriction, so the bot commit's own push here
-# fires the workflow again - that second run is what actually builds and
-# publishes to nilum-builds (see build.yml's "is_bot == true" step).
+# A real PAT doesn't have that restriction - but actions/checkout leaves a
+# persistent `http.https://github.com/.extraheader` Authorization header (its
+# own GITHUB_TOKEN) in the local git config for the whole job, and that header
+# applies to ANY https://github.com/... URL regardless of embedded userinfo,
+# silently overriding the PAT in the URL below. `-c http...extraheader=`
+# clears it for just this invocation so the PAT is what actually authenticates.
 REMOTE="https://x-access-token:${NILUM_BUILDS_TOKEN}@github.com/RATR2/nilum.git"
-git push "${REMOTE}" HEAD:main
+git -c http.https://github.com/.extraheader= push "${REMOTE}" HEAD:main
 
 # Source-code versioning, separate from nilum-builds' own release/<version>
 # branch of built artifacts: release/<version> here marks the exact nilum
 # source commit that version was cut from.
-git push "${REMOTE}" "HEAD:refs/heads/release/${NEW_VERSION}"
+git -c http.https://github.com/.extraheader= push "${REMOTE}" "HEAD:refs/heads/release/${NEW_VERSION}"
