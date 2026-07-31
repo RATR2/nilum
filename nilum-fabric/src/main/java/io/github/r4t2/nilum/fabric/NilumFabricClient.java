@@ -5,23 +5,38 @@ import io.github.r4t2.nilum.common.asset.AssetSyncSession;
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
 import io.github.r4t2.nilum.common.model.ClientModelPlacements;
 import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
+import io.github.r4t2.nilum.common.protocol.AtlasPatchPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
+import io.github.r4t2.nilum.common.protocol.HudFrameOverridePacket;
+import io.github.r4t2.nilum.common.protocol.HudFramePacket;
+import io.github.r4t2.nilum.common.protocol.HudFrameReleasePacket;
 import io.github.r4t2.nilum.common.protocol.ModEntry;
 import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
+import io.github.r4t2.nilum.common.protocol.RegisterClientVarPacket;
+import io.github.r4t2.nilum.common.protocol.SetClientVarPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.fabric.creativetab.NilumCreativeTabs;
+import io.github.r4t2.nilum.fabric.hud.ClientHudAtlasStore;
+import io.github.r4t2.nilum.fabric.hud.ClientVarStore;
+import io.github.r4t2.nilum.fabric.hud.HudAtlasRenderer;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
+import io.github.r4t2.nilum.fabric.network.NilumAtlasPatchPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
+import io.github.r4t2.nilum.fabric.network.NilumHudFrameOverridePayload;
+import io.github.r4t2.nilum.fabric.network.NilumHudFramePayload;
+import io.github.r4t2.nilum.fabric.network.NilumHudFrameReleasePayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
+import io.github.r4t2.nilum.fabric.network.NilumRegisterClientVarPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
 import io.github.r4t2.nilum.fabric.render.IconAtlas;
@@ -36,8 +51,10 @@ import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EntityType;
 
 import java.net.Socket;
@@ -55,7 +72,10 @@ public final class NilumFabricClient implements ClientModInitializer {
         ClientModelPlacements placements = new ClientModelPlacements();
         IconAtlas iconAtlas = new IconAtlas(
                 FabricLoader.getInstance().getConfigDir().resolve("nilum-cache").resolve("icon_atlas_debug.png"));
-        AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, NilumFabricMod.LOGGER);
+        ClientHudAtlasStore hudAtlases = new ClientHudAtlasStore();
+        ClientVarStore clientVars = new ClientVarStore();
+        AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
+                NilumFabricMod.LOGGER);
         TextureUploader textureUploader = new TextureUploader();
 
         // Deprecated as of fabric-rendering-v1 16.2.10 with no replacement yet; still works.
@@ -70,6 +90,9 @@ public final class NilumFabricClient implements ClientModInitializer {
                         new NilumIconItemModel(original, iconAtlas, iconRenderer), modelStore, modelRenderer)));
 
         NilumCreativeTabs.register(iconAtlas, modelStore);
+
+        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("nilum", "hud_atlas"),
+                new HudAtlasRenderer(hudAtlases, clientVars));
 
         // Registered on both phases: a Paper server sends hello in PLAY, a Fabric-hosted
         // server sends it during configuration (see FabricServerHandshake).
@@ -111,6 +134,36 @@ public final class NilumFabricClient implements ClientModInitializer {
                     .map(mod -> new ModEntry(mod.getMetadata().getId(), mod.getMetadata().getVersion().getFriendlyString()))
                     .toList();
             ClientPlayNetworking.send(new NilumModListPayload(new ModListPacket(mods).encode()));
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumHudFramePayload.TYPE, (payload, context) -> {
+            HudFramePacket packet = HudFramePacket.decode(payload.data());
+            hudAtlases.onHudFrame(packet.atlasId(), packet.elementId(), packet.frame());
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumAtlasPatchPayload.TYPE, (payload, context) -> {
+            AtlasPatchPacket packet = AtlasPatchPacket.decode(payload.data());
+            hudAtlases.onAtlasPatch(packet.atlasId(), packet.elementId(), packet.frame(), packet.png());
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumHudFrameOverridePayload.TYPE, (payload, context) -> {
+            HudFrameOverridePacket packet = HudFrameOverridePacket.decode(payload.data());
+            hudAtlases.onOverride(packet.atlasId(), packet.elementId(), packet.frame(), packet.durationTicks());
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumHudFrameReleasePayload.TYPE, (payload, context) -> {
+            HudFrameReleasePacket packet = HudFrameReleasePacket.decode(payload.data());
+            hudAtlases.onRelease(packet.atlasId(), packet.elementId());
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumRegisterClientVarPayload.TYPE, (payload, context) -> {
+            RegisterClientVarPacket packet = RegisterClientVarPacket.decode(payload.data());
+            clientVars.register(packet.name(), packet.initialValue());
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumSetClientVarPayload.TYPE, (payload, context) -> {
+            SetClientVarPacket packet = SetClientVarPacket.decode(payload.data());
+            clientVars.set(packet.name(), packet.value());
         });
     }
 

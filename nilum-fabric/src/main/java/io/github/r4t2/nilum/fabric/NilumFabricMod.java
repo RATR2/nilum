@@ -8,11 +8,17 @@ import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.fabric.logging.FabricLogSink;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
+import io.github.r4t2.nilum.fabric.network.NilumAtlasPatchPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
+import io.github.r4t2.nilum.fabric.network.NilumHudFrameOverridePayload;
+import io.github.r4t2.nilum.fabric.network.NilumHudFramePayload;
+import io.github.r4t2.nilum.fabric.network.NilumHudFrameReleasePayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
+import io.github.r4t2.nilum.fabric.network.NilumRegisterClientVarPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
 import net.fabricmc.api.ModInitializer;
@@ -66,6 +72,12 @@ public final class NilumFabricMod implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(NilumModelSpawnPayload.TYPE, NilumModelSpawnPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumModListRequestPayload.TYPE, NilumModListRequestPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(NilumModListPayload.TYPE, NilumModListPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumHudFramePayload.TYPE, NilumHudFramePayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumAtlasPatchPayload.TYPE, NilumAtlasPatchPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumHudFrameOverridePayload.TYPE, NilumHudFrameOverridePayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumHudFrameReleasePayload.TYPE, NilumHudFrameReleasePayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumRegisterClientVarPayload.TYPE, NilumRegisterClientVarPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumSetClientVarPayload.TYPE, NilumSetClientVarPayload.CODEC);
 
         LOGGER.info("Nilum initialized.");
     }
