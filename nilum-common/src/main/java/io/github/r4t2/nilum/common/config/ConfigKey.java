@@ -2,6 +2,7 @@ package io.github.r4t2.nilum.common.config;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -50,6 +51,13 @@ public final class ConfigKey<T> {
 
     public static ConfigKey<Boolean> ofBoolean(String section, String key, boolean defaultValue, String comment) {
         return new ConfigKey<>(section, key, defaultValue, comment, Boolean::parseBoolean, String::valueOf, b -> true, null);
+    }
+
+    /** Stores an enum constant as its lowercase name, e.g. {@code BOTH} &lt;-&gt; {@code both}. */
+    public static <E extends Enum<E>> ConfigKey<E> ofEnum(String section, String key, E defaultValue, String comment, Class<E> type) {
+        return new ConfigKey<>(section, key, defaultValue, comment,
+                raw -> Enum.valueOf(type, raw.trim().toUpperCase(Locale.ROOT)),
+                value -> value.name().toLowerCase(Locale.ROOT), value -> true, null);
     }
 
     /** Stores a list of strings as a quoted, bracketed, comma-separated value, e.g. {@code ["a","b"]}. */

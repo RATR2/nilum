@@ -41,7 +41,8 @@ public final class NilumFabricMod implements ModInitializer {
                 "Nilum configuration",
                 new ConfigSchema(List.of(
                         TcpConfig.BIND_ADDRESS, TcpConfig.PORT, TcpConfig.ADVERTISED_HOST,
-                        LoggingConfig.DEBUG, LoggingConfig.MAX_LOG_FILES)),
+                        LoggingConfig.DEBUG, LoggingConfig.WARNING, LoggingConfig.ERROR,
+                        LoggingConfig.MODERATION, LoggingConfig.MAX_LOG_FILES)),
                 List.of());
 
         try {
@@ -51,7 +52,7 @@ public final class NilumFabricMod implements ModInitializer {
         }
 
         LOGGER = new NilumLogger(new FabricLogSink(), configDir.resolve("logs").resolve("nilum.log"),
-                () -> CONFIG.get(LoggingConfig.DEBUG), CONFIG.get(LoggingConfig.MAX_LOG_FILES));
+                LoggingConfig.destinationLookup(CONFIG), CONFIG.get(LoggingConfig.MAX_LOG_FILES));
 
         // Registered on both phases: a Paper server sends hello in PLAY (see HandshakeListener),
         // a Fabric-hosted server sends it during configuration (see FabricServerHandshake).

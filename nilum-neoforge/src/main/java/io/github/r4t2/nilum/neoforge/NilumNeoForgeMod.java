@@ -52,7 +52,8 @@ public final class NilumNeoForgeMod {
                 "Nilum configuration",
                 new ConfigSchema(List.of(
                         TcpConfig.BIND_ADDRESS, TcpConfig.PORT, TcpConfig.ADVERTISED_HOST,
-                        LoggingConfig.DEBUG, LoggingConfig.MAX_LOG_FILES)),
+                        LoggingConfig.DEBUG, LoggingConfig.WARNING, LoggingConfig.ERROR,
+                        LoggingConfig.MODERATION, LoggingConfig.MAX_LOG_FILES)),
                 List.of());
 
         try {
@@ -62,7 +63,7 @@ public final class NilumNeoForgeMod {
         }
 
         this.logger = new NilumLogger(new NeoForgeLogSink(), configDir.resolve("logs").resolve("nilum.log"),
-                () -> configManager.get(LoggingConfig.DEBUG), configManager.get(LoggingConfig.MAX_LOG_FILES));
+                LoggingConfig.destinationLookup(configManager), configManager.get(LoggingConfig.MAX_LOG_FILES));
 
         this.serverHandshake = FMLEnvironment.getDist() == Dist.DEDICATED_SERVER
                 ? NeoForgeServerHandshake.register(modEventBus, configManager, logger, modVersion)

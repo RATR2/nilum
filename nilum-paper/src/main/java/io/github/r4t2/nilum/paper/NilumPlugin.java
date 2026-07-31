@@ -36,9 +36,10 @@ public final class NilumPlugin extends JavaPlugin {
                 "Nilum configuration",
                 new ConfigSchema(List.of(
                         TcpConfig.BIND_ADDRESS, TcpConfig.PORT, TcpConfig.ADVERTISED_HOST,
-                        LoggingConfig.DEBUG, LoggingConfig.MAX_LOG_FILES,
                         ModerationConfig.LOG_CLIENT_MODS, ModerationConfig.DISABLED_MODS,
-                        ModerationConfig.DISABLED_KICK_MESSAGE)),
+                        ModerationConfig.DISABLED_KICK_MESSAGE,
+                        LoggingConfig.DEBUG, LoggingConfig.WARNING, LoggingConfig.ERROR,
+                        LoggingConfig.MODERATION, LoggingConfig.MAX_LOG_FILES)),
                 List.of());
 
         try {
@@ -50,7 +51,7 @@ public final class NilumPlugin extends JavaPlugin {
         }
 
         logger = new NilumLogger(new PaperConsoleSink(), getDataFolder().toPath().resolve("logs").resolve("nilum.log"),
-                () -> configManager.get(LoggingConfig.DEBUG), configManager.get(LoggingConfig.MAX_LOG_FILES));
+                LoggingConfig.destinationLookup(configManager), configManager.get(LoggingConfig.MAX_LOG_FILES));
 
         handshakeListener = new HandshakeListener(this, logger, configManager);
 

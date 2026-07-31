@@ -26,6 +26,7 @@ public final class NilumConsoleFormat {
             case DEBUG, INFO -> "A8A8A8";
             case WARN -> "FFFF99";
             case ERROR -> "FA795F";
+            case MODERATION -> "7FB3FF";
         };
     }
 

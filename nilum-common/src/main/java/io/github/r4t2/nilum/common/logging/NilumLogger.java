@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 public final class NilumLogger {
 
@@ -15,12 +15,12 @@ public final class NilumLogger {
 
     private final NilumLogSink sink;
     private final Path logFile;
-    private final BooleanSupplier debugEnabled;
+    private final Function<NilumLogLevel, LogDestination> destinationOf;
 
-    public NilumLogger(NilumLogSink sink, Path logFile, BooleanSupplier debugEnabled, int maxLogFiles) {
+    public NilumLogger(NilumLogSink sink, Path logFile, Function<NilumLogLevel, LogDestination> destinationOf, int maxLogFiles) {
         this.sink = sink;
         this.logFile = logFile;
-        this.debugEnabled = debugEnabled;
+        this.destinationOf = destinationOf;
         if (logFile != null) {
             createParentDirectories(logFile);
             LogFileRotator.rotateOnStartup(logFile, maxLogFiles);
@@ -40,31 +40,39 @@ public final class NilumLogger {
     }
 
     public void debug(String message) {
-        writeToFile(NilumLogLevel.DEBUG, message);
-        if (debugEnabled.getAsBoolean()) {
-            sink.log(NilumLogLevel.DEBUG, message);
-        }
+        route(NilumLogLevel.DEBUG, message);
     }
 
+    /** Always shown in the console and written to the log file - not configurable. */
     public void info(String message) {
-        log(NilumLogLevel.INFO, message);
+        writeToFile(NilumLogLevel.INFO, message);
+        sink.log(NilumLogLevel.INFO, message);
     }
 
     public void warn(String message) {
-        log(NilumLogLevel.WARN, message);
+        route(NilumLogLevel.WARN, message);
     }
 
     public void error(String message) {
-        log(NilumLogLevel.ERROR, message);
+        route(NilumLogLevel.ERROR, message);
     }
 
     public void error(String message, Throwable cause) {
-        log(NilumLogLevel.ERROR, message + ": " + cause);
+        error(message + ": " + cause);
     }
 
-    private void log(NilumLogLevel level, String message) {
-        writeToFile(level, message);
-        sink.log(level, message);
+    public void moderation(String message) {
+        route(NilumLogLevel.MODERATION, message);
+    }
+
+    private void route(NilumLogLevel level, String message) {
+        LogDestination destination = destinationOf.apply(level);
+        if (destination.toFile()) {
+            writeToFile(level, message);
+        }
+        if (destination.toConsole()) {
+            sink.log(level, message);
+        }
     }
 
     private void writeToFile(NilumLogLevel level, String message) {

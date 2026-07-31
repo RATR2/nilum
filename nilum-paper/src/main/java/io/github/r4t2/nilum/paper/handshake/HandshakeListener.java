@@ -227,7 +227,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
 
     private void onModList(Player player, byte[] message) {
         List<ModEntry> mods = ModListPacket.decode(message).mods();
-        logger.info(player.getName() + "'s client mods (" + mods.size() + "): "
+        logger.moderation(player.getName() + "'s client mods (" + mods.size() + "): "
                 + mods.stream().map(ModEntry::modId).collect(Collectors.joining(", ")));
 
         List<String> disabledMods = configManager.get(ModerationConfig.DISABLED_MODS);
@@ -237,7 +237,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
                 .toList();
 
         if (!found.isEmpty()) {
-            logger.warn(player.getName() + " has disabled mod(s) (" + String.join(", ", found) + "), kicking.");
+            logger.moderation(player.getName() + " has disabled mod(s) (" + String.join(", ", found) + "), kicking.");
             String kickMessage = configManager.get(ModerationConfig.DISABLED_KICK_MESSAGE)
                     .replace("%list of disabled mods found on the client%", String.join(", ", found));
             player.kick(LegacyComponentSerializer.legacyAmpersand().deserialize(kickMessage));

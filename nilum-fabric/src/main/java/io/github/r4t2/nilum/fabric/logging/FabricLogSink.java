@@ -16,7 +16,7 @@ public final class FabricLogSink implements NilumLogSink {
         String formatted = NilumConsoleFormat.ansi(level, rawMessage);
         switch (level) {
             case DEBUG -> LOGGER.debug(formatted);
-            case INFO -> LOGGER.info(formatted);
+            case INFO, MODERATION -> LOGGER.info(formatted);
             case WARN -> LOGGER.warn(formatted);
             case ERROR -> LOGGER.error(formatted);
         }

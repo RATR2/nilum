@@ -4,5 +4,6 @@ public enum NilumLogLevel {
     DEBUG,
     INFO,
     WARN,
-    ERROR
+    ERROR,
+    MODERATION
 }
