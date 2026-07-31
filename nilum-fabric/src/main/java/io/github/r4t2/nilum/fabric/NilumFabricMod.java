@@ -6,7 +6,6 @@ import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.NilumConfigVersion;
 import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
-import io.github.r4t2.nilum.fabric.handshake.FabricServerHandshake;
 import io.github.r4t2.nilum.fabric.logging.FabricLogSink;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
@@ -23,10 +22,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Common entrypoint: runs regardless of physical side. Registers the shared
- * payload types/codecs and the Tier 2 server-side handshake. {@code CONFIG}
- * and {@code LOGGER} are static since Fabric gives entrypoints no way to pass
- * objects to each other directly.
+ * Common entrypoint: runs regardless of physical side, registers the shared payload types/codecs.
  */
 public final class NilumFabricMod implements ModInitializer {
 
@@ -55,14 +51,12 @@ public final class NilumFabricMod implements ModInitializer {
         LOGGER = new NilumLogger(new FabricLogSink(), configDir.resolve("nilum.log"),
                 () -> CONFIG.get(LoggingConfig.DEBUG), CONFIG.get(LoggingConfig.MAX_LOG_FILES));
 
-        PayloadTypeRegistry.playS2C().register(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC);
+        PayloadTypeRegistry.configurationS2C().register(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
+        PayloadTypeRegistry.configurationC2S().register(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumTcpOfferPayload.TYPE, NilumTcpOfferPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumAssetManifestPayload.TYPE, NilumAssetManifestPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumModelSpawnPayload.TYPE, NilumModelSpawnPayload.CODEC);
-
-        FabricServerHandshake.register(CONFIG, LOGGER);
 
         LOGGER.info("Nilum initialized.");
     }

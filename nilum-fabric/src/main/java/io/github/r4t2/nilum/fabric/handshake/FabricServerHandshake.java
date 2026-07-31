@@ -3,22 +3,26 @@ package io.github.r4t2.nilum.fabric.handshake;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
+import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpServer;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
-import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.FabricServerConfigurationNetworkHandler;
+import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -27,21 +31,16 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * sends {@code nilum:hello} on join and kicks players who don't
- * respond with {@code nilum:hello_ack} within 60 ticks, when this instance
- * is running as a Fabric server.
+ * Runs only on a Fabric dedicated server, and handles the handshake between server and client.
  */
 public final class FabricServerHandshake {
 
-    private static final long TIMEOUT_TICKS = 60L;
-    private static final String PROTOCOL_VERSION = "1.0.0";
-    private static final String REQUIRES_MOD_MESSAGE =
-            "This server requires Nilum. Get it at: https://github.com/RATR2/nilum";
+    private static final long TIMEOUT_TICKS = HandshakeProtocol.TIMEOUT_MILLIS / 50L;
 
     private final NilumConfigManager configManager;
     private final NilumLogger logger;
 
-    private final Map<UUID, Long> pendingDeadlines = new ConcurrentHashMap<>();
+    private final Map<UUID, PendingHandshake> pendingHandshakes = new ConcurrentHashMap<>();
     private final Map<UUID, HelloAckPacket> acknowledged = new ConcurrentHashMap<>();
     private final Map<UUID, Socket> tcpConnections = new ConcurrentHashMap<>();
     private volatile long currentTick = 0L;
@@ -50,6 +49,9 @@ public final class FabricServerHandshake {
     private volatile NilumTcpServer tcpServer;
     private volatile String tcpAdvertisedHost;
     private volatile int tcpPort;
+
+    private record PendingHandshake(ServerConfigurationPacketListenerImpl handler, long deadlineTick) {
+    }
 
     private FabricServerHandshake(NilumConfigManager configManager, NilumLogger logger) {
         this.configManager = configManager;
@@ -60,14 +62,13 @@ public final class FabricServerHandshake {
         FabricServerHandshake handshake = new FabricServerHandshake(configManager, logger);
         handshake.applyTcpConfig();
 
-        ServerPlayNetworking.registerGlobalReceiver(NilumHelloAckPayload.TYPE,
-                (payload, context) -> handshake.onHelloAck(context.player(), payload));
+        ServerConfigurationConnectionEvents.CONFIGURE.register(handshake::onConfigure);
+        ServerConfigurationNetworking.registerGlobalReceiver(NilumHelloAckPayload.TYPE, handshake::onHelloAck);
 
         ServerPlayNetworking.registerGlobalReceiver(NilumTcpUnavailablePayload.TYPE,
                 (payload, context) -> handshake.onTcpUnavailable(context.player()));
 
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
-                handshake.onJoin(handler.getPlayer()));
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> handshake.onJoin(handler.getPlayer()));
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
                 handshake.onDisconnect(handler.getPlayer().getUUID()));
@@ -120,14 +121,47 @@ public final class FabricServerHandshake {
         return serverModVersion;
     }
 
+    private void onConfigure(ServerConfigurationPacketListenerImpl handler, MinecraftServer server) {
+        UUID playerId = handler.getOwner().id();
+        pendingHandshakes.put(playerId, new PendingHandshake(handler, currentTick + TIMEOUT_TICKS));
+
+        ((FabricServerConfigurationNetworkHandler) handler)
+                .addTask(new NilumHandshakeTask(new HelloPacket(HandshakeProtocol.PROTOCOL_VERSION, serverModVersion())));
+    }
+
+    private void onHelloAck(NilumHelloAckPayload payload, ServerConfigurationNetworking.Context context) {
+        ServerConfigurationPacketListenerImpl handler = context.networkHandler();
+        UUID playerId = handler.getOwner().id();
+        pendingHandshakes.remove(playerId);
+
+        HelloAckPacket ack = HelloAckPacket.decode(payload.data());
+
+        if (SemanticVersions.isOlder(ack.modVersion(), serverModVersion())) {
+            logger.warn(handler.getOwner().name() + "'s Nilum version (" + ack.modVersion()
+                    + ") is older than this server's (" + serverModVersion() + "), kicking.");
+            handler.disconnect(Component.literal(HandshakeProtocol.tooOldMessage(ack.modVersion(), serverModVersion())));
+            return;
+        }
+
+        acknowledged.put(playerId, ack);
+        logger.info(handler.getOwner().name() + " completed the Nilum handshake (loader=" + ack.loader()
+                + ", version=" + ack.modVersion() + ").");
+
+        ((FabricServerConfigurationNetworkHandler) handler).completeTask(NilumHandshakeTask.TYPE);
+    }
+
     private void onJoin(ServerPlayer player) {
-        ServerPlayNetworking.send(player, new NilumHelloPayload(
-                new HelloPacket(PROTOCOL_VERSION, serverModVersion()).encode()));
-        pendingDeadlines.put(player.getUUID(), currentTick + TIMEOUT_TICKS);
+        NilumTcpServer server = tcpServer;
+        if (server != null) {
+            UUID playerId = player.getUUID();
+            String token = server.offerConnection(playerId);
+            ServerPlayNetworking.send(player, new NilumTcpOfferPayload(
+                    new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode()));
+        }
     }
 
     private void onDisconnect(UUID playerId) {
-        pendingDeadlines.remove(playerId);
+        pendingHandshakes.remove(playerId);
         acknowledged.remove(playerId);
         NilumTcpServer server = tcpServer;
         if (server != null) {
@@ -142,44 +176,15 @@ public final class FabricServerHandshake {
     private void onServerTick(MinecraftServer server) {
         currentTick++;
 
-        pendingDeadlines.entrySet().removeIf(entry -> {
-            if (currentTick < entry.getValue()) {
+        pendingHandshakes.entrySet().removeIf(entry -> {
+            if (currentTick < entry.getValue().deadlineTick()) {
                 return false;
             }
-            ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
-            if (player != null) {
-                logger.warn(player.getName().getString() + " didn't respond to the handshake in time, kicking.");
-                player.connection.disconnect(Component.literal(REQUIRES_MOD_MESSAGE));
-            }
+            ServerConfigurationPacketListenerImpl handler = entry.getValue().handler();
+            logger.warn(handler.getOwner().name() + " didn't respond to the handshake in time, kicking.");
+            handler.disconnect(Component.literal(HandshakeProtocol.REQUIRES_MOD_MESSAGE));
             return true;
         });
-    }
-
-    private void onHelloAck(ServerPlayer player, NilumHelloAckPayload payload) {
-        UUID playerId = player.getUUID();
-        pendingDeadlines.remove(playerId);
-
-        HelloAckPacket ack = HelloAckPacket.decode(payload.data());
-
-        if (SemanticVersions.isOlder(ack.modVersion(), serverModVersion())) {
-            logger.warn(player.getName().getString() + "'s Nilum version (" + ack.modVersion()
-                    + ") is older than this server's (" + serverModVersion() + "), kicking.");
-            player.connection.disconnect(Component.literal(
-                    "Your Nilum version (" + ack.modVersion() + ") is too old for this server, which requires "
-                            + serverModVersion() + " or newer. Get it at: https://github.com/RATR2/nilum"));
-            return;
-        }
-
-        acknowledged.put(playerId, ack);
-        logger.info(player.getName().getString() + " completed the Nilum handshake (loader=" + ack.loader()
-                + ", version=" + ack.modVersion() + ").");
-
-        NilumTcpServer server = tcpServer;
-        if (server != null) {
-            String token = server.offerConnection(playerId);
-            ServerPlayNetworking.send(player, new NilumTcpOfferPayload(
-                    new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode()));
-        }
     }
 
     private void onTcpUnavailable(ServerPlayer player) {

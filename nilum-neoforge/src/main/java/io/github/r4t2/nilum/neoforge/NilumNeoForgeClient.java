@@ -6,6 +6,7 @@ import io.github.r4t2.nilum.common.asset.ClientModelStore;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.common.model.ClientModelPlacements;
 import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
+import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
@@ -23,17 +24,15 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.net.Socket;
 
 /**
- * Client-only handling for the handshake, TCP side-channel offer, and asset
- * manifest/model-spawn tracking. Data plumbing only for now - there's no
- * custom renderer here yet, unlike nilum-fabric.
+ * Client-only handling for the handshake, TCP offer, and asset manifest/model-spawn tracking.
  */
 final class NilumNeoForgeClient {
 
-    private static final String PROTOCOL_VERSION = "1.0.0";
     private static final int TCP_CONNECT_TIMEOUT_MILLIS = 5000;
 
     private NilumNeoForgeClient() {
@@ -46,7 +45,7 @@ final class NilumNeoForgeClient {
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, logger);
 
         modEventBus.addListener((RegisterClientPayloadHandlersEvent event) -> {
-            event.register(NilumHelloPayload.TYPE, (payload, context) -> handleHello(payload, logger, modVersion));
+            event.register(NilumHelloPayload.TYPE, (payload, context) -> handleHello(payload, context, logger, modVersion));
             event.register(NilumTcpOfferPayload.TYPE, (payload, context) -> handleTcpOffer(payload, logger, assetSync));
             event.register(NilumAssetManifestPayload.TYPE, (payload, context) ->
                     assetSync.onManifest(AssetManifestPacket.decode(payload.data()).entries()));
@@ -57,7 +56,7 @@ final class NilumNeoForgeClient {
         });
     }
 
-    private static void handleHello(NilumHelloPayload payload, NilumLogger logger, String modVersion) {
+    private static void handleHello(NilumHelloPayload payload, IPayloadContext context, NilumLogger logger, String modVersion) {
         HelloPacket hello = HelloPacket.decode(payload.data());
 
         if (SemanticVersions.isNewer(modVersion, hello.serverModVersion())) {
@@ -68,13 +67,15 @@ final class NilumNeoForgeClient {
         HelloAckPacket ack = new HelloAckPacket(
                 "neoforge",
                 modVersion,
-                PROTOCOL_VERSION,
+                HandshakeProtocol.PROTOCOL_VERSION,
                 false,
                 false,
                 "vanilla"
         );
 
-        ClientPacketDistributor.sendToServer(new NilumHelloAckPayload(ack.encode()));
+        // Sent during configuration - Minecraft.getInstance().getConnection() (used by
+        // ClientPacketDistributor) is the play listener and is null at this point.
+        context.reply(new NilumHelloAckPayload(ack.encode()));
     }
 
     private static void handleTcpOffer(NilumTcpOfferPayload payload, NilumLogger logger, AssetSyncSession assetSync) {

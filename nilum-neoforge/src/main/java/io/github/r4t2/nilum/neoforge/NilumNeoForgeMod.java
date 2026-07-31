@@ -15,6 +15,7 @@ import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -28,15 +29,12 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Common entrypoint: runs regardless of physical side, so this class must
- * never reference client-only classes directly or transitively. Registers
- * the payload types/codecs and the Tier 3 server-side handshake.
+ * Common entrypoint: runs regardless of physical side, registers the shared payload types/codecs.
  */
 @Mod(NilumNeoForgeMod.MOD_ID)
 public final class NilumNeoForgeMod {
 
     public static final String MOD_ID = "nilum";
-    private static final String PROTOCOL_VERSION = "1.0.0";
 
     private final NilumConfigManager configManager;
     private final NilumLogger logger;
@@ -64,7 +62,9 @@ public final class NilumNeoForgeMod {
         this.logger = new NilumLogger(new NeoForgeLogSink(), configDir.resolve("nilum.log"),
                 () -> configManager.get(LoggingConfig.DEBUG), configManager.get(LoggingConfig.MAX_LOG_FILES));
 
-        this.serverHandshake = NeoForgeServerHandshake.register(configManager, logger, PROTOCOL_VERSION, modVersion);
+        this.serverHandshake = FMLEnvironment.getDist() == Dist.DEDICATED_SERVER
+                ? NeoForgeServerHandshake.register(modEventBus, configManager, logger, modVersion)
+                : null;
 
         modEventBus.addListener(this::onRegisterPayloadHandlers);
 
@@ -77,9 +77,9 @@ public final class NilumNeoForgeMod {
 
     private void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
-        registrar.playToClient(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
-        registrar.playToServer(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC,
-                (payload, context) -> serverHandshake.onHelloAck((ServerPlayer) context.player(), payload));
+        registrar.configurationToClient(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
+        registrar.configurationToServer(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC,
+                (payload, context) -> serverHandshake.onHelloAck(payload, context));
         registrar.playToClient(NilumTcpOfferPayload.TYPE, NilumTcpOfferPayload.CODEC);
         registrar.playToServer(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC,
                 (payload, context) -> serverHandshake.onTcpUnavailable((ServerPlayer) context.player()));

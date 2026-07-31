@@ -5,6 +5,7 @@ import io.github.r4t2.nilum.common.asset.AssetSyncSession;
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
 import io.github.r4t2.nilum.common.model.ClientModelPlacements;
 import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
+import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
@@ -20,6 +21,7 @@ import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
 import io.github.r4t2.nilum.fabric.render.NilumItemDisplayRenderer;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.loader.api.FabricLoader;
@@ -29,7 +31,6 @@ import java.net.Socket;
 
 public final class NilumFabricClient implements ClientModInitializer {
 
-    private static final String PROTOCOL_VERSION = "1.0.0";
     private static final int TCP_CONNECT_TIMEOUT_MILLIS = 5000;
 
     @Override
@@ -44,7 +45,7 @@ public final class NilumFabricClient implements ClientModInitializer {
         EntityRendererRegistry.register(EntityType.ITEM_DISPLAY,
                 context -> new NilumItemDisplayRenderer(context, modelStore, placements));
 
-        ClientPlayNetworking.registerGlobalReceiver(NilumHelloPayload.TYPE, (payload, context) -> {
+        ClientConfigurationNetworking.registerGlobalReceiver(NilumHelloPayload.TYPE, (payload, context) -> {
             HelloPacket hello = HelloPacket.decode(payload.data());
 
             String modVersion = FabricLoader.getInstance()
@@ -60,13 +61,13 @@ public final class NilumFabricClient implements ClientModInitializer {
             HelloAckPacket ack = new HelloAckPacket(
                     "fabric",
                     modVersion,
-                    PROTOCOL_VERSION,
+                    HandshakeProtocol.PROTOCOL_VERSION,
                     false,
                     false,
                     "vanilla"
             );
 
-            ClientPlayNetworking.send(new NilumHelloAckPayload(ack.encode()));
+            ClientConfigurationNetworking.send(new NilumHelloAckPayload(ack.encode()));
         });
 
         ClientPlayNetworking.registerGlobalReceiver(NilumTcpOfferPayload.TYPE, (payload, context) -> {

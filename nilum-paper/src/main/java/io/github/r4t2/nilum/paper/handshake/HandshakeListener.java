@@ -4,6 +4,7 @@ import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
+import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
@@ -12,6 +13,10 @@ import io.github.r4t2.nilum.common.tcp.NilumTcpAssetServer;
 import io.github.r4t2.nilum.common.tcp.NilumTcpServer;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.paper.NilumPlugin;
+import io.papermc.paper.connection.PlayerConfigurationConnection;
+import io.papermc.paper.connection.PlayerConnection;
+import io.papermc.paper.connection.PlayerGameConnection;
+import io.papermc.paper.event.connection.configuration.AsyncPlayerConnectionConfigureEvent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -19,30 +24,30 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.messaging.PluginMessageListener;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.io.IOException;
 import java.net.Socket;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
- * Sends {@code nilum:hello} on join and kicks players who don't respond with
- * {@code nilum:hello_ack} within 60 ticks, or whose reported mod version is
- * older than the server's own.
+ * Blocks a connecting player during configuration until they complete the Nilum handshake.
  */
 public final class HandshakeListener implements Listener, PluginMessageListener {
 
-    private static final long TIMEOUT_TICKS = 60L;
-    private static final String PROTOCOL_VERSION = "1.0.0";
+    private static final long CHANNEL_POLL_INTERVAL_MILLIS = 50L;
 
     private final NilumPlugin plugin;
     private final NilumLogger logger;
     private final NilumConfigManager configManager;
     private final String serverModVersion;
 
-    private final Map<UUID, BukkitTask> pendingHandshakes = new ConcurrentHashMap<>();
+    private final Map<UUID, CompletableFuture<HelloAckPacket>> pendingAcks = new ConcurrentHashMap<>();
     private final Map<UUID, HelloAckPacket> acknowledged = new ConcurrentHashMap<>();
     private final Map<UUID, Socket> tcpConnections = new ConcurrentHashMap<>();
 
@@ -108,73 +113,73 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         }
     }
 
+    /** Async - blocks configuration until the handshake completes, times out, or the client disconnects. */
+    @EventHandler
+    public void onConfigure(AsyncPlayerConnectionConfigureEvent event) {
+        PlayerConfigurationConnection connection = event.getConnection();
+        UUID playerId = connection.getProfile().getId();
+        long deadline = System.currentTimeMillis() + HandshakeProtocol.TIMEOUT_MILLIS;
+
+        if (!awaitChannelRegistration(connection, deadline)) {
+            connection.disconnect(Component.text(HandshakeProtocol.REQUIRES_MOD_MESSAGE));
+            return;
+        }
+
+        CompletableFuture<HelloAckPacket> future = new CompletableFuture<>();
+        pendingAcks.put(playerId, future);
+
+        try {
+            connection.sendPluginMessage(plugin, NilumChannels.HELLO_QUALIFIED,
+                    new HelloPacket(HandshakeProtocol.PROTOCOL_VERSION, serverModVersion).encode());
+
+            HelloAckPacket ack;
+            try {
+                ack = future.get(Math.max(1, deadline - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                connection.disconnect(Component.text(HandshakeProtocol.REQUIRES_MOD_MESSAGE));
+                return;
+            } catch (InterruptedException | ExecutionException e) {
+                Thread.currentThread().interrupt();
+                connection.disconnect(Component.text(HandshakeProtocol.REQUIRES_MOD_MESSAGE));
+                return;
+            }
+
+            if (SemanticVersions.isOlder(ack.modVersion(), serverModVersion)) {
+                logger.warn(connection.getProfile().getName() + "'s Nilum version (" + ack.modVersion()
+                        + ") is older than this server's (" + serverModVersion + "), kicking.");
+                connection.disconnect(Component.text(HandshakeProtocol.tooOldMessage(ack.modVersion(), serverModVersion)));
+                return;
+            }
+
+            acknowledged.put(playerId, ack);
+            logger.info(connection.getProfile().getName() + " completed the Nilum handshake (loader=" + ack.loader()
+                    + ", version=" + ack.modVersion() + ").");
+        } finally {
+            pendingAcks.remove(playerId);
+        }
+    }
+
+    /** Paper drops outgoing plugin messages until the client's channel registration arrives, so wait for it. */
+    private boolean awaitChannelRegistration(PlayerConfigurationConnection connection, long deadline) {
+        while (!connection.getListeningPluginChannels().contains(NilumChannels.HELLO_QUALIFIED)) {
+            if (!connection.isConnected() || System.currentTimeMillis() >= deadline) {
+                return false;
+            }
+            try {
+                Thread.sleep(CHANNEL_POLL_INTERVAL_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The player is guaranteed to have completed the handshake by now. */
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
-
-        player.sendPluginMessage(plugin, NilumChannels.HELLO_QUALIFIED,
-                new HelloPacket(PROTOCOL_VERSION, serverModVersion).encode());
-
-        BukkitTask kickTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            pendingHandshakes.remove(playerId);
-            if (player.isOnline()) {
-                logger.warn(player.getName() + " didn't respond to the handshake in time, kicking.");
-                player.kick(Component.text(
-                        "This server requires Nilum. Get it at: https://github.com/RATR2/nilum"));
-            }
-        }, TIMEOUT_TICKS);
-
-        pendingHandshakes.put(playerId, kickTask);
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        UUID playerId = event.getPlayer().getUniqueId();
-        BukkitTask pending = pendingHandshakes.remove(playerId);
-        if (pending != null) {
-            pending.cancel();
-        }
-        acknowledged.remove(playerId);
-        if (tcpServer != null) {
-            tcpServer.cancelOffer(playerId);
-        }
-        Socket socket = tcpConnections.remove(playerId);
-        if (socket != null) {
-            closeQuietly(socket);
-        }
-    }
-
-    @Override
-    public void onPluginMessageReceived(String channel, Player player, byte[] message) {
-        if (NilumChannels.HELLO_ACK_QUALIFIED.equals(channel)) {
-            onHelloAck(player, message);
-        } else if (NilumChannels.TCP_UNAVAILABLE_QUALIFIED.equals(channel)) {
-            onTcpUnavailable(player);
-        }
-    }
-
-    private void onHelloAck(Player player, byte[] message) {
-        UUID playerId = player.getUniqueId();
-        BukkitTask pending = pendingHandshakes.remove(playerId);
-        if (pending != null) {
-            pending.cancel();
-        }
-
-        HelloAckPacket ack = HelloAckPacket.decode(message);
-
-        if (SemanticVersions.isOlder(ack.modVersion(), serverModVersion)) {
-            logger.warn(player.getName() + "'s Nilum version (" + ack.modVersion()
-                    + ") is older than this server's (" + serverModVersion + "), kicking.");
-            player.kick(Component.text(
-                    "Your Nilum version (" + ack.modVersion() + ") is too old for this server, which requires "
-                            + serverModVersion + " or newer. Get it at: https://github.com/RATR2/nilum"));
-            return;
-        }
-
-        acknowledged.put(playerId, ack);
-        logger.info(player.getName() + " completed the Nilum handshake (loader=" + ack.loader()
-                + ", version=" + ack.modVersion() + ").");
 
         NilumTcpServer server = tcpServer;
         if (server != null) {
@@ -187,6 +192,58 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
 
         player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED,
                 new AssetManifestPacket(plugin.models().manifest()).encode());
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        UUID playerId = event.getPlayer().getUniqueId();
+        acknowledged.remove(playerId);
+        if (tcpServer != null) {
+            tcpServer.cancelOffer(playerId);
+        }
+        Socket socket = tcpConnections.remove(playerId);
+        if (socket != null) {
+            closeQuietly(socket);
+        }
+    }
+
+    @Override
+    public void onPluginMessageReceived(String channel, Player player, byte[] message) {
+        // Handled uniformly via the PlayerConnection overload below, which fires
+        // for both configuring and joined players.
+    }
+
+    @Override
+    public void onPluginMessageReceived(String channel, PlayerConnection connection, byte[] message) {
+        if (NilumChannels.HELLO_ACK_QUALIFIED.equals(channel)) {
+            onHelloAck(connection, message);
+        } else if (NilumChannels.TCP_UNAVAILABLE_QUALIFIED.equals(channel)
+                && connection instanceof PlayerGameConnection gameConnection) {
+            onTcpUnavailable(gameConnection.getPlayer());
+        }
+    }
+
+    private void onHelloAck(PlayerConnection connection, byte[] message) {
+        UUID playerId = uuidOf(connection);
+        if (playerId == null) {
+            return;
+        }
+
+        CompletableFuture<HelloAckPacket> future = pendingAcks.get(playerId);
+        if (future == null) {
+            return;
+        }
+        future.complete(HelloAckPacket.decode(message));
+    }
+
+    private static UUID uuidOf(PlayerConnection connection) {
+        if (connection instanceof PlayerConfigurationConnection configuration) {
+            return configuration.getProfile().getId();
+        }
+        if (connection instanceof PlayerGameConnection game) {
+            return game.getPlayer().getUniqueId();
+        }
+        return null;
     }
 
     private void onTcpUnavailable(Player player) {
