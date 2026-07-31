@@ -77,6 +77,16 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         return acknowledged.get(playerId);
     }
 
+    /** Re-sends the current asset manifest to every handshaked player, so a model reload reaches them live. */
+    public void broadcastAssetManifest() {
+        byte[] data = new AssetManifestPacket(plugin.models().manifest()).encode();
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            if (hasClient(player.getUniqueId())) {
+                player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED, data);
+            }
+        }
+    }
+
     /**
      * Restarts the TCP side-channel to match the current config. Leaves it
      * disabled if {@code tcp.advertised-host} is blank.

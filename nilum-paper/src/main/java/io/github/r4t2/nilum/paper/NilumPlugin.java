@@ -130,6 +130,7 @@ public final class NilumPlugin extends JavaPlugin {
                 logger.warn("Failed to load model '" + error.fileName() + "': " + error.cause());
             }
             logger.info("Loaded " + modelRegistry.modelIds().size() + " model(s) from the models folder.");
+            handshakeListener.broadcastAssetManifest();
             return true;
         } catch (IOException e) {
             logger.error("Failed to reload the models folder", e);
