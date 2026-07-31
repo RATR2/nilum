@@ -93,6 +93,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
     private List<AssetManifestEntry> combinedManifest() {
         List<AssetManifestEntry> entries = new ArrayList<>(plugin.models().manifest());
         entries.addAll(plugin.icons().manifest());
+        entries.addAll(plugin.hudAtlases().manifest());
         return entries;
     }
 
@@ -281,6 +282,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         NilumTcpAssetServer.serve(socket, (kind, id) -> switch (kind) {
             case MODEL -> plugin.models().rawBytes(id).orElse(null);
             case ICON -> plugin.icons().assetBytes(id).orElse(null);
+            case HUD_ATLAS -> plugin.hudAtlases().assetBytes(id).orElse(null);
         });
     }
 

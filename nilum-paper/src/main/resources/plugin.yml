@@ -7,7 +7,7 @@ authors: [r4t2]
 commands:
   nilum:
     description: Nilum admin commands.
-    usage: /nilum <ver|help|reload|placemodel|giveitem|giveicon>
+    usage: /nilum <ver|help|reload|placemodel|giveitem|giveicon|hudframe>
     permission: nilum.admin
 permissions:
   nilum.admin:

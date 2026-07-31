@@ -7,6 +7,7 @@ import io.github.r4t2.nilum.common.config.ModerationConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.NilumConfigVersion;
 import io.github.r4t2.nilum.common.config.TcpConfig;
+import io.github.r4t2.nilum.common.hud.HudAtlasRegistry;
 import io.github.r4t2.nilum.common.icon.IconDisplay;
 import io.github.r4t2.nilum.common.icon.IconRegistry;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
@@ -14,6 +15,7 @@ import io.github.r4t2.nilum.common.model.ModelLoadError;
 import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.paper.handshake.HandshakeListener;
+import io.github.r4t2.nilum.paper.hud.HudAtlasService;
 import io.github.r4t2.nilum.paper.icon.IconsYamlManager;
 import io.github.r4t2.nilum.paper.item.CustomItemService;
 import io.github.r4t2.nilum.paper.item.IconItemService;
@@ -35,6 +37,8 @@ public final class NilumPlugin extends JavaPlugin {
     private ModelRegistry modelRegistry;
     private IconRegistry iconRegistry;
     private IconsYamlManager iconsYamlManager;
+    private HudAtlasRegistry hudAtlasRegistry;
+    private HudAtlasService hudAtlasService;
     private ModelDisplayService modelDisplayService;
     private CustomItemService customItemService;
     private IconItemService iconItemService;
@@ -73,17 +77,26 @@ public final class NilumPlugin extends JavaPlugin {
         modelRegistry = new ModelRegistry();
         iconRegistry = new IconRegistry();
         iconsYamlManager = new IconsYamlManager(getDataFolder().toPath().resolve("icons"), logger);
+        hudAtlasRegistry = new HudAtlasRegistry();
         reloadModels();
         reloadIcons();
+        reloadHudAtlases();
         modelDisplayService = new ModelDisplayService(this, logger, modelRegistry);
         customItemService = new CustomItemService(modelRegistry);
         iconItemService = new IconItemService(iconRegistry);
+        hudAtlasService = new HudAtlasService(this);
 
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.HELLO_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.TCP_OFFER_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.MODEL_SPAWN_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ASSET_MANIFEST_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.MOD_LIST_REQUEST_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.HUD_FRAME_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ATLAS_PATCH_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.HUD_FRAME_OVERRIDE_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.HUD_FRAME_RELEASE_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.REGISTER_CLIENT_VAR_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_CLIENT_VAR_QUALIFIED);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.HELLO_ACK_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.TCP_UNAVAILABLE_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.MOD_LIST_QUALIFIED, handshakeListener);
@@ -167,6 +180,19 @@ public final class NilumPlugin extends JavaPlugin {
         }
     }
 
+    /** @return true if the reload succeeded. */
+    public boolean reloadHudAtlases() {
+        try {
+            hudAtlasRegistry.loadDirectory(getDataFolder().toPath().resolve("hud"));
+            logger.info("Loaded " + hudAtlasRegistry.atlasIds().size() + " HUD atlas(es) from the hud folder.");
+            handshakeListener.broadcastAssetManifest();
+            return true;
+        } catch (IOException e) {
+            logger.error("Failed to reload the hud folder", e);
+            return false;
+        }
+    }
+
     public String buildCommit() {
         return buildCommit;
     }
@@ -206,5 +232,13 @@ public final class NilumPlugin extends JavaPlugin {
 
     public IconItemService iconItems() {
         return iconItemService;
+    }
+
+    public HudAtlasRegistry hudAtlases() {
+        return hudAtlasRegistry;
+    }
+
+    public HudAtlasService hud() {
+        return hudAtlasService;
     }
 }
