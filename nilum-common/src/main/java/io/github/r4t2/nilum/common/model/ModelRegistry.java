@@ -1,5 +1,6 @@
 package io.github.r4t2.nilum.common.model;
 
+import io.github.r4t2.nilum.common.protocol.AssetKind;
 import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
 import io.github.r4t2.nilum.common.util.SHA256;
 
@@ -61,7 +62,7 @@ public final class ModelRegistry {
     public List<AssetManifestEntry> manifest() {
         List<AssetManifestEntry> entries = new ArrayList<>();
         for (Map.Entry<String, String> entry : hashById.entrySet()) {
-            entries.add(new AssetManifestEntry(entry.getKey(), entry.getValue()));
+            entries.add(new AssetManifestEntry(entry.getKey(), entry.getValue(), AssetKind.MODEL));
         }
         return entries;
     }

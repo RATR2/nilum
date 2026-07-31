@@ -6,21 +6,25 @@ import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 
 public final class AssetSyncSession {
 
     private final AssetCache cache;
     private final ClientModelStore modelStore;
+    private final BiConsumer<String, byte[]> iconSink;
     private final NilumLogger logger;
 
     private volatile Socket tcpSocket;
     private volatile List<AssetManifestEntry> pendingManifest;
     private boolean fetching;
 
-    public AssetSyncSession(AssetCache cache, ClientModelStore modelStore, NilumLogger logger) {
+    public AssetSyncSession(AssetCache cache, ClientModelStore modelStore, BiConsumer<String, byte[]> iconSink,
+                             NilumLogger logger) {
         this.cache = cache;
         this.modelStore = modelStore;
+        this.iconSink = iconSink;
         this.logger = logger;
     }
 
@@ -64,14 +68,18 @@ public final class AssetSyncSession {
             }
             try {
                 byte[] data;
-                if (cache.isCached(entry.assetId(), entry.sha256())) {
-                    data = cache.read(entry.assetId());
+                if (cache.isCached(entry.assetId(), entry.kind(), entry.sha256())) {
+                    data = cache.read(entry.assetId(), entry.kind());
                 } else {
-                    data = AssetClient.request(socket, entry.assetId());
-                    cache.write(entry.assetId(), data);
+                    data = AssetClient.request(socket, entry.assetId(), entry.kind());
+                    cache.write(entry.assetId(), entry.kind(), data);
                     logger.info("Cached asset '" + entry.assetId() + "' (" + data.length + " bytes).");
                 }
-                modelStore.load(entry.assetId(), data);
+
+                switch (entry.kind()) {
+                    case MODEL -> modelStore.load(entry.assetId(), data);
+                    case ICON -> iconSink.accept(entry.assetId(), data);
+                }
             } catch (IOException e) {
                 logger.warn("Failed to fetch asset '" + entry.assetId() + "': " + e);
             } catch (RuntimeException e) {

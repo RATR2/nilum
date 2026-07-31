@@ -7,12 +7,13 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-public record AssetRequestPacket(String assetId) {
+public record AssetRequestPacket(String assetId, AssetKind kind) {
 
     public byte[] encode() {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
             out.writeUTF(assetId);
+            out.writeByte(kind.ordinal());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -21,7 +22,9 @@ public record AssetRequestPacket(String assetId) {
 
     public static AssetRequestPacket decode(byte[] bytes) {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
-            return new AssetRequestPacket(in.readUTF());
+            String assetId = in.readUTF();
+            AssetKind kind = AssetKind.values()[in.readByte()];
+            return new AssetRequestPacket(assetId, kind);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -1,5 +1,6 @@
 package io.github.r4t2.nilum.common.asset;
 
+import io.github.r4t2.nilum.common.protocol.AssetKind;
 import io.github.r4t2.nilum.common.util.SHA256;
 
 import java.io.IOException;
@@ -14,8 +15,8 @@ public final class AssetCache {
         this.root = root;
     }
 
-    public boolean isCached(String assetId, String expectedSha256) {
-        Path file = fileFor(assetId);
+    public boolean isCached(String assetId, AssetKind kind, String expectedSha256) {
+        Path file = fileFor(assetId, kind);
         if (!Files.isRegularFile(file)) {
             return false;
         }
@@ -26,17 +27,21 @@ public final class AssetCache {
         }
     }
 
-    public byte[] read(String assetId) throws IOException {
-        return Files.readAllBytes(fileFor(assetId));
+    public byte[] read(String assetId, AssetKind kind) throws IOException {
+        return Files.readAllBytes(fileFor(assetId, kind));
     }
 
-    public void write(String assetId, byte[] data) throws IOException {
-        Path file = fileFor(assetId);
+    public void write(String assetId, AssetKind kind, byte[] data) throws IOException {
+        Path file = fileFor(assetId, kind);
         Files.createDirectories(file.getParent());
         Files.write(file, data);
     }
 
-    private Path fileFor(String assetId) {
-        return root.resolve(assetId + ".bbmodel");
+    private Path fileFor(String assetId, AssetKind kind) {
+        String extension = switch (kind) {
+            case MODEL -> ".bbmodel";
+            case ICON -> ".png";
+        };
+        return root.resolve(assetId + extension);
     }
 }

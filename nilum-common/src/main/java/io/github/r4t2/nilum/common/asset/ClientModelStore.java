@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 
@@ -41,5 +42,9 @@ public final class ClientModelStore {
 
     public Optional<Map<Integer, List<BbBakedQuad>>> bakedQuadsByTexture(String modelId) {
         return Optional.ofNullable(bakedById.get(modelId));
+    }
+
+    public Set<String> modelIds() {
+        return Set.copyOf(modelsById.keySet());
     }
 }

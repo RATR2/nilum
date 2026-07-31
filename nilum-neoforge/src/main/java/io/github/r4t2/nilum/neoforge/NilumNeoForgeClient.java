@@ -48,7 +48,9 @@ final class NilumNeoForgeClient {
         AssetCache assetCache = new AssetCache(FMLPaths.CONFIGDIR.get().resolve("nilum-cache"));
         ClientModelStore modelStore = new ClientModelStore();
         ClientModelPlacements placements = new ClientModelPlacements();
-        AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, logger);
+        AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore,
+                (iconId, data) -> logger.warn("Icon '" + iconId + "' fetched but NeoForge has no icon renderer yet."),
+                logger);
 
         modEventBus.addListener((RegisterClientPayloadHandlersEvent event) -> {
             event.register(NilumHelloPayload.TYPE, (payload, context) -> handleHello(payload, context, logger, modVersion));

@@ -18,6 +18,7 @@ public record AssetManifestPacket(List<AssetManifestEntry> entries) {
             for (AssetManifestEntry entry : entries) {
                 out.writeUTF(entry.assetId());
                 out.writeUTF(entry.sha256());
+                out.writeByte(entry.kind().ordinal());
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -32,7 +33,8 @@ public record AssetManifestPacket(List<AssetManifestEntry> entries) {
             for (int i = 0; i < count; i++) {
                 String assetId = in.readUTF();
                 String sha256 = in.readUTF();
-                entries.add(new AssetManifestEntry(assetId, sha256));
+                AssetKind kind = AssetKind.values()[in.readByte()];
+                entries.add(new AssetManifestEntry(assetId, sha256, kind));
             }
             return new AssetManifestPacket(entries);
         } catch (IOException e) {
