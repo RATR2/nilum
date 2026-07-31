@@ -2,7 +2,6 @@ package io.github.r4t2.nilum.fabric.network;
 
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
@@ -14,7 +13,7 @@ public record NilumTcpOfferPayload(byte[] data) implements CustomPacketPayload {
             new Type<>(Identifier.fromNamespaceAndPath(NilumChannels.NAMESPACE, NilumChannels.TCP_OFFER));
 
     public static final StreamCodec<ByteBuf, NilumTcpOfferPayload> CODEC =
-            ByteBufCodecs.BYTE_ARRAY.map(NilumTcpOfferPayload::new, NilumTcpOfferPayload::data);
+            RawByteArrayCodec.INSTANCE.map(NilumTcpOfferPayload::new, NilumTcpOfferPayload::data);
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

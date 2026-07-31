@@ -148,24 +148,12 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         }
     }
 
-    /**
-     * Diagnostic: deliberately delayed a few ticks past the join-time burst
-     * of every other mod's channel registrations/initial sync payloads, to
-     * test whether that burst - not this payload's own encoding - is what's
-     * corrupting the client's packet framing.
-     */
     private void sendHello(Player player) {
-        if (!helloSent.add(player.getUniqueId())) {
-            return;
-        }
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            if (!player.isOnline()) {
-                return;
-            }
-            logger.debug("Sending nilum:hello to " + player.getName() + " (delayed past join burst).");
+        if (helloSent.add(player.getUniqueId())) {
+            logger.debug("Sending nilum:hello to " + player.getName() + ".");
             player.sendPluginMessage(plugin, NilumChannels.HELLO_QUALIFIED,
                     new HelloPacket(HandshakeProtocol.PROTOCOL_VERSION, serverModVersion).encode());
-        }, 5L);
+        }
     }
 
     @EventHandler

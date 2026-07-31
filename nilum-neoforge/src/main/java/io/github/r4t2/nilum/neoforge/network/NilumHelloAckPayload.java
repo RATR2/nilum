@@ -2,7 +2,6 @@ package io.github.r4t2.nilum.neoforge.network;
 
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
@@ -17,7 +16,7 @@ public record NilumHelloAckPayload(byte[] data) implements CustomPacketPayload {
             new Type<>(Identifier.fromNamespaceAndPath(NilumChannels.NAMESPACE, NilumChannels.HELLO_ACK));
 
     public static final StreamCodec<ByteBuf, NilumHelloAckPayload> CODEC =
-            ByteBufCodecs.BYTE_ARRAY.map(NilumHelloAckPayload::new, NilumHelloAckPayload::data);
+            RawByteArrayCodec.INSTANCE.map(NilumHelloAckPayload::new, NilumHelloAckPayload::data);
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
