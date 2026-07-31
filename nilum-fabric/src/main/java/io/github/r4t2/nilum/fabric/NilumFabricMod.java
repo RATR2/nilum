@@ -51,8 +51,12 @@ public final class NilumFabricMod implements ModInitializer {
         LOGGER = new NilumLogger(new FabricLogSink(), configDir.resolve("nilum.log"),
                 () -> CONFIG.get(LoggingConfig.DEBUG), CONFIG.get(LoggingConfig.MAX_LOG_FILES));
 
+        // Registered on both phases: a Paper server sends hello in PLAY (see HandshakeListener),
+        // a Fabric-hosted server sends it during configuration (see FabricServerHandshake).
         PayloadTypeRegistry.configurationS2C().register(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
         PayloadTypeRegistry.configurationC2S().register(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumTcpOfferPayload.TYPE, NilumTcpOfferPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumAssetManifestPayload.TYPE, NilumAssetManifestPayload.CODEC);

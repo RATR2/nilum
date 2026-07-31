@@ -25,9 +25,11 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworkin
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.world.entity.EntityType;
 
 import java.net.Socket;
+import java.util.function.Consumer;
 
 public final class NilumFabricClient implements ClientModInitializer {
 
@@ -45,30 +47,12 @@ public final class NilumFabricClient implements ClientModInitializer {
         EntityRendererRegistry.register(EntityType.ITEM_DISPLAY,
                 context -> new NilumItemDisplayRenderer(context, modelStore, placements));
 
-        ClientConfigurationNetworking.registerGlobalReceiver(NilumHelloPayload.TYPE, (payload, context) -> {
-            HelloPacket hello = HelloPacket.decode(payload.data());
-
-            String modVersion = FabricLoader.getInstance()
-                    .getModContainer("nilum")
-                    .map(container -> container.getMetadata().getVersion().getFriendlyString())
-                    .orElse("unknown");
-
-            if (SemanticVersions.isNewer(modVersion, hello.serverModVersion())) {
-                NilumFabricMod.LOGGER.warn("This Nilum client (" + modVersion + ") is newer than the server ("
-                        + hello.serverModVersion() + ") - some features may not be available.");
-            }
-
-            HelloAckPacket ack = new HelloAckPacket(
-                    "fabric",
-                    modVersion,
-                    HandshakeProtocol.PROTOCOL_VERSION,
-                    false,
-                    false,
-                    "vanilla"
-            );
-
-            ClientConfigurationNetworking.send(new NilumHelloAckPayload(ack.encode()));
-        });
+        // Registered on both phases: a Paper server sends hello in PLAY, a Fabric-hosted
+        // server sends it during configuration (see FabricServerHandshake).
+        ClientConfigurationNetworking.registerGlobalReceiver(NilumHelloPayload.TYPE, (payload, context) ->
+                handleHello(payload, ClientConfigurationNetworking::send));
+        ClientPlayNetworking.registerGlobalReceiver(NilumHelloPayload.TYPE, (payload, context) ->
+                handleHello(payload, ClientPlayNetworking::send));
 
         ClientPlayNetworking.registerGlobalReceiver(NilumTcpOfferPayload.TYPE, (payload, context) -> {
             TcpOfferPacket offer = TcpOfferPacket.decode(payload.data());
@@ -97,5 +81,30 @@ public final class NilumFabricClient implements ClientModInitializer {
             ModelSpawnPacket spawn = ModelSpawnPacket.decode(payload.data());
             placements.put(spawn.entityId(), spawn.modelId());
         });
+    }
+
+    private static void handleHello(NilumHelloPayload payload, Consumer<CustomPacketPayload> sender) {
+        HelloPacket hello = HelloPacket.decode(payload.data());
+
+        String modVersion = FabricLoader.getInstance()
+                .getModContainer("nilum")
+                .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                .orElse("unknown");
+
+        if (SemanticVersions.isNewer(modVersion, hello.serverModVersion())) {
+            NilumFabricMod.LOGGER.warn("This Nilum client (" + modVersion + ") is newer than the server ("
+                    + hello.serverModVersion() + ") - some features may not be available.");
+        }
+
+        HelloAckPacket ack = new HelloAckPacket(
+                "fabric",
+                modVersion,
+                HandshakeProtocol.PROTOCOL_VERSION,
+                false,
+                false,
+                "vanilla"
+        );
+
+        sender.accept(new NilumHelloAckPayload(ack.encode()));
     }
 }

@@ -73,8 +73,8 @@ final class NilumNeoForgeClient {
                 "vanilla"
         );
 
-        // Sent during configuration - Minecraft.getInstance().getConnection() (used by
-        // ClientPacketDistributor) is the play listener and is null at this point.
+        // context.reply() works regardless of phase; ClientPacketDistributor doesn't - it
+        // requires Minecraft.getInstance().getConnection(), which is null during configuration.
         context.reply(new NilumHelloAckPayload(ack.encode()));
     }
 

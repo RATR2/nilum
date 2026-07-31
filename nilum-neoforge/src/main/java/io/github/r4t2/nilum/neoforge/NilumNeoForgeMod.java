@@ -77,8 +77,13 @@ public final class NilumNeoForgeMod {
 
     private void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
+        // Registered on both phases: a Paper server sends hello in PLAY, a NeoForge-hosted
+        // server sends it during configuration (see NeoForgeServerHandshake).
         registrar.configurationToClient(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
         registrar.configurationToServer(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC,
+                (payload, context) -> serverHandshake.onHelloAck(payload, context));
+        registrar.playToClient(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
+        registrar.playToServer(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC,
                 (payload, context) -> serverHandshake.onHelloAck(payload, context));
         registrar.playToClient(NilumTcpOfferPayload.TYPE, NilumTcpOfferPayload.CODEC);
         registrar.playToServer(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC,
