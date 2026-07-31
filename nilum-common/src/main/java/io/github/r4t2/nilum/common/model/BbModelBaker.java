@@ -26,12 +26,69 @@ public final class BbModelBaker {
         float y1 = (float) (element.to().y() / 16.0);
         float z1 = (float) (element.to().z() / 16.0);
 
+        BbVector3 rotation = element.rotation();
+        boolean rotated = rotation != null
+                && (rotation.x() != 0 || rotation.y() != 0 || rotation.z() != 0);
+        float originX = 0, originY = 0, originZ = 0;
+        if (rotated) {
+            originX = (float) (element.origin().x() / 16.0);
+            originY = (float) (element.origin().y() / 16.0);
+            originZ = (float) (element.origin().z() / 16.0);
+        }
+
         for (Map.Entry<String, BbFace> entry : element.faces().entrySet()) {
             BbBakedQuad quad = bakeFace(entry.getKey(), entry.getValue(), model, x0, y0, z0, x1, y1, z1);
             if (quad != null) {
+                if (rotated) {
+                    quad = rotateQuad(quad, (float) Math.toRadians(rotation.x()), (float) Math.toRadians(rotation.y()),
+                            (float) Math.toRadians(rotation.z()), originX, originY, originZ);
+                }
                 out.add(quad);
             }
         }
+    }
+
+    /**
+     * Blockbench's per-element rotation vector is applied intrinsically X, then Y, then Z (its
+     * default Three.js Euler order - it never overrides this for elements), around the element's
+     * own origin point. Positions rotate around that origin; normals rotate in place (direction
+     * only, no translation).
+     */
+    private static BbBakedQuad rotateQuad(BbBakedQuad quad, float rx, float ry, float rz,
+                                           float originX, float originY, float originZ) {
+        return new BbBakedQuad(
+                rotateVertex(quad.v0(), rx, ry, rz, originX, originY, originZ),
+                rotateVertex(quad.v1(), rx, ry, rz, originX, originY, originZ),
+                rotateVertex(quad.v2(), rx, ry, rz, originX, originY, originZ),
+                rotateVertex(quad.v3(), rx, ry, rz, originX, originY, originZ),
+                quad.textureIndex());
+    }
+
+    private static BbBakedVertex rotateVertex(BbBakedVertex v, float rx, float ry, float rz,
+                                               float originX, float originY, float originZ) {
+        float[] position = rotateXYZ(v.x() - originX, v.y() - originY, v.z() - originZ, rx, ry, rz);
+        float[] normal = rotateXYZ(v.nx(), v.ny(), v.nz(), rx, ry, rz);
+        return new BbBakedVertex(position[0] + originX, position[1] + originY, position[2] + originZ,
+                v.u(), v.v(), normal[0], normal[1], normal[2]);
+    }
+
+    private static float[] rotateXYZ(float x, float y, float z, float rx, float ry, float rz) {
+        float cosX = (float) Math.cos(rx), sinX = (float) Math.sin(rx);
+        float y1 = y * cosX - z * sinX;
+        float z1 = y * sinX + z * cosX;
+        float x1 = x;
+
+        float cosY = (float) Math.cos(ry), sinY = (float) Math.sin(ry);
+        float x2 = x1 * cosY + z1 * sinY;
+        float z2 = -x1 * sinY + z1 * cosY;
+        float y2 = y1;
+
+        float cosZ = (float) Math.cos(rz), sinZ = (float) Math.sin(rz);
+        float x3 = x2 * cosZ - y2 * sinZ;
+        float y3 = x2 * sinZ + y2 * cosZ;
+        float z3 = z2;
+
+        return new float[]{x3, y3, z3};
     }
 
     private static BbBakedQuad bakeFace(String direction, BbFace face, BbModel model,float x0, float y0, float z0, float x1, float y1, float z1) {
