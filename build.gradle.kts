@@ -1,6 +1,6 @@
 allprojects {
     group = "io.github.r4t2.nilum"
-    version = "0.1.1-SNAPSHOT"
+    version = "0.1.1"
 
     repositories {
         mavenCentral()
