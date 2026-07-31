@@ -125,7 +125,10 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         }, TIMEOUT_TICKS);
         pendingHandshakes.put(playerId, kickTask);
 
-        if (player.getListeningPluginChannels().contains(NilumChannels.HELLO_QUALIFIED)) {
+        boolean alreadyRegistered = player.getListeningPluginChannels().contains(NilumChannels.HELLO_QUALIFIED);
+        logger.debug(player.getName() + " joined; nilum:hello already registered=" + alreadyRegistered
+                + "; known channels=" + player.getListeningPluginChannels());
+        if (alreadyRegistered) {
             sendHello(player);
         }
     }
@@ -137,6 +140,8 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
      */
     @EventHandler
     public void onChannelRegister(PlayerRegisterChannelEvent event) {
+        logger.debug(event.getPlayer().getName() + " registered channel " + event.getChannel()
+                + "; pending=" + pendingHandshakes.containsKey(event.getPlayer().getUniqueId()));
         if (NilumChannels.HELLO_QUALIFIED.equals(event.getChannel())
                 && pendingHandshakes.containsKey(event.getPlayer().getUniqueId())) {
             sendHello(event.getPlayer());
@@ -145,6 +150,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
 
     private void sendHello(Player player) {
         if (helloSent.add(player.getUniqueId())) {
+            logger.debug("Sending nilum:hello to " + player.getName() + ".");
             player.sendPluginMessage(plugin, NilumChannels.HELLO_QUALIFIED,
                     new HelloPacket(HandshakeProtocol.PROTOCOL_VERSION, serverModVersion).encode());
         }
@@ -170,6 +176,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
 
     @Override
     public void onPluginMessageReceived(String channel, Player player, byte[] message) {
+        logger.debug("Received plugin message from " + player.getName() + " on channel " + channel + ".");
         if (NilumChannels.HELLO_ACK_QUALIFIED.equals(channel)) {
             onHelloAck(player, message);
         } else if (NilumChannels.TCP_UNAVAILABLE_QUALIFIED.equals(channel)) {
