@@ -13,12 +13,16 @@ import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Uploads a model's embedded PNG textures to the GPU once each, memoized by model id and texture index. */
-final class TextureUploader {
+/**
+ * Uploads a model's embedded PNG textures to the GPU once each, memoized by model id and texture
+ * index. Public/shared (rather than owned by a single renderer) so a model used both in-world
+ * (via the entity renderer) and as a held item doesn't upload the same texture twice.
+ */
+public final class TextureUploader {
 
     private final Map<String, Identifier> uploaded = new ConcurrentHashMap<>();
 
-    Identifier getOrUpload(String modelId, int textureIndex, BbModel model) {
+    public Identifier getOrUpload(String modelId, int textureIndex, BbModel model) {
         String key = modelId + "#" + textureIndex;
         return uploaded.computeIfAbsent(key, ignored -> upload(modelId, textureIndex, model));
     }

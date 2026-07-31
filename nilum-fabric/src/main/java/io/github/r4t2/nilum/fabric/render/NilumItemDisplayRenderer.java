@@ -1,10 +1,8 @@
 package io.github.r4t2.nilum.fabric.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
 import io.github.r4t2.nilum.common.model.BbBakedQuad;
-import io.github.r4t2.nilum.common.model.BbBakedVertex;
 import io.github.r4t2.nilum.common.model.BbModel;
 import io.github.r4t2.nilum.common.model.ClientModelPlacements;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -29,13 +27,14 @@ public final class NilumItemDisplayRenderer extends DisplayRenderer.ItemDisplayR
 
     private final ClientModelStore modelStore;
     private final ClientModelPlacements placements;
-    private final TextureUploader textureUploader = new TextureUploader();
+    private final TextureUploader textureUploader;
 
     public NilumItemDisplayRenderer(EntityRendererProvider.Context context, ClientModelStore modelStore,
-                                     ClientModelPlacements placements) {
+                                     ClientModelPlacements placements, TextureUploader textureUploader) {
         super(context);
         this.modelStore = modelStore;
         this.placements = placements;
+        this.textureUploader = textureUploader;
     }
 
     @Override
@@ -88,21 +87,9 @@ public final class NilumItemDisplayRenderer extends DisplayRenderer.ItemDisplayR
 
             collector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
                 for (BbBakedQuad quad : quads) {
-                    emitVertex(vertexConsumer, pose, quad.v0(), light);
-                    emitVertex(vertexConsumer, pose, quad.v1(), light);
-                    emitVertex(vertexConsumer, pose, quad.v2(), light);
-                    emitVertex(vertexConsumer, pose, quad.v3(), light);
+                    NilumModelGeometry.emitQuad(vertexConsumer, pose, quad, light, OverlayTexture.NO_OVERLAY);
                 }
             });
         }
-    }
-
-    private static void emitVertex(VertexConsumer consumer, PoseStack.Pose pose, BbBakedVertex vertex, int light) {
-        consumer.addVertex(pose, vertex.x(), vertex.y(), vertex.z())
-                .setColor(255, 255, 255, 255)
-                .setUv(vertex.u(), vertex.v())
-                .setOverlay(OverlayTexture.NO_OVERLAY)
-                .setLight(light)
-                .setNormal(pose, vertex.nx(), vertex.ny(), vertex.nz());
     }
 }
