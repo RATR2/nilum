@@ -50,6 +50,7 @@ final class NilumNeoForgeClient {
         ClientModelPlacements placements = new ClientModelPlacements();
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore,
                 (iconId, data) -> logger.warn("Icon '" + iconId + "' fetched but NeoForge has no icon renderer yet."),
+                (atlasId, data) -> logger.warn("HUD atlas '" + atlasId + "' fetched but NeoForge has no HUD renderer yet."),
                 logger);
 
         modEventBus.addListener((RegisterClientPayloadHandlersEvent event) -> {

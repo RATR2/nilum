@@ -41,6 +41,7 @@ public final class AssetCache {
         String extension = switch (kind) {
             case MODEL -> ".bbmodel";
             case ICON -> ".png";
+            case HUD_ATLAS -> ".hudatlas";
         };
         return root.resolve(assetId + extension);
     }

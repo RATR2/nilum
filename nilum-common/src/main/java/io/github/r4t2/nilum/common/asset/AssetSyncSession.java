@@ -14,6 +14,7 @@ public final class AssetSyncSession {
     private final AssetCache cache;
     private final ClientModelStore modelStore;
     private final BiConsumer<String, byte[]> iconSink;
+    private final BiConsumer<String, byte[]> hudAtlasSink;
     private final NilumLogger logger;
 
     private volatile Socket tcpSocket;
@@ -21,10 +22,11 @@ public final class AssetSyncSession {
     private boolean fetching;
 
     public AssetSyncSession(AssetCache cache, ClientModelStore modelStore, BiConsumer<String, byte[]> iconSink,
-                             NilumLogger logger) {
+                             BiConsumer<String, byte[]> hudAtlasSink, NilumLogger logger) {
         this.cache = cache;
         this.modelStore = modelStore;
         this.iconSink = iconSink;
+        this.hudAtlasSink = hudAtlasSink;
         this.logger = logger;
     }
 
@@ -79,6 +81,7 @@ public final class AssetSyncSession {
                 switch (entry.kind()) {
                     case MODEL -> modelStore.load(entry.assetId(), data);
                     case ICON -> iconSink.accept(entry.assetId(), data);
+                    case HUD_ATLAS -> hudAtlasSink.accept(entry.assetId(), data);
                 }
             } catch (IOException e) {
                 logger.warn("Failed to fetch asset '" + entry.assetId() + "': " + e);
