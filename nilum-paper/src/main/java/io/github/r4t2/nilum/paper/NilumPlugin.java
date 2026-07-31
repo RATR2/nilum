@@ -1,6 +1,7 @@
 package io.github.r4t2.nilum.paper;
 
 import io.github.r4t2.nilum.common.config.ConfigSchema;
+import io.github.r4t2.nilum.common.config.HandshakeConfig;
 import io.github.r4t2.nilum.common.config.LoggingConfig;
 import io.github.r4t2.nilum.common.config.ModerationConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
@@ -17,7 +18,9 @@ import io.github.r4t2.nilum.paper.model.ModelDisplayService;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
+import java.util.Properties;
 
 public final class NilumPlugin extends JavaPlugin {
 
@@ -27,15 +30,19 @@ public final class NilumPlugin extends JavaPlugin {
     private ModelRegistry modelRegistry;
     private ModelDisplayService modelDisplayService;
     private CustomItemService customItemService;
+    private String buildCommit = "unknown";
 
     @Override
     public void onEnable() {
+        buildCommit = readBuildCommit();
+
         configManager = new NilumConfigManager(
                 getDataFolder().toPath().resolve("config").resolve("main.yml"),
                 NilumConfigVersion.CURRENT,
                 "Nilum configuration",
                 new ConfigSchema(List.of(
                         TcpConfig.BIND_ADDRESS, TcpConfig.PORT, TcpConfig.ADVERTISED_HOST,
+                        HandshakeConfig.ALLOW_VANILLA_CLIENTS,
                         ModerationConfig.LOG_CLIENT_MODS, ModerationConfig.DISABLED_MODS,
                         ModerationConfig.DISABLED_KICK_MESSAGE,
                         LoggingConfig.DEBUG, LoggingConfig.WARNING, LoggingConfig.ERROR,
@@ -56,15 +63,7 @@ public final class NilumPlugin extends JavaPlugin {
         handshakeListener = new HandshakeListener(this, logger, configManager);
 
         modelRegistry = new ModelRegistry();
-        try {
-            List<ModelLoadError> errors = modelRegistry.loadDirectory(getDataFolder().toPath().resolve("models"));
-            for (ModelLoadError error : errors) {
-                logger.warn("Failed to load model '" + error.fileName() + "': " + error.cause());
-            }
-            logger.info("Loaded " + modelRegistry.modelIds().size() + " model(s) from the models folder.");
-        } catch (IOException e) {
-            logger.error("Failed to scan the models folder", e);
-        }
+        reloadModels();
         modelDisplayService = new ModelDisplayService(this, logger, modelRegistry);
         customItemService = new CustomItemService(modelRegistry);
 
@@ -80,7 +79,9 @@ public final class NilumPlugin extends JavaPlugin {
 
         var command = getCommand("nilum");
         if (command != null) {
-            command.setExecutor(new NilumCommand(this));
+            NilumCommand executor = new NilumCommand(this);
+            command.setExecutor(executor);
+            command.setTabCompleter(executor);
         }
 
         logger.info("Nilum enabled.");
@@ -96,16 +97,60 @@ public final class NilumPlugin extends JavaPlugin {
         }
     }
 
-    /** @return true if the reload succeeded. */
-    public boolean reloadNilumConfig() {
+    /** @return true if reading the config back succeeded. Doesn't touch the TCP socket or models. */
+    public boolean reloadSettings() {
         try {
             configManager.reload();
-            handshakeListener.applyTcpConfig();
             logger.info("Config reloaded.");
             return true;
         } catch (IOException e) {
             logger.error("Failed to reload config", e);
             return false;
+        }
+    }
+
+    /** @return true if the reload succeeded. Re-reads the config first, then restarts the TCP socket. */
+    public boolean reloadTcp() {
+        try {
+            configManager.reload();
+        } catch (IOException e) {
+            logger.error("Failed to reload config", e);
+            return false;
+        }
+        handshakeListener.applyTcpConfig();
+        logger.info("TCP side-channel reloaded.");
+        return true;
+    }
+
+    /** @return true if the reload succeeded. */
+    public boolean reloadModels() {
+        try {
+            List<ModelLoadError> errors = modelRegistry.loadDirectory(getDataFolder().toPath().resolve("models"));
+            for (ModelLoadError error : errors) {
+                logger.warn("Failed to load model '" + error.fileName() + "': " + error.cause());
+            }
+            logger.info("Loaded " + modelRegistry.modelIds().size() + " model(s) from the models folder.");
+            return true;
+        } catch (IOException e) {
+            logger.error("Failed to reload the models folder", e);
+            return false;
+        }
+    }
+
+    public String buildCommit() {
+        return buildCommit;
+    }
+
+    private String readBuildCommit() {
+        try (InputStream in = getClass().getResourceAsStream("/nilum-build.properties")) {
+            if (in == null) {
+                return "unknown";
+            }
+            Properties properties = new Properties();
+            properties.load(in);
+            return properties.getProperty("commit", "unknown");
+        } catch (IOException e) {
+            return "unknown";
         }
     }
 

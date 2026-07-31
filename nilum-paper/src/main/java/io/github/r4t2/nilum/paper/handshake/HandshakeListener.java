@@ -1,5 +1,6 @@
 package io.github.r4t2.nilum.paper.handshake;
 
+import io.github.r4t2.nilum.common.config.HandshakeConfig;
 import io.github.r4t2.nilum.common.config.ModerationConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
@@ -39,7 +40,8 @@ import java.util.stream.Collectors;
 
 /**
  * Sends {@code nilum:hello} on join and kicks players who don't respond with
- * {@code nilum:hello_ack} within the handshake timeout.
+ * {@code nilum:hello_ack} within the handshake timeout, unless
+ * {@code handshake.allow-vanilla-clients} lets them stay anyway.
  */
 public final class HandshakeListener implements Listener, PluginMessageListener {
 
@@ -125,10 +127,15 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         BukkitTask kickTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             pendingHandshakes.remove(playerId);
             helloSent.remove(playerId);
-            if (player.isOnline()) {
-                logger.warn(player.getName() + " didn't respond to the handshake in time, kicking.");
-                player.kick(Component.text(HandshakeProtocol.REQUIRES_MOD_MESSAGE));
+            if (!player.isOnline()) {
+                return;
             }
+            if (configManager.get(HandshakeConfig.ALLOW_VANILLA_CLIENTS)) {
+                logger.info(player.getName() + " joined without Nilum - allowed by config, no custom content for them.");
+                return;
+            }
+            logger.warn(player.getName() + " didn't respond to the handshake in time, kicking.");
+            player.kick(Component.text(HandshakeProtocol.REQUIRES_MOD_MESSAGE));
         }, TIMEOUT_TICKS);
         pendingHandshakes.put(playerId, kickTask);
 
