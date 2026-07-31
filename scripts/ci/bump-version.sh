@@ -26,5 +26,10 @@ git -c http.https://github.com/.extraheader= push "${REMOTE}" HEAD:main
 
 # Source-code versioning, separate from nilum-builds' own release/<version>
 # branch of built artifacts: release/<version> here marks the exact nilum
-# source commit that version was cut from.
-git -c http.https://github.com/.extraheader= push "${REMOTE}" "HEAD:refs/heads/release/${NEW_VERSION}"
+# source commit that version was cut from. Force: actions/checkout only
+# fetches main (shallow, single-branch), so this job's local clone has no
+# tracking ref for release/<version> at all - git's non-force push refuses
+# to touch a remote branch it can't verify as a fast-forward from nothing,
+# even when the actual history is one. release/<version> is a re-creatable
+# marker for exactly one version number, always safe to reset like this.
+git -c http.https://github.com/.extraheader= push --force "${REMOTE}" "HEAD:refs/heads/release/${NEW_VERSION}"
