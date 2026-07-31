@@ -15,6 +15,7 @@ import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
+import io.github.r4t2.nilum.fabric.creativetab.NilumCreativeTabs;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
@@ -23,8 +24,15 @@ import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.fabric.render.IconAtlas;
+import io.github.r4t2.nilum.fabric.render.NilumIconItemModel;
+import io.github.r4t2.nilum.fabric.render.NilumIconSpecialRenderer;
 import io.github.r4t2.nilum.fabric.render.NilumItemDisplayRenderer;
+import io.github.r4t2.nilum.fabric.render.NilumModelItemModel;
+import io.github.r4t2.nilum.fabric.render.NilumModelItemSpecialRenderer;
+import io.github.r4t2.nilum.fabric.render.TextureUploader;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
@@ -45,12 +53,23 @@ public final class NilumFabricClient implements ClientModInitializer {
         AssetCache assetCache = new AssetCache(FabricLoader.getInstance().getConfigDir().resolve("nilum-cache"));
         ClientModelStore modelStore = new ClientModelStore();
         ClientModelPlacements placements = new ClientModelPlacements();
-        AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, NilumFabricMod.LOGGER);
+        IconAtlas iconAtlas = new IconAtlas(
+                FabricLoader.getInstance().getConfigDir().resolve("nilum-cache").resolve("icon_atlas_debug.png"));
+        AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, NilumFabricMod.LOGGER);
+        TextureUploader textureUploader = new TextureUploader();
 
         // Deprecated as of fabric-rendering-v1 16.2.10 with no replacement yet; still works.
         //noinspection deprecation
         EntityRendererRegistry.register(EntityType.ITEM_DISPLAY,
-                context -> new NilumItemDisplayRenderer(context, modelStore, placements));
+                context -> new NilumItemDisplayRenderer(context, modelStore, placements, textureUploader));
+
+        NilumIconSpecialRenderer iconRenderer = new NilumIconSpecialRenderer(iconAtlas);
+        NilumModelItemSpecialRenderer modelRenderer = new NilumModelItemSpecialRenderer(modelStore, textureUploader);
+        ModelLoadingPlugin.register(context -> context.modifyItemModelAfterBake().register(
+                (original, ctx) -> new NilumModelItemModel(
+                        new NilumIconItemModel(original, iconAtlas, iconRenderer), modelStore, modelRenderer)));
+
+        NilumCreativeTabs.register(iconAtlas, modelStore);
 
         // Registered on both phases: a Paper server sends hello in PLAY, a Fabric-hosted
         // server sends it during configuration (see FabricServerHandshake).
