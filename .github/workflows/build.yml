@@ -38,10 +38,13 @@ jobs:
           # Bot detection can't key off github.actor: bump-version.sh pushes with
           # a real PAT (not the default GITHUB_TOKEN) so its commit actually
           # retriggers a run, but that means GitHub attributes the push to the
-          # PAT's owner, not github-actions[bot]. The "[ci-bump]" marker
-          # bump-version.sh puts in its own commit message is what's reliable.
+          # PAT's owner, not github-actions[bot]. Match bump-version.sh's exact
+          # commit *subject* instead - a plain substring check on the full
+          # message would also match any commit that merely *talks about*
+          # "[ci-bump]" in prose (as this comment itself now does).
+          SUBJECT=$(git log -1 --pretty=%s)
           IS_BOT="false"
-          if echo "$MSG" | grep -q '\[ci-bump\]'; then
+          if echo "$SUBJECT" | grep -qxE 'chore: bump version to [0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)? \[ci-bump\]'; then
             IS_BOT="true"
           fi
 
