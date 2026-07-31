@@ -22,6 +22,12 @@ public final class NilumChannels {
     public static final String ASSET_MANIFEST = "asset_manifest";
     public static final String ASSET_MANIFEST_QUALIFIED = NAMESPACE + ":" + ASSET_MANIFEST;
 
+    public static final String MOD_LIST_REQUEST = "mod_list_request";
+    public static final String MOD_LIST_REQUEST_QUALIFIED = NAMESPACE + ":" + MOD_LIST_REQUEST;
+
+    public static final String MOD_LIST = "mod_list";
+    public static final String MOD_LIST_QUALIFIED = NAMESPACE + ":" + MOD_LIST;
+
     private NilumChannels() {
     }
 }

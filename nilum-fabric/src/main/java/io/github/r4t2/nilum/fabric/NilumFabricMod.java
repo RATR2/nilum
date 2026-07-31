@@ -10,6 +10,8 @@ import io.github.r4t2.nilum.fabric.logging.FabricLogSink;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
+import io.github.r4t2.nilum.fabric.network.NilumModListPayload;
+import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
@@ -34,7 +36,7 @@ public final class NilumFabricMod implements ModInitializer {
         Path configDir = FabricLoader.getInstance().getConfigDir().resolve("nilum");
 
         CONFIG = new NilumConfigManager(
-                configDir.resolve("config.yml"),
+                configDir.resolve("config").resolve("main.yml"),
                 NilumConfigVersion.CURRENT,
                 "Nilum configuration",
                 new ConfigSchema(List.of(
@@ -48,7 +50,7 @@ public final class NilumFabricMod implements ModInitializer {
             throw new IllegalStateException("Failed to load Nilum's config", e);
         }
 
-        LOGGER = new NilumLogger(new FabricLogSink(), configDir.resolve("nilum.log"),
+        LOGGER = new NilumLogger(new FabricLogSink(), configDir.resolve("logs").resolve("nilum.log"),
                 () -> CONFIG.get(LoggingConfig.DEBUG), CONFIG.get(LoggingConfig.MAX_LOG_FILES));
 
         // Registered on both phases: a Paper server sends hello in PLAY (see HandshakeListener),
@@ -61,6 +63,8 @@ public final class NilumFabricMod implements ModInitializer {
         PayloadTypeRegistry.playC2S().register(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumAssetManifestPayload.TYPE, NilumAssetManifestPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumModelSpawnPayload.TYPE, NilumModelSpawnPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumModListRequestPayload.TYPE, NilumModListRequestPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(NilumModListPayload.TYPE, NilumModListPayload.CODEC);
 
         LOGGER.info("Nilum initialized.");
     }

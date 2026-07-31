@@ -8,6 +8,8 @@ import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
+import io.github.r4t2.nilum.common.protocol.ModEntry;
+import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
@@ -16,6 +18,8 @@ import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
+import io.github.r4t2.nilum.fabric.network.NilumModListPayload;
+import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
@@ -29,6 +33,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.world.entity.EntityType;
 
 import java.net.Socket;
+import java.util.List;
 import java.util.function.Consumer;
 
 public final class NilumFabricClient implements ClientModInitializer {
@@ -80,6 +85,13 @@ public final class NilumFabricClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(NilumModelSpawnPayload.TYPE, (payload, context) -> {
             ModelSpawnPacket spawn = ModelSpawnPacket.decode(payload.data());
             placements.put(spawn.entityId(), spawn.modelId());
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumModListRequestPayload.TYPE, (payload, context) -> {
+            List<ModEntry> mods = FabricLoader.getInstance().getAllMods().stream()
+                    .map(mod -> new ModEntry(mod.getMetadata().getId(), mod.getMetadata().getVersion().getFriendlyString()))
+                    .toList();
+            ClientPlayNetworking.send(new NilumModListPayload(new ModListPacket(mods).encode()));
         });
     }
 

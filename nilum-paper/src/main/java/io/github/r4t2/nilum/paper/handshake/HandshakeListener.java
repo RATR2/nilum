@@ -1,5 +1,6 @@
 package io.github.r4t2.nilum.paper.handshake;
 
+import io.github.r4t2.nilum.common.config.ModerationConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
@@ -7,6 +8,9 @@ import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
+import io.github.r4t2.nilum.common.protocol.ModEntry;
+import io.github.r4t2.nilum.common.protocol.ModListPacket;
+import io.github.r4t2.nilum.common.protocol.ModListRequestPacket;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpAssetServer;
@@ -14,6 +18,7 @@ import io.github.r4t2.nilum.common.tcp.NilumTcpServer;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.paper.NilumPlugin;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -25,10 +30,12 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Sends {@code nilum:hello} on join and kicks players who don't respond with
@@ -125,10 +132,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         }, TIMEOUT_TICKS);
         pendingHandshakes.put(playerId, kickTask);
 
-        boolean alreadyRegistered = player.getListeningPluginChannels().contains(NilumChannels.HELLO_QUALIFIED);
-        logger.debug(player.getName() + " joined; nilum:hello already registered=" + alreadyRegistered
-                + "; known channels=" + player.getListeningPluginChannels());
-        if (alreadyRegistered) {
+        if (player.getListeningPluginChannels().contains(NilumChannels.HELLO_QUALIFIED)) {
             sendHello(player);
         }
     }
@@ -140,8 +144,6 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
      */
     @EventHandler
     public void onChannelRegister(PlayerRegisterChannelEvent event) {
-        logger.debug(event.getPlayer().getName() + " registered channel " + event.getChannel()
-                + "; pending=" + pendingHandshakes.containsKey(event.getPlayer().getUniqueId()));
         if (NilumChannels.HELLO_QUALIFIED.equals(event.getChannel())
                 && pendingHandshakes.containsKey(event.getPlayer().getUniqueId())) {
             sendHello(event.getPlayer());
@@ -176,11 +178,12 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
 
     @Override
     public void onPluginMessageReceived(String channel, Player player, byte[] message) {
-        logger.debug("Received plugin message from " + player.getName() + " on channel " + channel + ".");
         if (NilumChannels.HELLO_ACK_QUALIFIED.equals(channel)) {
             onHelloAck(player, message);
         } else if (NilumChannels.TCP_UNAVAILABLE_QUALIFIED.equals(channel)) {
             onTcpUnavailable(player);
+        } else if (NilumChannels.MOD_LIST_QUALIFIED.equals(channel)) {
+            onModList(player, message);
         }
     }
 
@@ -207,20 +210,38 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         NilumTcpServer server = tcpServer;
         if (server != null) {
             String token = server.offerConnection(playerId);
-            byte[] tcpOfferBytes = new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode();
-            logger.debug("Sending nilum:tcp_offer to " + player.getName() + " (" + tcpOfferBytes.length + " bytes).");
-            player.sendPluginMessage(plugin, NilumChannels.TCP_OFFER_QUALIFIED, tcpOfferBytes);
-            logger.debug("Sent nilum:tcp_offer to " + player.getName() + ".");
+            player.sendPluginMessage(plugin, NilumChannels.TCP_OFFER_QUALIFIED,
+                    new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode());
         }
 
-        logger.debug("Broadcasting model displays to " + player.getName() + ".");
         plugin.modelDisplays().sendAllTo(player);
-        logger.debug("Broadcast model displays to " + player.getName() + ".");
 
-        byte[] manifestBytes = new AssetManifestPacket(plugin.models().manifest()).encode();
-        logger.debug("Sending nilum:asset_manifest to " + player.getName() + " (" + manifestBytes.length + " bytes).");
-        player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED, manifestBytes);
-        logger.debug("Sent nilum:asset_manifest to " + player.getName() + ".");
+        player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED,
+                new AssetManifestPacket(plugin.models().manifest()).encode());
+
+        if (configManager.get(ModerationConfig.LOG_CLIENT_MODS)) {
+            player.sendPluginMessage(plugin, NilumChannels.MOD_LIST_REQUEST_QUALIFIED,
+                    new ModListRequestPacket().encode());
+        }
+    }
+
+    private void onModList(Player player, byte[] message) {
+        List<ModEntry> mods = ModListPacket.decode(message).mods();
+        logger.info(player.getName() + "'s client mods (" + mods.size() + "): "
+                + mods.stream().map(ModEntry::modId).collect(Collectors.joining(", ")));
+
+        List<String> disabledMods = configManager.get(ModerationConfig.DISABLED_MODS);
+        List<String> found = mods.stream()
+                .map(ModEntry::modId)
+                .filter(disabledMods::contains)
+                .toList();
+
+        if (!found.isEmpty()) {
+            logger.warn(player.getName() + " has disabled mod(s) (" + String.join(", ", found) + "), kicking.");
+            String kickMessage = configManager.get(ModerationConfig.DISABLED_KICK_MESSAGE)
+                    .replace("%list of disabled mods found on the client%", String.join(", ", found));
+            player.kick(LegacyComponentSerializer.legacyAmpersand().deserialize(kickMessage));
+        }
     }
 
     private void onTcpUnavailable(Player player) {

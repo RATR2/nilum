@@ -27,9 +27,7 @@ public final class ModelRegistry {
         hashById.clear();
         List<ModelLoadError> errors = new ArrayList<>();
 
-        if (!Files.isDirectory(directory)) {
-            return errors;
-        }
+        Files.createDirectories(directory);
 
         try (Stream<Path> files = Files.list(directory)) {
             for (Path file : files.filter(ModelRegistry::isBbModelFile).toList()) {

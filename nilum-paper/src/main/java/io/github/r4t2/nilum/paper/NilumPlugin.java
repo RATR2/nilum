@@ -2,6 +2,7 @@ package io.github.r4t2.nilum.paper;
 
 import io.github.r4t2.nilum.common.config.ConfigSchema;
 import io.github.r4t2.nilum.common.config.LoggingConfig;
+import io.github.r4t2.nilum.common.config.ModerationConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.NilumConfigVersion;
 import io.github.r4t2.nilum.common.config.TcpConfig;
@@ -30,12 +31,14 @@ public final class NilumPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         configManager = new NilumConfigManager(
-                getDataFolder().toPath().resolve("config.yml"),
+                getDataFolder().toPath().resolve("config").resolve("main.yml"),
                 NilumConfigVersion.CURRENT,
                 "Nilum configuration",
                 new ConfigSchema(List.of(
                         TcpConfig.BIND_ADDRESS, TcpConfig.PORT, TcpConfig.ADVERTISED_HOST,
-                        LoggingConfig.DEBUG, LoggingConfig.MAX_LOG_FILES)),
+                        LoggingConfig.DEBUG, LoggingConfig.MAX_LOG_FILES,
+                        ModerationConfig.LOG_CLIENT_MODS, ModerationConfig.DISABLED_MODS,
+                        ModerationConfig.DISABLED_KICK_MESSAGE)),
                 List.of());
 
         try {
@@ -46,7 +49,7 @@ public final class NilumPlugin extends JavaPlugin {
             return;
         }
 
-        logger = new NilumLogger(new PaperConsoleSink(), getDataFolder().toPath().resolve("nilum.log"),
+        logger = new NilumLogger(new PaperConsoleSink(), getDataFolder().toPath().resolve("logs").resolve("nilum.log"),
                 () -> configManager.get(LoggingConfig.DEBUG), configManager.get(LoggingConfig.MAX_LOG_FILES));
 
         handshakeListener = new HandshakeListener(this, logger, configManager);
@@ -68,8 +71,10 @@ public final class NilumPlugin extends JavaPlugin {
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.TCP_OFFER_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.MODEL_SPAWN_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ASSET_MANIFEST_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.MOD_LIST_REQUEST_QUALIFIED);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.HELLO_ACK_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.TCP_UNAVAILABLE_QUALIFIED, handshakeListener);
+        getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.MOD_LIST_QUALIFIED, handshakeListener);
         getServer().getPluginManager().registerEvents(handshakeListener, this);
 
         var command = getCommand("nilum");

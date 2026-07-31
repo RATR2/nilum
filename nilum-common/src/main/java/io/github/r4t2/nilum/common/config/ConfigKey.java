@@ -1,5 +1,7 @@
 package io.github.r4t2.nilum.common.config;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -48,6 +50,45 @@ public final class ConfigKey<T> {
 
     public static ConfigKey<Boolean> ofBoolean(String section, String key, boolean defaultValue, String comment) {
         return new ConfigKey<>(section, key, defaultValue, comment, Boolean::parseBoolean, String::valueOf, b -> true, null);
+    }
+
+    /** Stores a list of strings as a quoted, bracketed, comma-separated value, e.g. {@code ["a","b"]}. */
+    public static ConfigKey<List<String>> ofStringList(String section, String key, List<String> defaultValue, String comment) {
+        return new ConfigKey<>(section, key, defaultValue, comment,
+                ConfigKey::parseStringList, ConfigKey::serializeStringList, list -> true, null);
+    }
+
+    private static List<String> parseStringList(String raw) {
+        String trimmed = raw.trim();
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            trimmed = trimmed.substring(1, trimmed.length() - 1);
+        }
+        if (trimmed.isBlank()) {
+            return List.of();
+        }
+
+        List<String> values = new ArrayList<>();
+        for (String part : trimmed.split(",")) {
+            String value = part.trim();
+            if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+                value = value.substring(1, value.length() - 1);
+            }
+            if (!value.isEmpty()) {
+                values.add(value);
+            }
+        }
+        return List.copyOf(values);
+    }
+
+    private static String serializeStringList(List<String> values) {
+        StringBuilder out = new StringBuilder("[");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                out.append(",");
+            }
+            out.append('"').append(values.get(i)).append('"');
+        }
+        return out.append(']').toString();
     }
 
     public String section() {

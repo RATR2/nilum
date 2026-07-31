@@ -22,7 +22,20 @@ public final class NilumLogger {
         this.logFile = logFile;
         this.debugEnabled = debugEnabled;
         if (logFile != null) {
+            createParentDirectories(logFile);
             LogFileRotator.rotateOnStartup(logFile, maxLogFiles);
+        }
+    }
+
+    private static void createParentDirectories(Path logFile) {
+        Path parent = logFile.getParent();
+        if (parent == null) {
+            return;
+        }
+        try {
+            Files.createDirectories(parent);
+        } catch (IOException e) {
+            // Nothing more useful to do - writeToFile() below will just keep failing silently too.
         }
     }
 

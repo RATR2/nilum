@@ -11,6 +11,8 @@ import io.github.r4t2.nilum.neoforge.logging.NeoForgeLogSink;
 import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumModListPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
@@ -45,7 +47,7 @@ public final class NilumNeoForgeMod {
         Path configDir = FMLPaths.CONFIGDIR.get().resolve("nilum");
 
         this.configManager = new NilumConfigManager(
-                configDir.resolve("config.yml"),
+                configDir.resolve("config").resolve("main.yml"),
                 NilumConfigVersion.CURRENT,
                 "Nilum configuration",
                 new ConfigSchema(List.of(
@@ -59,7 +61,7 @@ public final class NilumNeoForgeMod {
             throw new IllegalStateException("Failed to load Nilum's config", e);
         }
 
-        this.logger = new NilumLogger(new NeoForgeLogSink(), configDir.resolve("nilum.log"),
+        this.logger = new NilumLogger(new NeoForgeLogSink(), configDir.resolve("logs").resolve("nilum.log"),
                 () -> configManager.get(LoggingConfig.DEBUG), configManager.get(LoggingConfig.MAX_LOG_FILES));
 
         this.serverHandshake = FMLEnvironment.getDist() == Dist.DEDICATED_SERVER
@@ -90,5 +92,9 @@ public final class NilumNeoForgeMod {
                 (payload, context) -> serverHandshake.onTcpUnavailable((ServerPlayer) context.player()));
         registrar.playToClient(NilumAssetManifestPayload.TYPE, NilumAssetManifestPayload.CODEC);
         registrar.playToClient(NilumModelSpawnPayload.TYPE, NilumModelSpawnPayload.CODEC);
+        registrar.playToClient(NilumModListRequestPayload.TYPE, NilumModListRequestPayload.CODEC);
+        // Only Paper's HandshakeListener currently requests/processes mod lists; a NeoForge-hosted
+        // server never sends the request, so this handler is unreachable there.
+        registrar.playToServer(NilumModListPayload.TYPE, NilumModListPayload.CODEC, (payload, context) -> { });
     }
 }

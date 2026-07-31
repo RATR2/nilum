@@ -9,6 +9,8 @@ import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
+import io.github.r4t2.nilum.common.protocol.ModEntry;
+import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
@@ -17,16 +19,20 @@ import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumModListPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.net.Socket;
+import java.util.List;
 
 /**
  * Client-only handling for the handshake, TCP offer, and asset manifest/model-spawn tracking.
@@ -52,6 +58,12 @@ final class NilumNeoForgeClient {
             event.register(NilumModelSpawnPayload.TYPE, (payload, context) -> {
                 ModelSpawnPacket spawn = ModelSpawnPacket.decode(payload.data());
                 placements.put(spawn.entityId(), spawn.modelId());
+            });
+            event.register(NilumModListRequestPayload.TYPE, (payload, context) -> {
+                List<ModEntry> mods = ModList.get().getMods().stream()
+                        .map(info -> new ModEntry(info.getModId(), info.getVersion().toString()))
+                        .toList();
+                context.reply(new NilumModListPayload(new ModListPacket(mods).encode()));
             });
         });
     }
