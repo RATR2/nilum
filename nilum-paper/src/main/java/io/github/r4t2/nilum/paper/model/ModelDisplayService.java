@@ -45,7 +45,7 @@ public final class ModelDisplayService {
         this.modelRegistry = modelRegistry;
     }
 
-    /** Spawns an anchor entity for {@code modelId} at {@code location}, or empty if that model isn't loaded. */
+    /** Spawns an anchor entity for modelId at location, or empty if that model isn't loaded. */
     public Optional<UUID> place(Location location, String modelId) {
         Optional<BbModel> model = modelRegistry.get(modelId);
         if (model.isEmpty()) {
@@ -56,10 +56,10 @@ public final class ModelDisplayService {
             entity.setItemStack(ItemStack.empty());
             entity.getPersistentDataContainer().set(NilumKeys.MODEL_ID, PersistentDataType.STRING, modelId);
             // ItemStack.empty() is the vanilla default, so setItemStack() above never marks the
-            // entity's synced data dirty - the client's Display.renderState() (which vanilla's own
+            // entity's synced data dirty; the client's Display.renderState() (which vanilla's own
             // DisplayRenderer.submit() requires to be non-null before it will render anything at
             // all, custom geometry included) is then never computed and nothing ever draws. Forcing
-            // a real change to a tracked render-state field - shadow strength defaults to 1 - kicks
+            // a real change to a tracked render-state field (shadow strength defaults to 1) kicks
             // that off. It's also the shadow we'd want removed anyway, since there's no vanilla item
             // to cast it.
             entity.setShadowStrength(0f);
@@ -75,7 +75,7 @@ public final class ModelDisplayService {
         return Optional.of(entityId);
     }
 
-    /** Collision boxes resolved for a placement, in world space - empty if the model has no collision group. */
+    /** Collision boxes resolved for a placement, in world space; empty if the model has no collision group. */
     public List<BoundingBox> collisionBoxesOf(UUID entityId) {
         return collisionBoxes.getOrDefault(entityId, List.of());
     }
@@ -99,14 +99,14 @@ public final class ModelDisplayService {
                         + " collision box(es), classified as " + shape + ".");
             }
             case BbCollisionResult.IntentionallyNonSolid ignored -> {
-                // collision_intent: none - deliberate, no warning per the design doc.
+                // collision_intent: none; deliberate, no warning per the design doc.
             }
             case BbCollisionResult.MissingWarning ignored -> logger.warn("Nilum model '" + modelId
                     + "' has no collision group. It will be non-solid. Add a 'collision' group to define hitboxes.");
         }
     }
 
-    /** Sends every currently-tracked placement to one player - called once they complete the handshake. */
+    /** Sends every currently-tracked placement to one player; called once they complete the handshake. */
     public void sendAllTo(Player player) {
         for (Map.Entry<UUID, String> placement : placements.entrySet()) {
             player.sendPluginMessage(plugin, NilumChannels.MODEL_SPAWN_QUALIFIED,

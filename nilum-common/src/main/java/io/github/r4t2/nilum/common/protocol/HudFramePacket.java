@@ -7,7 +7,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-/** Cheap server -> client frame-index update for a {@code server}-type HUD atlas element. */
+/** Cheap server -> client frame-index update for a server-type HUD atlas element. */
 public record HudFramePacket(String atlasId, String elementId, int frame) {
 
     public byte[] encode() {

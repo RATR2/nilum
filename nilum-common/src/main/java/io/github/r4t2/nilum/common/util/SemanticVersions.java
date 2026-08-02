@@ -7,7 +7,7 @@ public final class SemanticVersions {
     }
 
     /**
-     * @return negative if {@code a < b}, zero if equal, positive if {@code a > b}
+     * @return negative if a < b, zero if equal, positive if a > b
      */
     public static int compare(String a, String b) {
         int[] partsA = numericParts(a);

@@ -13,56 +13,57 @@ public final class ConfigKey<T> {
     private final String key;
     private final T defaultValue;
     private final String comment;
+    private final int sinceVersion;
     private final Function<String, T> parser;
     private final Function<T, String> serializer;
     private final Predicate<T> validator;
     private final String validationMessage;
 
-    private ConfigKey(String section, String key, T defaultValue, String comment,
+    private ConfigKey(String section, String key, T defaultValue, String comment, int sinceVersion,
                        Function<String, T> parser, Function<T, String> serializer,
                        Predicate<T> validator, String validationMessage) {
         this.section = section;
         this.key = key;
         this.defaultValue = defaultValue;
         this.comment = comment;
+        this.sinceVersion = sinceVersion;
         this.parser = parser;
         this.serializer = serializer;
         this.validator = validator;
         this.validationMessage = validationMessage;
     }
 
-    public static ConfigKey<String> ofString(String section, String key, String defaultValue, String comment) {
-        return new ConfigKey<>(section, key, defaultValue, comment, s -> s, s -> s, s -> true, null);
+    public static ConfigKey<String> ofString(String section, String key, String defaultValue, String comment, int sinceVersion) {
+        return new ConfigKey<>(section, key, defaultValue, comment, sinceVersion, s -> s, s -> s, s -> true, null);
     }
 
-    public static ConfigKey<String> ofString(String section, String key, String defaultValue, String comment,
+    public static ConfigKey<String> ofString(String section, String key, String defaultValue, String comment, int sinceVersion,
                                               Predicate<String> validator, String validationMessage) {
-        return new ConfigKey<>(section, key, defaultValue, comment, s -> s, s -> s, validator, validationMessage);
+        return new ConfigKey<>(section, key, defaultValue, comment, sinceVersion, s -> s, s -> s, validator, validationMessage);
     }
 
-    public static ConfigKey<Integer> ofInt(String section, String key, int defaultValue, String comment) {
-        return new ConfigKey<>(section, key, defaultValue, comment, Integer::parseInt, String::valueOf, i -> true, null);
+    public static ConfigKey<Integer> ofInt(String section, String key, int defaultValue, String comment, int sinceVersion) {
+        return new ConfigKey<>(section, key, defaultValue, comment, sinceVersion, Integer::parseInt, String::valueOf, i -> true, null);
     }
 
-    public static ConfigKey<Integer> ofInt(String section, String key, int defaultValue, String comment,
+    public static ConfigKey<Integer> ofInt(String section, String key, int defaultValue, String comment, int sinceVersion,
                                             Predicate<Integer> validator, String validationMessage) {
-        return new ConfigKey<>(section, key, defaultValue, comment, Integer::parseInt, String::valueOf, validator, validationMessage);
+        return new ConfigKey<>(section, key, defaultValue, comment, sinceVersion, Integer::parseInt, String::valueOf, validator, validationMessage);
     }
 
-    public static ConfigKey<Boolean> ofBoolean(String section, String key, boolean defaultValue, String comment) {
-        return new ConfigKey<>(section, key, defaultValue, comment, Boolean::parseBoolean, String::valueOf, b -> true, null);
+    public static ConfigKey<Boolean> ofBoolean(String section, String key, boolean defaultValue, String comment, int sinceVersion) {
+        return new ConfigKey<>(section, key, defaultValue, comment, sinceVersion, Boolean::parseBoolean, String::valueOf, b -> true, null);
     }
 
-    /** Stores an enum constant as its lowercase name, e.g. {@code BOTH} &lt;-&gt; {@code both}. */
-    public static <E extends Enum<E>> ConfigKey<E> ofEnum(String section, String key, E defaultValue, String comment, Class<E> type) {
-        return new ConfigKey<>(section, key, defaultValue, comment,
+    /** Stores an enum constant as its lowercase name. */
+    public static <E extends Enum<E>> ConfigKey<E> ofEnum(String section, String key, E defaultValue, String comment, int sinceVersion, Class<E> type) {
+        return new ConfigKey<>(section, key, defaultValue, comment, sinceVersion,
                 raw -> Enum.valueOf(type, raw.trim().toUpperCase(Locale.ROOT)),
                 value -> value.name().toLowerCase(Locale.ROOT), value -> true, null);
     }
 
-    /** Stores a list of strings as a quoted, bracketed, comma-separated value, e.g. {@code ["a","b"]}. */
-    public static ConfigKey<List<String>> ofStringList(String section, String key, List<String> defaultValue, String comment) {
-        return new ConfigKey<>(section, key, defaultValue, comment,
+    public static ConfigKey<List<String>> ofStringList(String section, String key, List<String> defaultValue, String comment, int sinceVersion) {
+        return new ConfigKey<>(section, key, defaultValue, comment, sinceVersion,
                 ConfigKey::parseStringList, ConfigKey::serializeStringList, list -> true, null);
     }
 
@@ -113,6 +114,11 @@ public final class ConfigKey<T> {
 
     public String comment() {
         return comment;
+    }
+
+    /** The config schema version this key was introduced in; ConfigSchema.currentVersion() is derived from these. */
+    public int sinceVersion() {
+        return sinceVersion;
     }
 
     /** Parses and validates raw text from the file; null means "use the default," caller logs why. */

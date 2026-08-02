@@ -3,22 +3,26 @@ package io.github.r4t2.nilum.fabric;
 import io.github.r4t2.nilum.common.config.ConfigSchema;
 import io.github.r4t2.nilum.common.config.LoggingConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
-import io.github.r4t2.nilum.common.config.NilumConfigVersion;
 import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.fabric.logging.FabricLogSink;
+import io.github.r4t2.nilum.fabric.network.NilumActivateShaderPackPayload;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumAtlasPatchPayload;
+import io.github.r4t2.nilum.fabric.network.NilumDeactivateShaderPackPayload;
+import io.github.r4t2.nilum.fabric.network.NilumChunkBlocksPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHudFrameOverridePayload;
 import io.github.r4t2.nilum.fabric.network.NilumHudFramePayload;
 import io.github.r4t2.nilum.fabric.network.NilumHudFrameReleasePayload;
+import io.github.r4t2.nilum.fabric.network.NilumKeybindPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.fabric.network.NilumRegisterClientVarPayload;
 import io.github.r4t2.nilum.fabric.network.NilumSetClientVarPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetHudTextPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
 import net.fabricmc.api.ModInitializer;
@@ -43,7 +47,6 @@ public final class NilumFabricMod implements ModInitializer {
 
         CONFIG = new NilumConfigManager(
                 configDir.resolve("config").resolve("main.yml"),
-                NilumConfigVersion.CURRENT,
                 "Nilum configuration",
                 new ConfigSchema(List.of(
                         TcpConfig.BIND_ADDRESS, TcpConfig.PORT, TcpConfig.ADVERTISED_HOST,
@@ -78,6 +81,11 @@ public final class NilumFabricMod implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(NilumHudFrameReleasePayload.TYPE, NilumHudFrameReleasePayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumRegisterClientVarPayload.TYPE, NilumRegisterClientVarPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumSetClientVarPayload.TYPE, NilumSetClientVarPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumSetHudTextPayload.TYPE, NilumSetHudTextPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(NilumKeybindPayload.TYPE, NilumKeybindPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumChunkBlocksPayload.TYPE, NilumChunkBlocksPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumActivateShaderPackPayload.TYPE, NilumActivateShaderPackPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumDeactivateShaderPackPayload.TYPE, NilumDeactivateShaderPackPayload.CODEC);
 
         LOGGER.info("Nilum initialized.");
     }

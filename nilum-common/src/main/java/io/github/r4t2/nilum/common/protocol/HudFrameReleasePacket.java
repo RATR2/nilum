@@ -7,7 +7,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-/** Hands a {@code auto} element back after a {@link HudFrameOverridePacket}. */
+/** Hands an auto element back after a HudFrameOverridePacket. */
 public record HudFrameReleasePacket(String atlasId, String elementId) {
 
     public byte[] encode() {

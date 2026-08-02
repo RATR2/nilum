@@ -7,7 +7,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-/** Rewrites one frame's actual pixels - client applies via a sub-region GPU upload, not a full re-upload. */
+/** Rewrites one frame's actual pixels; client applies via a sub-region GPU upload, not a full re-upload. */
 public record AtlasPatchPacket(String atlasId, String elementId, int frame, byte[] png) {
 
     public byte[] encode() {

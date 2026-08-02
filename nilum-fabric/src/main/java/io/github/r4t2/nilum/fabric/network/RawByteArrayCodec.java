@@ -4,10 +4,9 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 
 /**
- * Reads/writes a byte array as the entire remainder of the packet, with no
- * length prefix - matches Paper's raw plugin-message wire format. Unlike
- * {@code ByteBufCodecs.BYTE_ARRAY}, which prefixes a VarInt length and is
- * only wire-compatible when both ends are Fabric.
+ * Reads/writes a byte array as the entire remainder of the packet, with no length prefix,
+ * matching Paper's raw plugin-message wire format. Unlike ByteBufCodecs.BYTE_ARRAY, which
+ * prefixes a VarInt length and is only wire-compatible when both ends are Fabric.
  */
 final class RawByteArrayCodec {
 

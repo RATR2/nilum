@@ -12,10 +12,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Parses a {@code .atlas} descriptor - the design doc's example is YAML, but this reads the same
- * field structure as JSON instead: Gson is already on every platform's runtime classpath (used
- * for {@code .bbmodel} too), while SnakeYAML isn't available on the Fabric/NeoForge client
- * without bundling a new dependency just for this one file format.
+ * Parses a .atlas descriptor as JSON (the design doc's example is YAML) since Gson is already
+ * on every platform's runtime classpath and SnakeYAML isn't, without bundling a new dependency.
  */
 public final class HudAtlasParser {
 
@@ -50,6 +48,18 @@ public final class HudAtlasParser {
     }
 
     private static HudAtlasElement parseElement(String id, JsonObject el) {
+        if (!el.has("type")) {
+            throw new HudAtlasParseException("Element '" + id + "' is missing required 'type' field");
+        }
+        String typeStr = el.get("type").getAsString();
+
+        if (typeStr.equalsIgnoreCase("render_text")) {
+            return parseTextElement(id, el);
+        }
+        return parseSpriteElement(id, el, typeStr);
+    }
+
+    private static HudAtlasElement.Sprite parseSpriteElement(String id, JsonObject el, String typeStr) {
         JsonArray origin = requireArray(el, id, "origin");
         int originX = origin.get(0).getAsInt();
         int originY = origin.get(1).getAsInt();
@@ -64,10 +74,7 @@ public final class HudAtlasParser {
                 ? HudElementLayout.valueOf(el.get("layout").getAsString().toUpperCase(Locale.ROOT))
                 : HudElementLayout.HORIZONTAL;
 
-        if (!el.has("type")) {
-            throw new HudAtlasParseException("Element '" + id + "' is missing required 'type' field");
-        }
-        HudElementType type = HudElementType.valueOf(el.get("type").getAsString().toUpperCase(Locale.ROOT));
+        HudElementType type = HudElementType.valueOf(typeStr.toUpperCase(Locale.ROOT));
 
         Optional<String> clientConnector = el.has("client_connector")
                 ? Optional.of(el.get("client_connector").getAsString())
@@ -78,17 +85,37 @@ public final class HudAtlasParser {
         }
 
         int staticFrame = el.has("static_frame") ? el.get("static_frame").getAsInt() : 0;
+        int[] screenPosition = parseScreenPosition(el);
 
-        int screenX = 0;
-        int screenY = 0;
-        if (el.has("screen_position")) {
-            JsonArray screenPosition = el.getAsJsonArray("screen_position");
-            screenX = screenPosition.get(0).getAsInt();
-            screenY = screenPosition.get(1).getAsInt();
+        return new HudAtlasElement.Sprite(originX, originY, frameWidth, frameHeight, frameCount,
+                layout, type, clientConnector, staticFrame, screenPosition[0], screenPosition[1]);
+    }
+
+    private static HudAtlasElement.Text parseTextElement(String id, JsonObject el) {
+        String font = el.has("font") ? el.get("font").getAsString() : "default";
+
+        Optional<String> clientConnector = el.has("client_connector")
+                ? Optional.of(el.get("client_connector").getAsString())
+                : Optional.empty();
+        Optional<String> serverConnector = el.has("server_connector")
+                ? Optional.of(el.get("server_connector").getAsString())
+                : Optional.empty();
+
+        if (clientConnector.isEmpty() && serverConnector.isEmpty()) {
+            throw new HudAtlasParseException("Element '" + id
+                    + "' is type 'render_text' but has neither 'client_connector' nor 'server_connector'");
         }
 
-        return new HudAtlasElement(originX, originY, frameWidth, frameHeight, frameCount,
-                layout, type, clientConnector, staticFrame, screenX, screenY);
+        int[] screenPosition = parseScreenPosition(el);
+        return new HudAtlasElement.Text(font, clientConnector, serverConnector, screenPosition[0], screenPosition[1]);
+    }
+
+    private static int[] parseScreenPosition(JsonObject el) {
+        if (!el.has("screen_position")) {
+            return new int[] {0, 0};
+        }
+        JsonArray screenPosition = el.getAsJsonArray("screen_position");
+        return new int[] {screenPosition.get(0).getAsInt(), screenPosition.get(1).getAsInt()};
     }
 
     private static JsonArray requireArray(JsonObject el, String id, String field) {

@@ -4,8 +4,10 @@ import io.github.r4t2.nilum.common.asset.AssetCache;
 import io.github.r4t2.nilum.common.asset.AssetSyncSession;
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
 import io.github.r4t2.nilum.common.model.ClientModelPlacements;
+import io.github.r4t2.nilum.common.protocol.ActivateShaderPackPacket;
 import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.AtlasPatchPacket;
+import io.github.r4t2.nilum.common.protocol.ChunkBlocksPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
@@ -17,16 +19,25 @@ import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
 import io.github.r4t2.nilum.common.protocol.RegisterClientVarPacket;
 import io.github.r4t2.nilum.common.protocol.SetClientVarPacket;
+import io.github.r4t2.nilum.common.protocol.SetHudTextPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
+import io.github.r4t2.nilum.fabric.block.ClientBlockRegistry;
+import io.github.r4t2.nilum.fabric.font.FontInstaller;
+import io.github.r4t2.nilum.fabric.block.NilumBlockRenderer;
+import io.github.r4t2.nilum.fabric.block.NilumBlockStateModel;
 import io.github.r4t2.nilum.fabric.creativetab.NilumCreativeTabs;
 import io.github.r4t2.nilum.fabric.hud.ClientHudAtlasStore;
 import io.github.r4t2.nilum.fabric.hud.ClientVarStore;
 import io.github.r4t2.nilum.fabric.hud.HudAtlasRenderer;
+import io.github.r4t2.nilum.fabric.keybind.NilumKeybinds;
+import io.github.r4t2.nilum.fabric.network.NilumActivateShaderPackPayload;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumAtlasPatchPayload;
+import io.github.r4t2.nilum.fabric.network.NilumChunkBlocksPayload;
+import io.github.r4t2.nilum.fabric.network.NilumDeactivateShaderPackPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHudFrameOverridePayload;
@@ -37,28 +48,36 @@ import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.fabric.network.NilumRegisterClientVarPayload;
 import io.github.r4t2.nilum.fabric.network.NilumSetClientVarPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetHudTextPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
 import io.github.r4t2.nilum.fabric.render.IconAtlas;
+import io.github.r4t2.nilum.fabric.render.NilumGlintSpecialRenderer;
 import io.github.r4t2.nilum.fabric.render.NilumIconItemModel;
 import io.github.r4t2.nilum.fabric.render.NilumIconSpecialRenderer;
+import io.github.r4t2.nilum.fabric.render.NilumIrisIntegration;
 import io.github.r4t2.nilum.fabric.render.NilumItemDisplayRenderer;
 import io.github.r4t2.nilum.fabric.render.NilumModelItemModel;
 import io.github.r4t2.nilum.fabric.render.NilumModelItemSpecialRenderer;
+import io.github.r4t2.nilum.fabric.render.ShaderCapability;
 import io.github.r4t2.nilum.fabric.render.TextureUploader;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EntityType;
 
 import java.net.Socket;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public final class NilumFabricClient implements ClientModInitializer {
@@ -74,9 +93,38 @@ public final class NilumFabricClient implements ClientModInitializer {
                 FabricLoader.getInstance().getConfigDir().resolve("nilum-cache").resolve("icon_atlas_debug.png"));
         ClientHudAtlasStore hudAtlases = new ClientHudAtlasStore();
         ClientVarStore clientVars = new ClientVarStore();
+
+        // NilumIrisIntegration references Iris's own classes directly, so it (and anything that
+        // touches it) must never be constructed/called unless Iris is actually installed; merely
+        // loading the class without Iris present throws NoClassDefFoundError.
+        BiConsumer<String, byte[]> shaderPackSink;
+        if (FabricLoader.getInstance().isModLoaded("iris")) {
+            NilumIrisIntegration irisIntegration = new NilumIrisIntegration();
+            Path shaderScratchDir = FabricLoader.getInstance().getConfigDir().resolve("nilum-cache");
+            shaderPackSink = (packId, data) -> irisIntegration.installPack(packId, data, shaderScratchDir);
+            ClientPlayNetworking.registerGlobalReceiver(NilumActivateShaderPackPayload.TYPE, (payload, context) -> {
+                ActivateShaderPackPacket packet = ActivateShaderPackPacket.decode(payload.data());
+                irisIntegration.activate(packet.packId());
+            });
+            ClientPlayNetworking.registerGlobalReceiver(NilumDeactivateShaderPackPayload.TYPE, (payload, context) ->
+                    irisIntegration.deactivate());
+        } else {
+            shaderPackSink = (packId, data) ->
+                    NilumFabricMod.LOGGER.warn("Shader pack '" + packId + "' received but Iris isn't installed - ignoring.");
+            ClientPlayNetworking.registerGlobalReceiver(NilumActivateShaderPackPayload.TYPE, (payload, context) -> { });
+            ClientPlayNetworking.registerGlobalReceiver(NilumDeactivateShaderPackPayload.TYPE, (payload, context) -> { });
+        }
+
+        Path fontDirectory = FabricLoader.getInstance().getConfigDir().resolve("nilum").resolve("font");
+        BiConsumer<String, byte[]> fontSink = (fontId, data) -> FontInstaller.install(fontId, data, fontDirectory);
+
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
-                NilumFabricMod.LOGGER);
+                shaderPackSink, fontSink, NilumFabricMod.LOGGER);
         TextureUploader textureUploader = new TextureUploader();
+        // A model reloading with new bytes under the same id (e.g. a default-retexture block
+        // after a blocktextures/ edit) must drop any already-uploaded GPU textures for it, or
+        // getOrUpload's cache would keep serving the old ones forever.
+        modelStore.onReload(textureUploader::invalidate);
 
         // Deprecated as of fabric-rendering-v1 16.2.10 with no replacement yet; still works.
         //noinspection deprecation
@@ -85,14 +133,26 @@ public final class NilumFabricClient implements ClientModInitializer {
 
         NilumIconSpecialRenderer iconRenderer = new NilumIconSpecialRenderer(iconAtlas);
         NilumModelItemSpecialRenderer modelRenderer = new NilumModelItemSpecialRenderer(modelStore, textureUploader);
+        NilumGlintSpecialRenderer glintRenderer = new NilumGlintSpecialRenderer(iconAtlas);
         ModelLoadingPlugin.register(context -> context.modifyItemModelAfterBake().register(
                 (original, ctx) -> new NilumModelItemModel(
-                        new NilumIconItemModel(original, iconAtlas, iconRenderer), modelStore, modelRenderer)));
+                        new NilumIconItemModel(original, iconAtlas, iconRenderer, glintRenderer),
+                        modelStore, modelRenderer, glintRenderer)));
 
         NilumCreativeTabs.register(iconAtlas, modelStore);
 
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("nilum", "hud_atlas"),
                 new HudAtlasRenderer(hudAtlases, clientVars));
+
+        NilumKeybinds.register();
+
+        ClientBlockRegistry blockRegistry = new ClientBlockRegistry();
+        ModelLoadingPlugin.register(blockContext -> blockContext.modifyBlockModelAfterBake().register(
+                (original, ctx) -> new NilumBlockStateModel(original, blockRegistry)));
+        ClientChunkEvents.CHUNK_UNLOAD.register((clientWorld, chunk) ->
+                blockRegistry.onChunkUnload(chunk.getPos().x, chunk.getPos().z));
+        NilumBlockRenderer blockRenderer = new NilumBlockRenderer(modelStore, blockRegistry, textureUploader);
+        WorldRenderEvents.AFTER_ENTITIES.register(blockRenderer::render);
 
         // Registered on both phases: a Paper server sends hello in PLAY, a Fabric-hosted
         // server sends it during configuration (see FabricServerHandshake).
@@ -104,7 +164,7 @@ public final class NilumFabricClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(NilumTcpOfferPayload.TYPE, (payload, context) -> {
             TcpOfferPacket offer = TcpOfferPacket.decode(payload.data());
 
-            // NilumTcpClient.connect blocks until success/timeout - never call it on the
+            // NilumTcpClient.connect blocks until success/timeout; never call it on the
             // network callback thread, that would stall all other packet handling.
             Thread.ofVirtual().start(() -> {
                 Socket socket = NilumTcpClient.connect(offer.host(), offer.port(), offer.token(),
@@ -165,6 +225,16 @@ public final class NilumFabricClient implements ClientModInitializer {
             SetClientVarPacket packet = SetClientVarPacket.decode(payload.data());
             clientVars.set(packet.name(), packet.value());
         });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumSetHudTextPayload.TYPE, (payload, context) -> {
+            SetHudTextPacket packet = SetHudTextPacket.decode(payload.data());
+            hudAtlases.onHudText(packet.atlasId(), packet.elementId(), packet.text());
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumChunkBlocksPayload.TYPE, (payload, context) -> {
+            ChunkBlocksPacket packet = ChunkBlocksPacket.decode(payload.data());
+            blockRegistry.apply(packet.entries());
+        });
     }
 
     private static void handleHello(NilumHelloPayload payload, Consumer<CustomPacketPayload> sender) {
@@ -180,13 +250,14 @@ public final class NilumFabricClient implements ClientModInitializer {
                     + hello.serverModVersion() + ") - some features may not be available.");
         }
 
+        ShaderCapability.Renderer shaderRenderer = ShaderCapability.detect();
         HelloAckPacket ack = new HelloAckPacket(
                 "fabric",
                 modVersion,
                 HandshakeProtocol.PROTOCOL_VERSION,
+                true,
                 false,
-                false,
-                "vanilla"
+                shaderRenderer.wireName()
         );
 
         sender.accept(new NilumHelloAckPayload(ack.encode()));

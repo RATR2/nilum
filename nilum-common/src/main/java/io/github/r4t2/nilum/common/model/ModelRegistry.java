@@ -47,6 +47,17 @@ public final class ModelRegistry {
         return errors;
     }
 
+    /**
+     * Registers a model built from bytes that didn't come from a file on disk (e.g. a synthesized
+     * cube model), in the same map slots as a real .bbmodel. loadDirectory clears these on every
+     * rescan; callers depending on a synthetic id surviving a reload must re-register it after.
+     */
+    public void registerSynthetic(String modelId, byte[] rawBytes) {
+        modelsById.put(modelId, BbModelParser.parse(new String(rawBytes, StandardCharsets.UTF_8)));
+        rawBytesById.put(modelId, rawBytes);
+        hashById.put(modelId, SHA256.of(rawBytes));
+    }
+
     public Optional<BbModel> get(String modelId) {
         return Optional.ofNullable(modelsById.get(modelId));
     }

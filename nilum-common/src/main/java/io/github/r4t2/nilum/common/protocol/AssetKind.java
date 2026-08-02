@@ -4,5 +4,7 @@ package io.github.r4t2.nilum.common.protocol;
 public enum AssetKind {
     MODEL,
     ICON,
-    HUD_ATLAS
+    HUD_ATLAS,
+    SHADER_PACK,
+    FONT
 }

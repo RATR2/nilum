@@ -16,10 +16,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 /**
- * Server-side registry of HUD atlases - each one a paired {@code <id>.png} spritesheet and
- * {@code <id>.atlas} descriptor sharing a base filename. What's served/hashed is a
- * {@link HudAtlasAssetPayload} bundling both files' bytes, so a descriptor-only edit (no PNG
- * change) still changes the asset's hash and triggers a client re-fetch.
+ * Server-side registry of HUD atlases, each a paired <id>.png spritesheet and <id>.atlas
+ * descriptor sharing a base filename. Served/hashed as a HudAtlasAssetPayload bundling both
+ * files' bytes, so a descriptor-only edit still triggers a client re-fetch.
  */
 public final class HudAtlasRegistry {
 

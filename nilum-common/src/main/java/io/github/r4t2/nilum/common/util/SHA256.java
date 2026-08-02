@@ -18,7 +18,7 @@ public final class SHA256 {
      * @param data the input byte array to be hashed
      * @return a 64-character lowercase hexadecimal string representing the SHA-256 digest
      * @throws IllegalStateException if the SHA-256 algorithm is not supported by the JDK environment
-     * @throws NullPointerException if the provided {@code data} array is null
+     * @throws NullPointerException if the provided data array is null
      */
     public static String of(byte[] data) {
         try {

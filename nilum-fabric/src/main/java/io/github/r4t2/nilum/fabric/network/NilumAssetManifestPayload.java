@@ -6,7 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/** Thin CustomPacketPayload wrapper around a raw {@code AssetManifestPacket}. See {@link NilumHelloPayload}. */
+/** Thin CustomPacketPayload wrapper around a raw AssetManifestPacket. See NilumHelloPayload. */
 public record NilumAssetManifestPayload(byte[] data) implements CustomPacketPayload {
 
     public static final Type<NilumAssetManifestPayload> TYPE =

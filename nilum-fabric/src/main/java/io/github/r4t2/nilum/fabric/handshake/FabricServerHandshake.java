@@ -79,8 +79,8 @@ public final class FabricServerHandshake {
     }
 
     /**
-     * Restarts the TCP side-channel to match the current config. Leaves it
-     * disabled if {@code tcp.advertised-host} is blank.
+     * Restarts the TCP side-channel to match the current config. Leaves it disabled if
+     * tcp.advertised-host is blank.
      */
     public synchronized void applyTcpConfig() {
         if (tcpServer != null) {

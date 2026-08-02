@@ -57,7 +57,7 @@ public final class NilumTcpServer {
         connectionHandlers.shutdownNow();
     }
 
-    /** Generates a fresh token and registers it as the expected credential for {@code playerId}. */
+    /** Generates a fresh token and registers it as the expected credential for playerId. */
     public String offerConnection(UUID playerId) {
         String token = UUID.randomUUID().toString();
         pendingTokens.put(token, playerId);

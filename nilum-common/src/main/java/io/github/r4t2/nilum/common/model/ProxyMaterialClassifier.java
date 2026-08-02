@@ -3,12 +3,9 @@ package io.github.r4t2.nilum.common.model;
 import java.util.List;
 
 /**
- * Classifies a resolved collision shape into a simple vanilla-representable
- * proxy per the design doc's Proxy Material Auto-Classification. Only
- * recognizes a single box spanning the full block (full cube) or a
- * half-height slab; anything else (multiple boxes, partial footprint,
- * stairs) falls back to {@link BbProxyShape#COMPLEX} - stair-shape detection
- * isn't implemented yet.
+ * Classifies a resolved collision shape into a simple vanilla-representable proxy. Only
+ * recognizes a single box spanning the full block, or a half-height slab; anything else
+ * (multiple boxes, partial footprint, stairs) falls back to BbProxyShape.COMPLEX.
  */
 public final class ProxyMaterialClassifier {
 

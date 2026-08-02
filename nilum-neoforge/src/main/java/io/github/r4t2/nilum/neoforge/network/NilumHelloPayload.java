@@ -7,9 +7,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
- * Thin CustomPacketPayload wrapper around a raw {@code HelloPacket}.
- * The field encoding lives in nilum-common; this just adapts it to
- * NeoForge's payload registration API.
+ * Thin CustomPacketPayload wrapper around a raw HelloPacket. The field encoding lives in
+ * nilum-common; this adapts it to NeoForge's payload registration API.
  */
 public record NilumHelloPayload(byte[] data) implements CustomPacketPayload {
 

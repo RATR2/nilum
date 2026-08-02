@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-/** Draws a Nilum full-.bbmodel item as its actual baked geometry - the same quads the in-world entity renderer draws. */
+/** Draws a Nilum full-.bbmodel item as its actual baked geometry, the same quads the in-world entity renderer draws. */
 public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer<String> {
 
     private final ClientModelStore modelStore;
@@ -64,19 +64,16 @@ public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer
     }
 
     /**
-     * {@link SpecialModelRenderer#getExtents(Consumer)} has no per-argument parameter, so it
-     * can't report a distinct box per modelId through this hook alone (confirmed by decompiling
-     * the interface and vanilla's own fixed-shape implementations, e.g. TridentSpecialRenderer).
-     * Real per-model wiring happens via {@link #extentsOf(String)}, called directly by {@link
-     * NilumModelItemModel} through {@code LayerRenderState.setExtents(...)} - the actual hookup
-     * point, mirroring vanilla's own {@code SpecialModelWrapper.update()}. This method is left
-     * empty since nothing invokes it through the shared-instance path.
+     * SpecialModelRenderer.getExtents has no per-argument parameter, so it can't report a
+     * distinct box per modelId through this hook alone. Real per-model wiring happens via
+     * extentsOf(String), called directly by NilumModelItemModel. Left empty since nothing
+     * invokes it through the shared-instance path.
      */
     @Override
     public void getExtents(Consumer<Vector3fc> consumer) {
     }
 
-    /** Exact bounding-box corners (8) for one model's own baked geometry, computed once and cached. */
+    /** Exact bounding-box corners (8) for one model's baked geometry, computed once and cached. */
     public Vector3fc[] extentsOf(String modelId) {
         return extentsByModelId.computeIfAbsent(modelId, this::computeExtents);
     }

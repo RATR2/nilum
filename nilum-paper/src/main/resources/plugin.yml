@@ -4,10 +4,11 @@ main: io.github.r4t2.nilum.paper.NilumPlugin
 api-version: '1.21'
 description: Live, per-player asset streaming server plugin.
 authors: [r4t2]
+softdepend: [PlaceholderAPI]
 commands:
   nilum:
     description: Nilum admin commands.
-    usage: /nilum <ver|help|reload|placemodel|giveitem|giveicon|hudframe>
+    usage: /nilum <ver|help|reload|placemodel|giveitem|giveicon|hudframe|placeblock|removeblock|giveitemdef>
     permission: nilum.admin
 permissions:
   nilum.admin:

@@ -13,10 +13,10 @@ import org.joml.Vector3fc;
 
 import java.util.function.Consumer;
 
-/** Draws a Nilum icon-only item as a flat quad sampling its rect within the shared {@link IconAtlas}. */
+/** Draws a Nilum icon-only item as a flat quad sampling its rect within the shared IconAtlas. */
 public final class NilumIconSpecialRenderer implements SpecialModelRenderer<String> {
 
-    // Every icon shares this exact quad shape (see submit() below) - only the UV rect differs per icon.
+    // Every icon shares this exact quad shape (see submit() below); only the UV rect differs per icon.
     public static final Vector3fc[] EXTENTS = {
             new Vector3f(0f, 0f, 0.5f), new Vector3f(1f, 0f, 0.5f),
             new Vector3f(0f, 1f, 0.5f), new Vector3f(1f, 1f, 0.5f),

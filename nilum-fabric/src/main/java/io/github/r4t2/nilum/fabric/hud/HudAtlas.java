@@ -5,9 +5,11 @@ import io.github.r4t2.nilum.common.expr.ExprEvaluationException;
 import io.github.r4t2.nilum.common.expr.ExprEvaluator;
 import io.github.r4t2.nilum.common.expr.ExprNode;
 import io.github.r4t2.nilum.common.expr.ExprParser;
+import io.github.r4t2.nilum.common.expr.TextValueSource;
 import io.github.r4t2.nilum.common.expr.ValueSource;
 import io.github.r4t2.nilum.common.hud.HudAtlasAssetPayload;
 import io.github.r4t2.nilum.common.hud.HudAtlasDescriptor;
+import io.github.r4t2.nilum.common.hud.HudAtlasElement;
 import io.github.r4t2.nilum.common.hud.HudElementType;
 import io.github.r4t2.nilum.fabric.NilumFabricMod;
 import net.minecraft.client.Minecraft;
@@ -17,16 +19,16 @@ import net.minecraft.resources.Identifier;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * One server-streamed HUD atlas: its spritesheet texture, parsed {@code .atlas} descriptor,
- * and the client-side state (server-pushed frames, temporary overrides) needed to pick each
- * element's current frame every render tick.
+ * One server-streamed HUD atlas: its spritesheet texture, parsed .atlas descriptor, and the
+ * client-side state needed to pick each element's current frame every render tick.
  */
 public final class HudAtlas {
 
-    /** {@code -1} means "hold indefinitely until a release", matching HudFrameOverridePacket. */
+    /** -1 means "hold indefinitely until a release", matching HudFrameOverridePacket. */
     private record FrameOverride(int frame, long expiryEpochMillis) {
         boolean active(long nowEpochMillis) {
             return expiryEpochMillis < 0 || nowEpochMillis < expiryEpochMillis;
@@ -43,6 +45,7 @@ public final class HudAtlas {
 
     private final Map<String, Integer> serverFrameByElement = new ConcurrentHashMap<>();
     private final Map<String, FrameOverride> overrideByElement = new ConcurrentHashMap<>();
+    private final Map<String, String> serverTextByElement = new ConcurrentHashMap<>();
 
     private HudAtlas(String atlasId, Identifier textureId, HudAtlasDescriptor descriptor,
                       Map<String, ExprNode> parsedAutoExpressions, NativeImage canvas, DynamicTexture gpuTexture) {
@@ -54,23 +57,26 @@ public final class HudAtlas {
         this.gpuTexture = gpuTexture;
     }
 
-    /** Must be called on the render thread - decodes the PNG and registers a real GPU texture. */
+    /** Must be called on the render thread; decodes the PNG and registers a real GPU texture. */
     static HudAtlas load(String atlasId, byte[] assetBytes) throws IOException {
         HudAtlasAssetPayload payload = HudAtlasAssetPayload.decode(assetBytes);
         HudAtlasDescriptor descriptor = payload.decodeDescriptor();
 
         Map<String, ExprNode> parsed = new HashMap<>();
         descriptor.elements().forEach((elementId, element) -> {
-            if (element.type() == HudElementType.AUTO) {
-                element.clientConnector().ifPresent(source -> {
-                    try {
-                        parsed.put(elementId, ExprParser.parse(source));
-                    } catch (RuntimeException e) {
-                        NilumFabricMod.LOGGER.warn("HUD atlas '" + atlasId + "' element '" + elementId
-                                + "' has an invalid client_connector, treating as frame 0: " + e);
-                    }
-                });
-            }
+            Optional<String> clientConnector = switch (element) {
+                case HudAtlasElement.Sprite sprite when sprite.type() == HudElementType.AUTO -> sprite.clientConnector();
+                case HudAtlasElement.Text text -> text.clientConnector();
+                default -> Optional.empty();
+            };
+            clientConnector.ifPresent(source -> {
+                try {
+                    parsed.put(elementId, ExprParser.parse(source));
+                } catch (RuntimeException e) {
+                    NilumFabricMod.LOGGER.warn("HUD atlas '" + atlasId + "' element '" + elementId
+                            + "' has an invalid client_connector, treating as frame 0/empty: " + e);
+                }
+            });
         });
 
         NativeImage canvas = NativeImage.read(payload.pngBytes());
@@ -83,13 +89,12 @@ public final class HudAtlas {
 
     /**
      * Rewrites one frame's pixels and re-uploads. Vanishingly rare compared to a per-tick
-     * render, so a full-texture re-upload (the same tradeoff {@code IconAtlas} already makes
-     * on growth) is simpler than a true sub-rectangle GPU upload and costs nothing in practice.
+     * render, so a full-texture re-upload is simpler than a sub-rectangle GPU upload.
      */
     void applyPatch(String elementId, int frame, byte[] png) {
-        var element = descriptor.elements().get(elementId);
-        if (element == null) {
-            NilumFabricMod.LOGGER.warn("Atlas patch for unknown HUD element '" + elementId + "' in atlas '" + atlasId + "'.");
+        var raw = descriptor.elements().get(elementId);
+        if (!(raw instanceof HudAtlasElement.Sprite element)) {
+            NilumFabricMod.LOGGER.warn("Atlas patch for unknown or non-sprite HUD element '" + elementId + "' in atlas '" + atlasId + "'.");
             return;
         }
 
@@ -124,6 +129,10 @@ public final class HudAtlas {
         serverFrameByElement.put(elementId, frame);
     }
 
+    void setServerText(String elementId, String text) {
+        serverTextByElement.put(elementId, text);
+    }
+
     void override(String elementId, int frame, int durationTicks) {
         long expiry = durationTicks < 0 ? -1 : System.currentTimeMillis() + durationTicks * 50L;
         overrideByElement.put(elementId, new FrameOverride(frame, expiry));
@@ -149,10 +158,9 @@ public final class HudAtlas {
         return canvas.getHeight();
     }
 
-    /** Resolves one element's frame to draw right now - override, then server/auto/static per its type. */
+    /** Resolves one sprite element's frame to draw right now: override, then server/auto/static per its type. */
     public int currentFrame(String elementId, ValueSource valueSource, double timeSeconds) {
-        var element = descriptor.elements().get(elementId);
-        if (element == null) {
+        if (!(descriptor.elements().get(elementId) instanceof HudAtlasElement.Sprite element)) {
             return 0;
         }
 
@@ -169,6 +177,33 @@ public final class HudAtlas {
             case SERVER -> serverFrameByElement.getOrDefault(elementId, 0);
             case AUTO -> evaluateAuto(elementId, valueSource, timeSeconds);
         };
+    }
+
+    /**
+     * Resolves one render_text element's display string right now. A pushed server_connector
+     * value always wins over a locally-evaluated client_connector.
+     */
+    public String currentText(String elementId, ValueSource valueSource, TextValueSource textSource, double timeSeconds) {
+        if (!(descriptor.elements().get(elementId) instanceof HudAtlasElement.Text)) {
+            return "";
+        }
+
+        String serverText = serverTextByElement.get(elementId);
+        if (serverText != null) {
+            return serverText;
+        }
+
+        ExprNode expr = parsedAutoExpressions.get(elementId);
+        if (expr == null) {
+            return "";
+        }
+        try {
+            return ExprEvaluator.evaluateText(expr, valueSource, textSource, timeSeconds);
+        } catch (ExprEvaluationException e) {
+            NilumFabricMod.LOGGER.warn("HUD atlas '" + atlasId + "' text element '" + elementId
+                    + "' failed to evaluate: " + e.getMessage());
+            return "";
+        }
     }
 
     private int evaluateAuto(String elementId, ValueSource valueSource, double timeSeconds) {

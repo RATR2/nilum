@@ -12,24 +12,20 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.stream.Stream;
 
 /**
- * Owns each icon's {@code icons/<iconId>.yml}, sitting right next to that icon's PNG, describing
- * how it should be positioned/scaled/rotated per {@code ItemDisplayContext}. Auto-creates missing
- * icon files (and fills in any fields missing from existing ones, e.g. after a new context is
- * added in a future version) on every reload, without ever touching values an admin has already
- * configured - the only kind of "migration" purely-additive schema growth needs, matching how
- * {@code NilumConfigManager} treats main.yml.
+ * Owns each icon's icons/<iconId>.yml: which texture file it uses and how it's
+ * positioned/scaled/rotated per ItemDisplayContext. Auto-creates missing files/fields
+ * on reload without touching values an admin already set.
  *
- * <p>Each context (thirdperson_righthand, gui, fixed, ...) has rotation/translation/scale, and
- * each of those is either the keyword {@code generated} (vanilla's built-in flat-item default),
- * {@code blockbench} (pulled from {@code blockbench-reference}'s own Blockbench Display panel
- * data for that context/field), or a literal {@code {x, y, z}} override.
+ * <p>Each context field is either "generated" (vanilla's flat-item default),
+ * "blockbench" (pulled from blockbench-reference), or a literal {x, y, z}.
  */
 public final class IconsYamlManager {
 
@@ -42,28 +38,38 @@ public final class IconsYamlManager {
     }
 
     /**
-     * Ensures every id in {@code iconIds} has an {@code <iconId>.yml} (creating missing
-     * files/fields with "generated" defaults, without touching existing values), and returns
-     * each icon's fully-resolved {@link IconDisplay}.
+     * Scans iconsDirectory for <iconId>.yml files (creating missing files/fields with defaults,
+     * without touching existing values), and returns each icon's texture filename plus its
+     * fully-resolved IconDisplay.
      */
-    public Map<String, IconDisplay> reload(Set<String> iconIds, ModelRegistry modelRegistry) throws IOException {
-        Map<String, IconDisplay> resolved = new HashMap<>();
-        for (String iconId : iconIds) {
-            Path iconFile = iconsDirectory.resolve(iconId + ".yml");
-            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(iconFile.toFile());
+    public Map<String, IconYamlConfig> reload(ModelRegistry modelRegistry) throws IOException {
+        Files.createDirectories(iconsDirectory);
+        Map<String, IconYamlConfig> resolved = new HashMap<>();
 
-            if (ensureDefaults(yaml)) {
-                yaml.save(iconFile.toFile());
+        try (Stream<Path> files = Files.list(iconsDirectory)) {
+            for (Path iconFile : files.filter(p -> p.getFileName().toString().endsWith(".yml")).toList()) {
+                String iconId = iconFile.getFileName().toString();
+                iconId = iconId.substring(0, iconId.length() - ".yml".length());
+
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(iconFile.toFile());
+                if (ensureDefaults(iconId, yaml)) {
+                    yaml.save(iconFile.toFile());
+                }
+
+                String textureFileName = yaml.getString("texture", iconId + ".png");
+                resolved.put(iconId, new IconYamlConfig(textureFileName, resolve(iconId, yaml, modelRegistry)));
             }
-
-            resolved.put(iconId, resolve(iconId, yaml, modelRegistry));
         }
         return resolved;
     }
 
     /** @return true if anything was added (file was missing or missing fields, and needs a save). */
-    private boolean ensureDefaults(ConfigurationSection section) {
+    private boolean ensureDefaults(String iconId, ConfigurationSection section) {
         boolean changed = false;
+        if (!section.isSet("texture")) {
+            section.set("texture", iconId + ".png");
+            changed = true;
+        }
         if (!section.isSet("use-blockbench-reference")) {
             section.set("use-blockbench-reference", false);
             changed = true;

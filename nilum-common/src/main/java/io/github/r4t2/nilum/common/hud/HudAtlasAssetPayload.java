@@ -9,10 +9,9 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * What actually travels over the wire for a HUD atlas: the spritesheet PNG bytes plus the raw
- * {@code .atlas} descriptor JSON bytes, bundled into one payload so the existing manifest/TCP
- * asset-fetch transport (kind-agnostic byte[] in, byte[] out) can carry both without any
- * protocol changes - the same trick {@code IconAssetPayload} uses for PNG + display config.
+ * What travels over the wire for a HUD atlas: the spritesheet PNG bytes plus the raw .atlas
+ * descriptor JSON bytes, bundled into one payload so the existing manifest/TCP asset-fetch
+ * transport can carry both.
  */
 public record HudAtlasAssetPayload(byte[] pngBytes, byte[] descriptorJsonBytes) {
 

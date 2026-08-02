@@ -3,7 +3,6 @@ package io.github.r4t2.nilum.neoforge;
 import io.github.r4t2.nilum.common.config.ConfigSchema;
 import io.github.r4t2.nilum.common.config.LoggingConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
-import io.github.r4t2.nilum.common.config.NilumConfigVersion;
 import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.neoforge.handshake.NeoForgeServerHandshake;
@@ -48,7 +47,6 @@ public final class NilumNeoForgeMod {
 
         this.configManager = new NilumConfigManager(
                 configDir.resolve("config").resolve("main.yml"),
-                NilumConfigVersion.CURRENT,
                 "Nilum configuration",
                 new ConfigSchema(List.of(
                         TcpConfig.BIND_ADDRESS, TcpConfig.PORT, TcpConfig.ADVERTISED_HOST,

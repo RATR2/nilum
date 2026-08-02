@@ -2,5 +2,10 @@
   "itemGroup.nilum.items": "Nilum Items",
   "itemGroup.nilum.blocks": "Nilum Blocks",
   "itemGroup.nilum.models": "Nilum Models",
-  "itemGroup.nilum.custom_items": "Nilum Custom Items"
+  "itemGroup.nilum.custom_items": "Nilum Custom Items",
+  "key.category.nilum.keybinds": "Nilum",
+  "key.nilum.keybind_1": "Nilum Keybind 1",
+  "key.nilum.keybind_2": "Nilum Keybind 2",
+  "key.nilum.keybind_3": "Nilum Keybind 3",
+  "key.nilum.keybind_4": "Nilum Keybind 4"
 }

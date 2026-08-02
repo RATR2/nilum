@@ -24,7 +24,7 @@ public final class CustomItemService {
     /**
      * @param modelId      loaded model to represent
      * @param baseMaterial vanilla material to back the item
-     * @return the item, or empty if {@code modelId} isn't loaded
+     * @return the item, or empty if modelId isn't loaded
      */
     public Optional<ItemStack> createItem(String modelId, Material baseMaterial) {
         if (modelRegistry.get(modelId).isEmpty()) {

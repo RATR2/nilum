@@ -8,11 +8,15 @@ plugins {
 
 repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
+    maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
 }
 
 dependencies {
     implementation(project(":nilum-common"))
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    // Soft dependency (see plugin.yml); server_connector HUD text elements just stay blank
+    // if it isn't actually installed, checked at runtime in HudTextService.
+    compileOnly("me.clip:placeholderapi:2.11.6")
 }
 
 // shadowJar is the real output (no classifier); the plain jar task's output is renamed
@@ -27,7 +31,7 @@ tasks.build {
     dependsOn(tasks.shadowJar)
 }
 
-// Only for /nilum ver's display - never fed into plugin.yml's version, which
+// Only for /nilum ver's display, never fed into plugin.yml's version, which
 // SemanticVersions compares between client and server during the handshake.
 // Reads .git directly rather than shelling out to a git binary, which isn't
 // guaranteed to be on PATH in every build environment.

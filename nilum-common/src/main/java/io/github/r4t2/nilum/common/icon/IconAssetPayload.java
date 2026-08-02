@@ -12,9 +12,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * What actually travels over the wire for an icon asset: the PNG bytes plus its fully-resolved
- * {@link IconDisplay}, bundled into one payload so the existing manifest/TCP asset-fetch
- * transport (kind-agnostic byte[] in, byte[] out) can carry both without any protocol changes.
+ * What travels over the wire for an icon asset: the PNG bytes plus its fully-resolved
+ * IconDisplay, bundled into one payload so the existing manifest/TCP asset-fetch transport
+ * can carry both without protocol changes.
  */
 public record IconAssetPayload(byte[] pngBytes, IconDisplay display) {
 

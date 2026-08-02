@@ -11,6 +11,7 @@ import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
+import io.github.r4t2.nilum.common.protocol.KeybindPacket;
 import io.github.r4t2.nilum.common.protocol.ModEntry;
 import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModListRequestPacket;
@@ -20,6 +21,7 @@ import io.github.r4t2.nilum.common.tcp.NilumTcpAssetServer;
 import io.github.r4t2.nilum.common.tcp.NilumTcpServer;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.paper.NilumPlugin;
+import io.github.r4t2.nilum.paper.event.NilumKeybindEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
@@ -42,9 +44,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Sends {@code nilum:hello} on join and kicks players who don't respond with
- * {@code nilum:hello_ack} within the handshake timeout, unless
- * {@code handshake.allow-vanilla-clients} lets them stay anyway.
+ * Sends nilum:hello on join and kicks players who don't respond with nilum:hello_ack within the
+ * handshake timeout, unless handshake.allow-vanilla-clients lets them stay anyway.
  */
 public final class HandshakeListener implements Listener, PluginMessageListener {
 
@@ -94,12 +95,14 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         List<AssetManifestEntry> entries = new ArrayList<>(plugin.models().manifest());
         entries.addAll(plugin.icons().manifest());
         entries.addAll(plugin.hudAtlases().manifest());
+        entries.addAll(plugin.shaderPacks().manifest());
+        entries.addAll(plugin.fonts().manifest());
         return entries;
     }
 
     /**
-     * Restarts the TCP side-channel to match the current config. Leaves it
-     * disabled if {@code tcp.advertised-host} is blank.
+     * Restarts the TCP side-channel to match the current config. Leaves it disabled if
+     * tcp.advertised-host is blank.
      */
     public synchronized void applyTcpConfig() {
         if (tcpServer != null) {
@@ -165,9 +168,8 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
     }
 
     /**
-     * Paper drops outgoing plugin messages sent before the client's own
-     * channel registration arrives, and that can still be in flight right at
-     * join - wait for it instead of racing it.
+     * Paper drops outgoing plugin messages sent before the client's own channel registration
+     * arrives, which can still be in flight right at join. Wait for it instead of racing it.
      */
     @EventHandler
     public void onChannelRegister(PlayerRegisterChannelEvent event) {
@@ -211,7 +213,17 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
             onTcpUnavailable(player);
         } else if (NilumChannels.MOD_LIST_QUALIFIED.equals(channel)) {
             onModList(player, message);
+        } else if (NilumChannels.KEYBIND_QUALIFIED.equals(channel)) {
+            onKeybind(player, message);
         }
+    }
+
+    private void onKeybind(Player player, byte[] message) {
+        KeybindPacket packet = KeybindPacket.decode(message);
+        logger.debug(player.getName() + " " + (packet.pressed() ? "pressed" : "released")
+                + " Nilum keybind " + (packet.slot() + 1) + ".");
+        plugin.getServer().getPluginManager().callEvent(
+                new NilumKeybindEvent(player, packet.slot(), packet.pressed()));
     }
 
     private void onHelloAck(Player player, byte[] message) {
@@ -283,6 +295,8 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
             case MODEL -> plugin.models().rawBytes(id).orElse(null);
             case ICON -> plugin.icons().assetBytes(id).orElse(null);
             case HUD_ATLAS -> plugin.hudAtlases().assetBytes(id).orElse(null);
+            case SHADER_PACK -> plugin.shaderPacks().rawBytes(id).orElse(null);
+            case FONT -> plugin.fonts().rawBytes(id).orElse(null);
         });
     }
 

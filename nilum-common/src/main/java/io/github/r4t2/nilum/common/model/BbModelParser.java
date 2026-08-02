@@ -45,16 +45,90 @@ public final class BbModelParser {
         Map<String, BbDisplayTransform> display = root.has("display")
                 ? parseDisplay(root.getAsJsonObject("display"))
                 : Map.of();
+        List<BbAnimation> animations = root.has("animations")
+                ? parseAnimations(root.getAsJsonArray("animations"))
+                : List.of();
 
         // Nilum-specific convention
         Optional<String> collisionIntent = root.has("collision_intent")
                 ? Optional.of(root.get("collision_intent").getAsString())
                 : Optional.empty();
 
-        return new BbModel(formatVersion, resolutionWidth, resolutionHeight, elements, outliner, textures, collisionIntent, display);
+        return new BbModel(formatVersion, resolutionWidth, resolutionHeight, elements, outliner, textures,
+                collisionIntent, display, animations);
     }
 
-    /** Blockbench's "Display" panel - one entry per {@code ItemDisplayContext}, e.g. "gui", "thirdperson_righthand". */
+    private static List<BbAnimation> parseAnimations(JsonArray animationsJson) {
+        List<BbAnimation> animations = new ArrayList<>();
+        for (JsonElement raw : animationsJson) {
+            JsonObject a = raw.getAsJsonObject();
+            String uuid = requireString(a, "uuid");
+            String name = a.has("name") ? a.get("name").getAsString() : uuid;
+            String loop = a.has("loop") ? a.get("loop").getAsString() : "once";
+            double length = a.has("length") ? a.get("length").getAsDouble() : 0.0;
+            Map<String, BbAnimator> animators = a.has("animators")
+                    ? parseAnimators(a.getAsJsonObject("animators"))
+                    : Map.of();
+            animations.add(new BbAnimation(uuid, name, loop, length, animators));
+        }
+        return animations;
+    }
+
+    private static Map<String, BbAnimator> parseAnimators(JsonObject animatorsJson) {
+        Map<String, BbAnimator> animators = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : animatorsJson.entrySet()) {
+            JsonObject a = entry.getValue().getAsJsonObject();
+            String name = a.has("name") ? a.get("name").getAsString() : entry.getKey();
+            String type = a.has("type") ? a.get("type").getAsString() : "bone";
+            List<BbKeyframe> keyframes = a.has("keyframes")
+                    ? parseKeyframes(a.getAsJsonArray("keyframes"))
+                    : List.of();
+            animators.put(entry.getKey(), new BbAnimator(name, type, keyframes));
+        }
+        return animators;
+    }
+
+    private static List<BbKeyframe> parseKeyframes(JsonArray keyframesJson) {
+        List<BbKeyframe> keyframes = new ArrayList<>();
+        for (JsonElement raw : keyframesJson) {
+            JsonObject kf = raw.getAsJsonObject();
+            String channel = kf.has("channel") ? kf.get("channel").getAsString() : "rotation";
+            double time = kf.has("time") ? kf.get("time").getAsDouble() : 0.0;
+            String interpolation = kf.has("interpolation") ? kf.get("interpolation").getAsString() : "linear";
+
+            BbVector3 value = BbVector3.ZERO;
+            if (kf.has("data_points")) {
+                JsonArray dataPoints = kf.getAsJsonArray("data_points");
+                if (!dataPoints.isEmpty()) {
+                    value = parseDataPoint(dataPoints.get(0).getAsJsonObject());
+                }
+            }
+
+            keyframes.add(new BbKeyframe(channel, time, interpolation, value));
+        }
+        return keyframes;
+    }
+
+    /** Components are strings in the raw format (Blockbench allows molang-style expressions there); plain numbers only for now. */
+    private static BbVector3 parseDataPoint(JsonObject dataPoint) {
+        return new BbVector3(
+                parseExpressionAsNumber(dataPoint, "x"),
+                parseExpressionAsNumber(dataPoint, "y"),
+                parseExpressionAsNumber(dataPoint, "z"));
+    }
+
+    private static double parseExpressionAsNumber(JsonObject dataPoint, String field) {
+        if (!dataPoint.has(field)) {
+            return 0.0;
+        }
+        try {
+            return Double.parseDouble(dataPoint.get(field).getAsString());
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
+
+    /** Blockbench's "Display" panel: one entry per ItemDisplayContext, e.g. "gui", "thirdperson_righthand". */
     private static Map<String, BbDisplayTransform> parseDisplay(JsonObject displayJson) {
         Map<String, BbDisplayTransform> display = new LinkedHashMap<>();
         for (Map.Entry<String, JsonElement> entry : displayJson.entrySet()) {

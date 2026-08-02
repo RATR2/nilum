@@ -7,13 +7,14 @@ import io.github.r4t2.nilum.common.protocol.HudFrameReleasePacket;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.common.protocol.RegisterClientVarPacket;
 import io.github.r4t2.nilum.common.protocol.SetClientVarPacket;
+import io.github.r4t2.nilum.common.protocol.SetHudTextPacket;
 import io.github.r4t2.nilum.paper.NilumPlugin;
 import org.bukkit.entity.Player;
 
 /**
  * Server-side entry point for driving HUD atlas elements. Frame/override state lives entirely
- * client-side (see the design doc) - this is a thin fire-and-forget packet sender, gated on
- * whether a given player has completed the Nilum handshake.
+ * client-side; this is a thin fire-and-forget packet sender, gated on whether a given player
+ * has completed the Nilum handshake.
  */
 public final class HudAtlasService {
 
@@ -62,6 +63,10 @@ public final class HudAtlasService {
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             send(player, NilumChannels.SET_CLIENT_VAR_QUALIFIED, data);
         }
+    }
+
+    public void setHudText(Player player, String atlasId, String elementId, String text) {
+        send(player, NilumChannels.SET_HUD_TEXT_QUALIFIED, new SetHudTextPacket(atlasId, elementId, text).encode());
     }
 
     private void send(Player player, String channel, byte[] data) {

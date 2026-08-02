@@ -14,4 +14,9 @@ public final class ConfigSchema {
     public List<ConfigKey<?>> keys() {
         return keys;
     }
+
+    /** Current version of the config schema. */
+    public int currentVersion() {
+        return keys.stream().mapToInt(ConfigKey::sinceVersion).max().orElse(1);
+    }
 }

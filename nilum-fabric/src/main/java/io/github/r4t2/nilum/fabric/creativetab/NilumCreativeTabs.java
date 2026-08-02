@@ -18,14 +18,9 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Four fixed Nilum creative tabs, registered once at mod init (tab shells - icon/title/id - can't
- * be added after the creative-tab registry freezes, so unlike their contents these aren't dynamic).
- * Items and Models populate from whatever's currently loaded via the existing asset pipeline - no
- * new packets needed, since the client already knows every icon/model id it has. Blocks stays
- * empty until Nilum has a custom block system. Custom Items stays empty until something calls
- * {@link #addCustomItem}, the one part of this meant for other code (or a future public API) to
- * feed into - matching the design doc's "Fake Creative Tab" as an API surface rather than a fixed
- * list.
+ * Four fixed Nilum creative tabs, registered once at mod init. Items and Models populate from
+ * whatever's currently loaded. Blocks stays empty until Nilum has a custom block system. Custom
+ * Items stays empty until something calls addCustomItem, an API surface for other code to feed into.
  */
 public final class NilumCreativeTabs {
 
@@ -82,7 +77,7 @@ public final class NilumCreativeTabs {
         });
     }
 
-    /** Adds an item to the "Nilum Custom Items" tab - empty by default, meant for other code to populate. */
+    /** Adds an item to the "Nilum Custom Items" tab; empty by default, meant for other code to populate. */
     public static void addCustomItem(ItemStack stack) {
         CUSTOM_ITEMS.add(stack);
     }

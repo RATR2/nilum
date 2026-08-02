@@ -15,6 +15,8 @@ public final class AssetSyncSession {
     private final ClientModelStore modelStore;
     private final BiConsumer<String, byte[]> iconSink;
     private final BiConsumer<String, byte[]> hudAtlasSink;
+    private final BiConsumer<String, byte[]> shaderPackSink;
+    private final BiConsumer<String, byte[]> fontSink;
     private final NilumLogger logger;
 
     private volatile Socket tcpSocket;
@@ -22,11 +24,14 @@ public final class AssetSyncSession {
     private boolean fetching;
 
     public AssetSyncSession(AssetCache cache, ClientModelStore modelStore, BiConsumer<String, byte[]> iconSink,
-                             BiConsumer<String, byte[]> hudAtlasSink, NilumLogger logger) {
+                             BiConsumer<String, byte[]> hudAtlasSink, BiConsumer<String, byte[]> shaderPackSink,
+                             BiConsumer<String, byte[]> fontSink, NilumLogger logger) {
         this.cache = cache;
         this.modelStore = modelStore;
         this.iconSink = iconSink;
         this.hudAtlasSink = hudAtlasSink;
+        this.shaderPackSink = shaderPackSink;
+        this.fontSink = fontSink;
         this.logger = logger;
     }
 
@@ -82,11 +87,13 @@ public final class AssetSyncSession {
                     case MODEL -> modelStore.load(entry.assetId(), data);
                     case ICON -> iconSink.accept(entry.assetId(), data);
                     case HUD_ATLAS -> hudAtlasSink.accept(entry.assetId(), data);
+                    case SHADER_PACK -> shaderPackSink.accept(entry.assetId(), data);
+                    case FONT -> fontSink.accept(entry.assetId(), data);
                 }
             } catch (IOException e) {
-                logger.warn("Failed to fetch asset '" + entry.assetId() + "': " + e);
+                logger.warn("Failed to fetch asset '" + entry.assetId() + "'", e);
             } catch (RuntimeException e) {
-                logger.warn("Failed to parse asset '" + entry.assetId() + "': " + e);
+                logger.warn("Failed to parse asset '" + entry.assetId() + "'", e);
             }
         }
     }

@@ -16,25 +16,26 @@ public final class LoggingConfig {
                     + "debug: log\n"
                     + "warning: disabled\n"
                     + "error: both",
-            LogDestination.class);
+            1, LogDestination.class);
 
     public static final ConfigKey<LogDestination> WARNING = ConfigKey.ofEnum(
-            "logging", "warning", LogDestination.BOTH, "", LogDestination.class);
+            "logging", "warning", LogDestination.BOTH, "", 1, LogDestination.class);
 
     public static final ConfigKey<LogDestination> ERROR = ConfigKey.ofEnum(
-            "logging", "error", LogDestination.BOTH, "", LogDestination.class);
+            "logging", "error", LogDestination.BOTH, "", 1, LogDestination.class);
 
     public static final ConfigKey<LogDestination> MODERATION = ConfigKey.ofEnum(
-            "logging", "moderation", LogDestination.BOTH, "", LogDestination.class);
+            "logging", "moderation", LogDestination.BOTH, "", 1, LogDestination.class);
 
     public static final ConfigKey<Integer> MAX_LOG_FILES = ConfigKey.ofInt(
             "logging", "max-log-files", 5,
             "How many rotated Nilum log files to keep. On the next one past\n"
                     + "this, the oldest gets deleted. Must be between 2 and 20.",
+            1,
             n -> n >= 2 && n <= 20,
             "must be between 2 and 20");
 
-    /** Where each destination-routable log level should go, read live from {@code configManager}. */
+    /** Where each destination-routable log level should go, read live from configManager. */
     public static Function<NilumLogLevel, LogDestination> destinationLookup(NilumConfigManager configManager) {
         return level -> switch (level) {
             case DEBUG -> configManager.get(DEBUG);

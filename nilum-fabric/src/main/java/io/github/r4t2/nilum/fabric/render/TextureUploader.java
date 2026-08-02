@@ -4,12 +4,12 @@ import com.mojang.blaze3d.platform.NativeImage;
 import io.github.r4t2.nilum.common.model.BbModel;
 import io.github.r4t2.nilum.common.model.BbTexture;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.Identifier;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -27,13 +27,27 @@ public final class TextureUploader {
         return uploaded.computeIfAbsent(key, ignored -> upload(modelId, textureIndex, model));
     }
 
+    /** Drops every GPU texture uploaded for this model id, so the next getOrUpload call re-uploads fresh bytes. */
+    public void invalidate(String modelId) {
+        String prefix = modelId + "#";
+        TextureManager textureManager = Minecraft.getInstance().getTextureManager();
+        Iterator<Map.Entry<String, Identifier>> it = uploaded.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Identifier> entry = it.next();
+            if (entry.getKey().startsWith(prefix)) {
+                textureManager.release(entry.getValue());
+                it.remove();
+            }
+        }
+    }
+
     private Identifier upload(String modelId, int textureIndex, BbModel model) {
         BbTexture texture = model.textures().get(textureIndex);
         Identifier id = Identifier.fromNamespaceAndPath("nilum", "dynamic/" + modelId + "_" + textureIndex);
 
         try {
             NativeImage image = NativeImage.read(texture.pngBytes());
-            DynamicTexture dynamicTexture = new DynamicTexture(() -> "Nilum model texture " + modelId, image);
+            NilumDynamicTexture dynamicTexture = new NilumDynamicTexture(() -> "Nilum model texture " + modelId, image);
             dynamicTexture.upload();
 
             TextureManager textureManager = Minecraft.getInstance().getTextureManager();

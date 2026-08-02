@@ -42,6 +42,8 @@ public final class AssetCache {
             case MODEL -> ".bbmodel";
             case ICON -> ".png";
             case HUD_ATLAS -> ".hudatlas";
+            case SHADER_PACK -> ".zip";
+            case FONT -> ".ttf";
         };
         return root.resolve(assetId + extension);
     }

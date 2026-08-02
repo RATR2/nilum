@@ -51,6 +51,8 @@ final class NilumNeoForgeClient {
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore,
                 (iconId, data) -> logger.warn("Icon '" + iconId + "' fetched but NeoForge has no icon renderer yet."),
                 (atlasId, data) -> logger.warn("HUD atlas '" + atlasId + "' fetched but NeoForge has no HUD renderer yet."),
+                (packId, data) -> logger.warn("Shader pack '" + packId + "' fetched but NeoForge has no Iris integration yet."),
+                (fontId, data) -> logger.warn("Font '" + fontId + "' fetched but NeoForge has no font installer yet."),
                 logger);
 
         modEventBus.addListener((RegisterClientPayloadHandlersEvent event) -> {
@@ -88,7 +90,7 @@ final class NilumNeoForgeClient {
                 "vanilla"
         );
 
-        // context.reply() works regardless of phase; ClientPacketDistributor doesn't - it
+        // context.reply() works regardless of phase; ClientPacketDistributor doesn't, it
         // requires Minecraft.getInstance().getConnection(), which is null during configuration.
         context.reply(new NilumHelloAckPayload(ack.encode()));
     }
@@ -96,7 +98,7 @@ final class NilumNeoForgeClient {
     private static void handleTcpOffer(NilumTcpOfferPayload payload, NilumLogger logger, AssetSyncSession assetSync) {
         TcpOfferPacket offer = TcpOfferPacket.decode(payload.data());
 
-        // NilumTcpClient.connect blocks until success/timeout - never call it on the
+        // NilumTcpClient.connect blocks until success/timeout; never call it on the
         // network callback thread, that would stall all other packet handling.
         Thread.ofVirtual().start(() -> {
             Socket socket = NilumTcpClient.connect(offer.host(), offer.port(), offer.token(),

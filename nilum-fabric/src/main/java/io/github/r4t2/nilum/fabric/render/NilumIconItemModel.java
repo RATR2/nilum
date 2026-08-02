@@ -9,23 +9,31 @@ import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+
 /**
- * Wraps a vanilla per-item-id baked {@link ItemModel}. Checks the actual stack instance for
- * a Nilum icon tag first - if present and loaded in the shared atlas, draws that instead;
- * otherwise delegates untouched to the wrapped model. Registered once per item id via
- * {@code ModelLoadingPlugin}'s after-bake hook, so this runs for every item type, but only
- * ever diverges from vanilla behavior for stacks actually carrying our tag.
+ * Wraps a vanilla per-item-id baked ItemModel. If the stack carries a Nilum icon tag loaded in
+ * the shared atlas, draws that instead; otherwise delegates to the wrapped model.
  */
 public final class NilumIconItemModel implements ItemModel {
+
+    private static final List<GlintQuad> ICON_GLINT_QUADS = List.of(new GlintQuad(
+            new GlintQuad.GlintVertex(0f, 0f, 0.5f, 0f, 0f),
+            new GlintQuad.GlintVertex(1f, 0f, 0.5f, 1f, 0f),
+            new GlintQuad.GlintVertex(1f, 1f, 0.5f, 1f, 1f),
+            new GlintQuad.GlintVertex(0f, 1f, 0.5f, 0f, 1f)));
 
     private final ItemModel original;
     private final IconAtlas iconAtlas;
     private final NilumIconSpecialRenderer iconRenderer;
+    private final NilumGlintSpecialRenderer glintRenderer;
 
-    public NilumIconItemModel(ItemModel original, IconAtlas iconAtlas, NilumIconSpecialRenderer iconRenderer) {
+    public NilumIconItemModel(ItemModel original, IconAtlas iconAtlas, NilumIconSpecialRenderer iconRenderer,
+                               NilumGlintSpecialRenderer glintRenderer) {
         this.original = original;
         this.iconAtlas = iconAtlas;
         this.iconRenderer = iconRenderer;
+        this.glintRenderer = glintRenderer;
     }
 
     @Override
@@ -40,18 +48,35 @@ public final class NilumIconItemModel implements ItemModel {
         state.appendModelIdentityElement(iconId == null ? "no-icon" : iconId);
 
         if (iconId != null && iconAtlas.uvOf(iconId).isPresent()) {
+            var itemTransform = iconAtlas.displayOf(iconId)
+                    .map(display -> display.transformFor(displayContext.getSerializedName()))
+                    .map(transform -> NilumDisplayTransforms.toItemTransform(
+                            transform.rotation(), transform.translation(), transform.scale()))
+                    .orElse(null);
+
             ItemStackRenderState.LayerRenderState layer = state.newLayer();
-            iconAtlas.displayOf(iconId).ifPresent(display -> {
-                var transform = display.transformFor(displayContext.getSerializedName());
-                layer.setTransform(NilumDisplayTransforms.toItemTransform(
-                        transform.rotation(), transform.translation(), transform.scale()));
-            });
+            if (itemTransform != null) {
+                layer.setTransform(itemTransform);
+            }
             // Without this, LayerRenderState.extents stays at its default empty-array supplier,
             // ItemStackRenderState.getModelBoundingBox() ends up with minY=+Infinity, and
-            // ItemEntityRenderer translates dropped items by -Infinity - invisible. See vanilla's
-            // own SpecialModelWrapper.update(), which does the same setExtents(...) call.
+            // ItemEntityRenderer translates dropped items by -Infinity, making them invisible.
+            // See vanilla's own SpecialModelWrapper.update(), which does the same setExtents(...) call.
             layer.setExtents(() -> NilumIconSpecialRenderer.EXTENTS);
             layer.setupSpecialModel(iconRenderer, iconId);
+
+            GlintRenderData glint = GlintTagReader.read(itemStack, ICON_GLINT_QUADS);
+            if (glint != null) {
+                // Same quad shape and same per-context transform as the icon layer above, so the
+                // glint is masked to the icon's real shape and tracks its exact positioning
+                // instead of floating as an unrelated overlay.
+                ItemStackRenderState.LayerRenderState glintLayer = state.newLayer();
+                if (itemTransform != null) {
+                    glintLayer.setTransform(itemTransform);
+                }
+                glintLayer.setExtents(() -> NilumIconSpecialRenderer.EXTENTS);
+                glintLayer.setupSpecialModel(glintRenderer, glint);
+            }
             return;
         }
 

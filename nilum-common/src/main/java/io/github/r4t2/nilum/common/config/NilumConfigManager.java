@@ -23,10 +23,9 @@ public final class NilumConfigManager {
 
     private volatile Map<ConfigKey<?>, Object> values;
 
-    public NilumConfigManager(Path file, int currentVersion, String header,
-                               ConfigSchema schema, List<ConfigMigration> migrations) {
+    public NilumConfigManager(Path file, String header, ConfigSchema schema, List<ConfigMigration> migrations) {
         this.file = file;
-        this.currentVersion = currentVersion;
+        this.currentVersion = schema.currentVersion();
         this.header = header;
         this.schema = schema;
         this.migrations = migrations;

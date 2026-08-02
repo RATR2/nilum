@@ -6,9 +6,9 @@ import net.minecraft.world.item.component.CustomData;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Reads a Nilum tag back off an ItemStack, matching exactly how Paper serializes a
- * PersistentDataContainer entry into the {@code minecraft:custom_data} component on the wire:
- * a top-level {@code PublicBukkitValues} compound, keyed by the full {@code namespace:key} string.
+ * Reads a Nilum tag back off an ItemStack, matching how Paper serializes a
+ * PersistentDataContainer entry into the minecraft:custom_data component: a top-level
+ * PublicBukkitValues compound, keyed by the full namespace:key string.
  */
 final class NilumItemTags {
 

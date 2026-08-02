@@ -13,12 +13,19 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 
 public final class ClientModelStore {
 
     private final Map<String, BbModel> modelsById = new ConcurrentHashMap<>();
     private final Map<String, Map<Integer, List<BbBakedQuad>>> bakedById = new ConcurrentHashMap<>();
+    private final List<Consumer<String>> reloadListeners = new CopyOnWriteArrayList<>();
+
+    public void onReload(Consumer<String> listener) {
+        reloadListeners.add(listener);
+    }
 
     public void load(String modelId, byte[] rawBytes) {
         BbModel model = BbModelParser.parse(new String(rawBytes, StandardCharsets.UTF_8));
@@ -34,6 +41,9 @@ public final class ClientModelStore {
 
         modelsById.put(modelId, model);
         bakedById.put(modelId, Map.copyOf(byTexture));
+        for (Consumer<String> listener : reloadListeners) {
+            listener.accept(modelId);
+        }
     }
 
     public Optional<BbModel> model(String modelId) {

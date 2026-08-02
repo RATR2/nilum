@@ -7,7 +7,7 @@ import org.bukkit.util.BoundingBox;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Converts nilum-common's loader-agnostic {@link BbCollisionBox}es into world-space Bukkit {@link BoundingBox}es. */
+/** Converts nilum-common's loader-agnostic BbCollisionBoxes into world-space Bukkit BoundingBoxes. */
 final class CollisionShapes {
 
     private CollisionShapes() {

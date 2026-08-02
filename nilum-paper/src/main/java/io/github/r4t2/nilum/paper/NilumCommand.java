@@ -1,5 +1,6 @@
 package io.github.r4t2.nilum.paper;
 
+import io.github.r4t2.nilum.paper.block.CustomBlockBroadcaster;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -48,6 +49,10 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             case "giveitem" -> giveItem(sender, args);
             case "giveicon" -> giveIcon(sender, args);
             case "hudframe" -> hudFrame(sender, args);
+            case "placeblock" -> placeBlock(sender, args);
+            case "removeblock" -> removeBlock(sender, args);
+            case "giveitemdef" -> giveItemDef(sender, args);
+            case "shaderpack" -> shaderPack(sender, args);
             default -> {
                 sender.sendMessage(Component.text(
                         "Unknown subcommand '" + args[0] + "'. Run /nilum help for a list of commands."));
@@ -67,18 +72,25 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("Nilum commands:"));
         sender.sendMessage(Component.text("/nilum ver - Show the plugin version."));
         sender.sendMessage(Component.text("/nilum help - Show this message."));
-        sender.sendMessage(Component.text("/nilum reload <models|icons|hud|tcp|config> - Reload part of Nilum."));
+        sender.sendMessage(Component.text(
+                "/nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config> - Reload part of Nilum."));
         sender.sendMessage(Component.text(
                 "/nilum placemodel <modelId> [x] [y] [z] [yaw] [pitch] - Place a model. "
                         + "Coordinates and rotation default to ~ (your position/facing)."));
         sender.sendMessage(Component.text("/nilum giveitem <modelId> [material] - Give yourself a custom item."));
         sender.sendMessage(Component.text("/nilum giveicon <iconId> [material] - Give yourself an icon-only custom item."));
         sender.sendMessage(Component.text("/nilum hudframe <atlasId>:<elementId> <frame> - Set a HUD frame for yourself."));
+        sender.sendMessage(Component.text(
+                "/nilum placeblock <blockId> [x] [y] [z] - Place a real, rendered custom block."));
+        sender.sendMessage(Component.text("/nilum removeblock [x] [y] [z] - Remove a Nilum block."));
+        sender.sendMessage(Component.text("/nilum giveitemdef <id> - Give yourself a defined item (name/lore/enchants included)."));
+        sender.sendMessage(Component.text(
+                "/nilum shaderpack <id>|off - Switch yourself to a Nilum shaderpack, or back to normal. Needs Iris."));
     }
 
     private boolean reload(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /nilum reload <models|icons|hud|tcp|config>"));
+            sender.sendMessage(Component.text("Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config>"));
             return true;
         }
 
@@ -86,11 +98,15 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             case "models" -> reloadAndReport(sender, plugin.reloadModels(), "Models", "reload the models folder");
             case "icons" -> reloadAndReport(sender, plugin.reloadIcons(), "Icons", "reload the icons folder");
             case "hud" -> reloadAndReport(sender, plugin.reloadHudAtlases(), "HUD atlases", "reload the hud folder");
+            case "items" -> reloadAndReport(sender, plugin.reloadItems(), "Item definitions", "reload the items folder");
+            case "blocks" -> reloadAndReport(sender, plugin.reloadBlocks(), "Block definitions", "reload the blocks folder");
+            case "shaderpacks" -> reloadAndReport(sender, plugin.reloadShaderPacks(), "Shader packs", "reload the shaderpacks folder");
+            case "fonts" -> reloadAndReport(sender, plugin.reloadFonts(), "Fonts", "reload the fonts folder");
             case "tcp" -> reloadAndReport(sender, plugin.reloadTcp(), "TCP side-channel", "reload the TCP side-channel");
             case "config" -> reloadAndReport(sender, plugin.reloadSettings(), "Config", "reload the config");
             default -> {
                 sender.sendMessage(Component.text(
-                        "Unknown reload target '" + args[1] + "'. Usage: /nilum reload <models|icons|hud|tcp|config>"));
+                        "Unknown reload target '" + args[1] + "'. Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config>"));
                 yield true;
             }
         };
@@ -136,6 +152,94 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         } else {
             sender.sendMessage(Component.text("Placed '" + modelId + "' (entity " + entityId + ")."));
         }
+        return true;
+    }
+
+    private boolean placeBlock(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can place a block (needs a location)."));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /nilum placeblock <blockId> [x] [y] [z]"));
+            return true;
+        }
+
+        String blockTypeId = args[1];
+        Location base = player.getLocation();
+        Location location;
+        try {
+            double x = parseCoordinate(args.length > 2 ? args[2] : "~", base.getX());
+            double y = parseCoordinate(args.length > 3 ? args[3] : "~", base.getY());
+            double z = parseCoordinate(args.length > 4 ? args[4] : "~", base.getZ());
+            location = new Location(base.getWorld(), x, y, z);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            return true;
+        }
+
+        var definition = plugin.customBlocks().place(location, blockTypeId);
+        if (definition.isEmpty()) {
+            sender.sendMessage(Component.text("No loaded block type named '" + blockTypeId
+                    + "' (drop a matching blocks/" + blockTypeId + ".yml into the plugin's blocks folder)."));
+            return true;
+        }
+
+        CustomBlockBroadcaster.broadcastPlacement(plugin, location, definition.get().modelId());
+        sender.sendMessage(Component.text("Placed '" + blockTypeId + "' block at "
+                + location.getBlockX() + ", " + location.getBlockY() + ", " + location.getBlockZ() + "."));
+        return true;
+    }
+
+    private boolean removeBlock(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can remove a block (needs a location)."));
+            return true;
+        }
+
+        Location base = player.getLocation();
+        Location location;
+        try {
+            double x = parseCoordinate(args.length > 1 ? args[1] : "~", base.getX());
+            double y = parseCoordinate(args.length > 2 ? args[2] : "~", base.getY());
+            double z = parseCoordinate(args.length > 3 ? args[3] : "~", base.getZ());
+            location = new Location(base.getWorld(), x, y, z);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            return true;
+        }
+
+        Optional<String> removed = plugin.customBlocks().remove(location);
+        if (removed.isEmpty()) {
+            sender.sendMessage(Component.text("No Nilum block at that position."));
+            return true;
+        }
+
+        CustomBlockBroadcaster.broadcastRemoval(plugin, location);
+        sender.sendMessage(Component.text("Removed '" + removed.get() + "' block."));
+        return true;
+    }
+
+    private boolean giveItemDef(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can be given an item."));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /nilum giveitemdef <id>"));
+            return true;
+        }
+
+        String id = args[1];
+        Optional<ItemStack> item = plugin.items().resolve(id);
+        if (item.isEmpty()) {
+            sender.sendMessage(Component.text("No item definition named '" + id
+                    + "' (or its underlying model/icon isn't loaded)."));
+            return true;
+        }
+
+        player.getInventory().addItem(item.get());
+        sender.sendMessage(Component.text("Gave you '" + id + "'."));
         return true;
     }
 
@@ -245,19 +349,55 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean shaderPack(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can be switched to a shaderpack."));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /nilum shaderpack <id>|off"));
+            return true;
+        }
+
+        String id = args[1];
+        if (id.equalsIgnoreCase("off")) {
+            plugin.shaderPackService().deactivate(player);
+            sender.sendMessage(Component.text("Told your client to restore its previous shaderpack state."));
+            return true;
+        }
+
+        if (!plugin.shaderPacks().packIds().contains(id)) {
+            sender.sendMessage(Component.text("No shader pack '" + id + "' loaded."));
+            return true;
+        }
+
+        plugin.shaderPackService().activate(player, id);
+        sender.sendMessage(Component.text("Told your client to switch to shader pack '" + id + "'."));
+        return true;
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filterByPrefix(List.of("ver", "help", "reload", "placemodel", "giveitem", "giveicon", "hudframe"), args[0]);
+            return filterByPrefix(List.of("ver", "help", "reload", "placemodel", "giveitem", "giveicon",
+                    "hudframe", "placeblock", "removeblock", "giveitemdef", "shaderpack"), args[0]);
         }
 
         if (args.length == 2) {
             return switch (args[0].toLowerCase(Locale.ROOT)) {
-                case "reload" -> filterByPrefix(List.of("models", "icons", "hud", "tcp", "config"), args[1]);
+                case "reload" -> filterByPrefix(
+                        List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "tcp", "config"), args[1]);
                 case "placemodel", "giveitem" -> filterByPrefix(plugin.models().modelIds(), args[1]);
+                case "placeblock" -> filterByPrefix(plugin.blockDefinitions().blockIds(), args[1]);
                 case "giveicon" -> filterByPrefix(plugin.icons().iconIds(), args[1]);
+                case "giveitemdef" -> filterByPrefix(plugin.items().itemIds(), args[1]);
                 case "hudframe" -> filterByPrefix(plugin.hudAtlases().atlasIds().stream()
                         .map(id -> id + ":").toList(), args[1]);
+                case "shaderpack" -> {
+                    List<String> options = new ArrayList<>(plugin.shaderPacks().packIds());
+                    options.add("off");
+                    yield filterByPrefix(options, args[1]);
+                }
                 default -> List.of();
             };
         }
@@ -285,7 +425,33 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             return filterByPrefix(options, args[args.length - 1]);
         }
 
+        if (args.length <= 5 && args[0].equalsIgnoreCase("placeblock")) {
+            return filterByPrefix(coordinateOptions(sender, args.length - 1, 2), args[args.length - 1]);
+        }
+
+        if (args.length <= 4 && args[0].equalsIgnoreCase("removeblock")) {
+            return filterByPrefix(coordinateOptions(sender, args.length - 1, 1), args[args.length - 1]);
+        }
+
         return List.of();
+    }
+
+    /** "~" plus the player's own rounded coordinate for whichever of x/y/z this arg index is, given where x starts. */
+    private static List<String> coordinateOptions(CommandSender sender, int argIndex, int xIndex) {
+        List<String> options = new ArrayList<>(List.of("~"));
+        if (sender instanceof Player player) {
+            Location location = player.getLocation();
+            Double rounded = switch (argIndex - xIndex) {
+                case 0 -> (double) Math.round(location.getX());
+                case 1 -> (double) Math.round(location.getY());
+                case 2 -> (double) Math.round(location.getZ());
+                default -> null;
+            };
+            if (rounded != null) {
+                options.add(String.valueOf(rounded.longValue()));
+            }
+        }
+        return options;
     }
 
     private static List<String> filterByPrefix(Collection<String> options, String prefix) {

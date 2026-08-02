@@ -16,13 +16,10 @@ public final class NilumDisplayTransforms {
     }
 
     /**
-     * Resolves a full {@code .bbmodel}'s own Blockbench Display panel data for one context,
-     * falling back per-field to identity - no config file involved, unlike icons.yml, since a
-     * full model already authors this in Blockbench. Deliberately does NOT fall back to
-     * vanilla's generated-item defaults (unlike the icon-atlas path): those numbers (e.g. the
-     * firstperson_righthand (0,-90,25) rotation) exist to lay vanilla's flat single-quad
-     * "generated" icon flat to face the camera, and reorienting a real 3D Blockbench mesh with
-     * them produces a wrong, hand-specific rotation instead of the intended no-op.
+     * Resolves a full .bbmodel's Blockbench Display panel data for one context, falling back
+     * per-field to identity. Deliberately does not fall back to vanilla's generated-item
+     * defaults like the icon-atlas path does; those numbers exist to face a flat single-quad
+     * icon at the camera and would misorient a real 3D mesh.
      */
     public static ItemTransform resolve(BbModel model, String context) {
         BbDisplayTransform authored = model.display().get(context);
@@ -42,10 +39,9 @@ public final class NilumDisplayTransforms {
     }
 
     /**
-     * Rotation/translation/scale here are in the same raw units Blockbench's Display panel (and
-     * vanilla's own model JSON) use. Vanilla's own ItemTransform.Deserializer scales translation
-     * by 1/16 and clamps it to [-5, 5] (scale to [-4, 4]) when loading from JSON - reproduced
-     * here since we build ItemTransform directly rather than going through that deserializer.
+     * Rotation/translation/scale here use Blockbench's raw units. Matches vanilla's
+     * ItemTransform.Deserializer: translation scaled by 1/16 and clamped to [-5, 5]
+     * (scale clamped to [-4, 4]), reproduced here since we build ItemTransform directly.
      */
     public static ItemTransform toItemTransform(BbVector3 rotation, BbVector3 translation, BbVector3 scale) {
         Vector3f rotationVec = toVector3f(rotation);

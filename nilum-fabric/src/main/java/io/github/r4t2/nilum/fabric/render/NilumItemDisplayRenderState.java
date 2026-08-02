@@ -15,10 +15,9 @@ public final class NilumItemDisplayRenderState extends ItemDisplayEntityRenderSt
     public Map<Integer, List<BbBakedQuad>> nilumQuadsByTexture;
 
     /**
-     * Vanilla's DisplayRenderer.submit() only calls submitInner() when this
-     * returns true, and the vanilla item is always empty for a Nilum anchor
-     * entity (it's spawned with ItemStack.empty()) - so without this override,
-     * our submitInner() override is never reached at all.
+     * Vanilla's DisplayRenderer.submit() only calls submitInner() when this returns true, and
+     * the vanilla item is always empty for a Nilum anchor entity. Without this override,
+     * submitInner() is never reached.
      */
     @Override
     public boolean hasSubState() {

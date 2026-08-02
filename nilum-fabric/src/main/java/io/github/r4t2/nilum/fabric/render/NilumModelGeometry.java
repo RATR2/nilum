@@ -5,13 +5,13 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.r4t2.nilum.common.model.BbBakedQuad;
 import io.github.r4t2.nilum.common.model.BbBakedVertex;
 
-/** Shared baked-quad vertex emission, used by both in-world entity rendering and held-item rendering. */
-final class NilumModelGeometry {
+/** Shared baked-quad vertex emission, used by in-world entity rendering, held-item rendering, and block rendering. */
+public final class NilumModelGeometry {
 
     private NilumModelGeometry() {
     }
 
-    static void emitQuad(VertexConsumer consumer, PoseStack.Pose pose, BbBakedQuad quad, int light, int overlay) {
+    public static void emitQuad(VertexConsumer consumer, PoseStack.Pose pose, BbBakedQuad quad, int light, int overlay) {
         emitVertex(consumer, pose, quad.v0(), light, overlay);
         emitVertex(consumer, pose, quad.v1(), light, overlay);
         emitVertex(consumer, pose, quad.v2(), light, overlay);

@@ -25,7 +25,7 @@ public final class IconItemService {
     /**
      * @param iconId       loaded icon to represent
      * @param baseMaterial vanilla material to back the item
-     * @return the item, or empty if {@code iconId} isn't loaded
+     * @return the item, or empty if iconId isn't loaded
      */
     public Optional<ItemStack> createItem(String iconId, Material baseMaterial) {
         if (!iconRegistry.iconIds().contains(iconId)) {

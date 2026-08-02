@@ -7,7 +7,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-/** Declares a server-pushed named variable an {@code auto} expression can reference as {@code number("server:name")}. */
+/** Declares a server-pushed named variable an auto expression can reference as number("server:name"). */
 public record RegisterClientVarPacket(String name, double initialValue) {
 
     public byte[] encode() {

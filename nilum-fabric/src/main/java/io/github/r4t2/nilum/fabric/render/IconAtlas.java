@@ -17,21 +17,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A single shared, growable texture atlas for icon-only custom items. Icons are packed
- * left-to-right into shelves (rows); a shelf that doesn't fit starts a new one, and the
- * canvas only ever grows taller (never wider, never repacked) so an already-placed icon's
- * pixel rect never moves once assigned. Canvas width is fixed; height grows in shelves as
- * needed. Not vanilla's real item atlas - that's tied to the resourcepack reload lifecycle,
- * and icons can arrive from the server at any time mid-session.
- *
- * <p>Icons larger than {@link #MAX_ICON_DIMENSION} in either axis are downscaled (preserving
- * aspect ratio) before packing - admins shouldn't need to hand-tune source image dimensions
- * for what's meant to be a small inventory icon.
- *
- * <p>All packing/upload work happens on the render thread (icons can arrive off-thread, from
- * AssetSyncSession's fetch thread) via {@link Minecraft#execute}. The GPU texture
- * is only recreated when the canvas actually grows (a new GPU allocation is unavoidable then);
- * otherwise an icon addition just re-uploads the mutated pixels into the existing texture.
+ * Shared, growable texture atlas for icon-only custom items, packed left-to-right into
+ * shelves. Icons larger than MAX_ICON_DIMENSION are downscaled to fit. All packing/upload
+ * work must happen on the render thread, via Minecraft.execute.
  */
 public final class IconAtlas {
 

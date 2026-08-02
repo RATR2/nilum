@@ -4,9 +4,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Caches server-pushed named variables ({@code number("server:name")} in the expression
- * language) so {@code auto} elements don't need a packet every tick for values that change
- * infrequently - just once, when the server actually updates them.
+ * Caches server-pushed named variables (number("server:name") in the expression language) so
+ * auto elements don't need a packet every tick, just once when the server updates them.
  */
 public final class ClientVarStore {
 

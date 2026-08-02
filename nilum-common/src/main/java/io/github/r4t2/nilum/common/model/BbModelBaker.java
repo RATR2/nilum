@@ -49,10 +49,9 @@ public final class BbModelBaker {
     }
 
     /**
-     * Blockbench's per-element rotation vector is applied intrinsically X, then Y, then Z (its
-     * default Three.js Euler order - it never overrides this for elements), around the element's
-     * own origin point. Positions rotate around that origin; normals rotate in place (direction
-     * only, no translation).
+     * Blockbench's per-element rotation vector is applied intrinsically X, then Y, then Z, around
+     * the element's own origin point. Positions rotate around that origin; normals rotate in
+     * place (direction only, no translation).
      */
     private static BbBakedQuad rotateQuad(BbBakedQuad quad, float rx, float ry, float rz,
                                            float originX, float originY, float originZ) {

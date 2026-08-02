@@ -4,24 +4,18 @@ import io.github.r4t2.nilum.common.protocol.AssetKind;
 import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
 import io.github.r4t2.nilum.common.util.SHA256;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
 
 /**
- * Server-side registry of icon-only custom item textures. What's actually served/hashed for an
- * icon is an {@link IconAssetPayload} - the PNG bundled with its resolved {@link IconDisplay} -
- * not just the raw file bytes, so a display-config-only change (no PNG edit at all) still
- * changes the asset's hash and triggers a client re-fetch. {@link #loadDirectory} alone leaves
- * every icon's display at identity; call {@link #applyDisplay} once it's actually resolved
- * (from icons.yml, server-side only - this class stays loader-agnostic).
+ * Server-side registry of icon-only custom item textures. What's served/hashed is an
+ * IconAssetPayload, the PNG bundled with its resolved IconDisplay, so a display-only change
+ * still triggers a client re-fetch. load() alone leaves the icon's display at identity;
+ * call applyDisplay() once it's resolved.
  */
 public final class IconRegistry {
 
@@ -29,21 +23,16 @@ public final class IconRegistry {
     private final Map<String, byte[]> assetBytesById = new ConcurrentHashMap<>();
     private final Map<String, String> hashById = new ConcurrentHashMap<>();
 
-    public void loadDirectory(Path directory) throws IOException {
+    public void clear() {
         pngBytesById.clear();
         assetBytesById.clear();
         hashById.clear();
+    }
 
-        Files.createDirectories(directory);
-
-        try (Stream<Path> files = Files.list(directory)) {
-            for (Path file : files.filter(IconRegistry::isPngFile).toList()) {
-                String iconId = stripExtension(file.getFileName().toString());
-                byte[] pngBytes = Files.readAllBytes(file);
-                pngBytesById.put(iconId, pngBytes);
-                applyDisplay(iconId, IconDisplay.allIdentity());
-            }
-        }
+    /** Registers one icon's already-read texture bytes under iconId, defaulting its display to identity. */
+    public void load(String iconId, byte[] pngBytes) {
+        pngBytesById.put(iconId, pngBytes);
+        applyDisplay(iconId, IconDisplay.allIdentity());
     }
 
     /** Rebuilds the served payload/hash for one icon from its loaded PNG bytes plus a resolved display. */
@@ -71,13 +60,5 @@ public final class IconRegistry {
             entries.add(new AssetManifestEntry(entry.getKey(), entry.getValue(), AssetKind.ICON));
         }
         return entries;
-    }
-
-    private static boolean isPngFile(Path path) {
-        return Files.isRegularFile(path) && path.getFileName().toString().endsWith(".png");
-    }
-
-    private static String stripExtension(String fileName) {
-        return fileName.substring(0, fileName.length() - ".png".length());
     }
 }

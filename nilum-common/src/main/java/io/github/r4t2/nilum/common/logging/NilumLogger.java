@@ -35,7 +35,7 @@ public final class NilumLogger {
         try {
             Files.createDirectories(parent);
         } catch (IOException e) {
-            // Nothing more useful to do - writeToFile() below will just keep failing silently too.
+            // Nothing more useful to do; writeToFile() below will just keep failing silently too.
         }
     }
 
@@ -43,7 +43,7 @@ public final class NilumLogger {
         route(NilumLogLevel.DEBUG, message);
     }
 
-    /** Always shown in the console and written to the log file - not configurable. */
+    /** Always shown in the console and written to the log file; not configurable. */
     public void info(String message) {
         writeToFile(NilumLogLevel.INFO, message);
         sink.log(NilumLogLevel.INFO, message);
@@ -53,16 +53,36 @@ public final class NilumLogger {
         route(NilumLogLevel.WARN, message);
     }
 
+    public void warn(String message, Throwable cause) {
+        warn(message + ": " + causeChain(cause));
+    }
+
     public void error(String message) {
         route(NilumLogLevel.ERROR, message);
     }
 
     public void error(String message, Throwable cause) {
-        error(message + ": " + cause);
+        error(message + ": " + causeChain(cause));
     }
 
     public void moderation(String message) {
         route(NilumLogLevel.MODERATION, message);
+    }
+
+    /**
+     * Throwable#toString() alone drops everything past the outermost wrapper, e.g. an
+     * UncheckedIOException hiding the real IOException that explains why. Walks the full cause
+     * chain instead.
+     */
+    private static String causeChain(Throwable cause) {
+        StringBuilder chain = new StringBuilder(String.valueOf(cause));
+        Throwable next = cause.getCause();
+        while (next != null && next != cause) {
+            chain.append(" | caused by: ").append(next);
+            cause = next;
+            next = cause.getCause();
+        }
+        return chain.toString();
     }
 
     private void route(NilumLogLevel level, String message) {

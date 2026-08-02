@@ -13,8 +13,13 @@ public record BbModel(
         List<BbOutlinerNode> outliner,
         List<BbTexture> textures,
         Optional<String> collisionIntent,
-        Map<String, BbDisplayTransform> display
+        Map<String, BbDisplayTransform> display,
+        List<BbAnimation> animations
 ) {
+
+    public Optional<BbAnimation> findAnimation(String name) {
+        return animations.stream().filter(animation -> animation.name().equals(name)).findFirst();
+    }
 
     public Optional<BbOutlinerGroup> findGroup(String name) {
         return findGroup(outliner, name);

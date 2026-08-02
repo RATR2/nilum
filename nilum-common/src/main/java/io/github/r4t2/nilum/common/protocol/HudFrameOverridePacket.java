@@ -7,7 +7,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-/** Temporarily seizes control of a normally {@code auto} element. durationTicks -1 holds until a release. */
+/** Temporarily seizes control of a normally auto element. durationTicks -1 holds until a release. */
 public record HudFrameOverridePacket(String atlasId, String elementId, int frame, int durationTicks) {
 
     public byte[] encode() {

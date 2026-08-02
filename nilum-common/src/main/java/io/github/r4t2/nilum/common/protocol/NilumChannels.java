@@ -46,6 +46,21 @@ public final class NilumChannels {
     public static final String SET_CLIENT_VAR = "set_client_var";
     public static final String SET_CLIENT_VAR_QUALIFIED = NAMESPACE + ":" + SET_CLIENT_VAR;
 
+    public static final String SET_HUD_TEXT = "set_hud_text";
+    public static final String SET_HUD_TEXT_QUALIFIED = NAMESPACE + ":" + SET_HUD_TEXT;
+
+    public static final String KEYBIND = "keybind";
+    public static final String KEYBIND_QUALIFIED = NAMESPACE + ":" + KEYBIND;
+
+    public static final String CHUNK_BLOCKS = "chunk_blocks";
+    public static final String CHUNK_BLOCKS_QUALIFIED = NAMESPACE + ":" + CHUNK_BLOCKS;
+
+    public static final String ACTIVATE_SHADER_PACK = "activate_shader_pack";
+    public static final String ACTIVATE_SHADER_PACK_QUALIFIED = NAMESPACE + ":" + ACTIVATE_SHADER_PACK;
+
+    public static final String DEACTIVATE_SHADER_PACK = "deactivate_shader_pack";
+    public static final String DEACTIVATE_SHADER_PACK_QUALIFIED = NAMESPACE + ":" + DEACTIVATE_SHADER_PACK;
+
     private NilumChannels() {
     }
 }

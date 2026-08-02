@@ -6,7 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/** Thin CustomPacketPayload wrapper around a raw {@code RegisterClientVarPacket}. See {@link NilumHelloPayload}. */
+/** Thin CustomPacketPayload wrapper around a raw RegisterClientVarPacket. See NilumHelloPayload. */
 public record NilumRegisterClientVarPayload(byte[] data) implements CustomPacketPayload {
 
     public static final Type<NilumRegisterClientVarPayload> TYPE =

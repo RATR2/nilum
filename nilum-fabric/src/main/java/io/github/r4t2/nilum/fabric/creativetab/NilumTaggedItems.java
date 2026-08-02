@@ -7,10 +7,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 
 /**
- * Builds representative ItemStacks for Nilum's creative tabs, tagged the exact same way Paper's
- * PersistentDataContainer serializes onto the wire ({@code custom_data -> PublicBukkitValues ->
- * <namespace>:<key>}) - so picking one up via vanilla's own creative-tab click handling round-trips
- * correctly with no Nilum-specific packet involved at all.
+ * Builds representative ItemStacks for Nilum's creative tabs, tagged the same way Paper's
+ * PersistentDataContainer serializes onto the wire (custom_data -> PublicBukkitValues ->
+ * namespace:key), so picking one up via vanilla's creative-tab click handling round-trips
+ * correctly.
  */
 final class NilumTaggedItems {
 

@@ -5,9 +5,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Every {@code ItemDisplayContext} an icon item needs a placement for, fully resolved server-side
- * (icons.yml's "generated"/"blockbench"/literal config already applied) so the client only ever
- * deals with concrete numbers.
+ * Every ItemDisplayContext an icon item needs a placement for, fully resolved server-side so
+ * the client only ever deals with concrete numbers.
  */
 public record IconDisplay(Map<String, IconTransform> byContext) {
 

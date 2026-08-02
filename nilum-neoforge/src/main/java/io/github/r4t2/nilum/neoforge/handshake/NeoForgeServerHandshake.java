@@ -122,7 +122,7 @@ public final class NeoForgeServerHandshake {
 
     public void onHelloAck(NilumHelloAckPayload payload, IPayloadContext context) {
         // This handshake only ever sends nilum:hello as a configuration task (see
-        // onRegisterConfigurationTasks) - a play-phase ack means a Paper server's client
+        // onRegisterConfigurationTasks); a play-phase ack means a Paper server's client
         // replying via play, which isn't this instance's business.
         if (!(context.listener() instanceof ServerConfigurationPacketListenerImpl listener)) {
             return;

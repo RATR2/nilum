@@ -6,7 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/** Thin CustomPacketPayload wrapper around a raw {@code ModelSpawnPacket}. See {@link NilumHelloPayload}. */
+/** Thin CustomPacketPayload wrapper around a raw ModelSpawnPacket. See NilumHelloPayload. */
 public record NilumModelSpawnPayload(byte[] data) implements CustomPacketPayload {
 
     public static final Type<NilumModelSpawnPayload> TYPE =

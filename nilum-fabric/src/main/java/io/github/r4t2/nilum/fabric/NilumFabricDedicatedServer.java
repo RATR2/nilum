@@ -4,8 +4,8 @@ import io.github.r4t2.nilum.fabric.handshake.FabricServerHandshake;
 import net.fabricmc.api.DedicatedServerModInitializer;
 
 /**
- * Runs only when this instance is an actual Fabric dedicated server - never
- * on a physical client, unlike the common {@code "main"} entrypoint.
+ * Runs only when this instance is an actual Fabric dedicated server, never on a physical
+ * client, unlike the common "main" entrypoint.
  */
 public final class NilumFabricDedicatedServer implements DedicatedServerModInitializer {
 

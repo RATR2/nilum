@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * Recursive-descent parser for the HUD expression DSL. Parsed once at atlas load time into an
  * AST, never re-parsed per frame. Depth and total-node limits are safety backstops against a
- * pathological expression, not a security measure - see the design doc's "Safety" section.
+ * pathological expression, not a security measure.
  */
 public final class ExprParser {
 

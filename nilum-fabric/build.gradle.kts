@@ -13,6 +13,11 @@ dependencies {
     mappings(loom.officialMojangMappings())
     modImplementation("net.fabricmc:fabric-loader:0.19.3")
     modImplementation("net.fabricmc.fabric-api:fabric-api:0.141.6+1.21.11")
+
+    // Compile-only, optional at runtime; Iris integration is behind FabricLoader.isModLoaded("iris")
+    // checks everywhere it's used, so the game runs fine without Iris installed. Vendored locally
+    // rather than pulled from Iris's maven since that coordinate wasn't verified.
+    modCompileOnly(files("libs/iris-fabric-1.10.7+mc1.21.11.jar"))
 }
 
 tasks.withType<JavaCompile>().configureEach {

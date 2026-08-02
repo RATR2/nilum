@@ -9,16 +9,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
- * Resolves {@code number("minecraft:...")}/{@code boolean("minecraft:...")} against the local
- * player, {@code server:name} against a {@link ClientVarStore}, and anything else against
- * values other client mods have registered via {@link #register(String, Supplier)} - matching
- * the design doc's "Other Mod Integration" example.
+ * Resolves number("minecraft:...")/boolean("minecraft:...") against the local player,
+ * server:name against a ClientVarStore, and anything else against values other client mods
+ * have registered via register(String, Supplier).
  */
 public final class NilumHudValueSource implements ValueSource {
 
     private static final Map<String, Supplier<Double>> externalValues = new ConcurrentHashMap<>();
 
-    /** Lets other mods expose a value under a namespaced key, e.g. {@code "origins:current_origin_power"}. */
+    /** Lets other mods expose a value under a namespaced key, e.g. "origins:current_origin_power". */
     public static void register(String key, Supplier<Double> supplier) {
         externalValues.put(key, supplier);
     }

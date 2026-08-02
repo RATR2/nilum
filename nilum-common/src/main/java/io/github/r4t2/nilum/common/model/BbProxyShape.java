@@ -1,10 +1,8 @@
 package io.github.r4t2.nilum.common.model;
 
 /**
- * Result of {@link ProxyMaterialClassifier}: which vanilla-shaped proxy a
- * collision shape can be represented by, per the design doc's Proxy Material
- * Auto-Classification. {@code COMPLEX} covers anything that isn't a simple
- * full cube or half-height slab, including stair shapes (not classified yet).
+ * Result of ProxyMaterialClassifier: which vanilla-shaped proxy a collision shape can be
+ * represented by. COMPLEX covers anything that isn't a full cube or half-height slab.
  */
 public enum BbProxyShape {
     FULL_CUBE,

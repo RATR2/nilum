@@ -7,9 +7,9 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
- * Thin CustomPacketPayload wrapper around a raw {@code io.github.r4t2.nilum.common.protocol.HelloPacket}.
- * The actual field encoding lives in nilum-common so the wire format is identical
- * across every platform; this just adapts it to Fabric's payload registration API.
+ * Thin CustomPacketPayload wrapper around a raw HelloPacket. The field encoding lives in
+ * nilum-common so the wire format is identical across platforms; this adapts it to Fabric's
+ * payload registration API.
  */
 public record NilumHelloPayload(byte[] data) implements CustomPacketPayload {
 
