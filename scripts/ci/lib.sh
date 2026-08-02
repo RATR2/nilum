@@ -5,6 +5,31 @@ read_version() {
   grep -oE 'version = "[^"]*"' build.gradle.kts | head -1 | cut -d'"' -f2
 }
 
+# nilum-fabric/libs/*.jar is gitignored (see nilum-fabric/libs/attach.md), so CI has to fetch
+# it itself before Gradle configures nilum-fabric. Bumping the vendored version means updating
+# both the filename in nilum-fabric/build.gradle.kts and the URL/hash here together.
+IRIS_JAR_NAME="iris-fabric-1.10.7+mc1.21.11.jar"
+IRIS_JAR_URL="https://cdn.modrinth.com/data/YL57xq9U/versions/fDpuVzVr/iris-fabric-1.10.7%2Bmc1.21.11.jar"
+IRIS_JAR_SHA1="aae8567bd9ea397d50aff1d0b680a82ffe67040c"
+
+fetch_vendored_libs() {
+  local dest="nilum-fabric/libs/${IRIS_JAR_NAME}"
+  if [ -f "${dest}" ]; then
+    return
+  fi
+
+  mkdir -p nilum-fabric/libs
+  curl -fsSL -o "${dest}" "${IRIS_JAR_URL}"
+
+  local actual_sha1
+  actual_sha1="$(sha1sum "${dest}" | cut -d' ' -f1)"
+  if [ "${actual_sha1}" != "${IRIS_JAR_SHA1}" ]; then
+    echo "iris-fabric jar sha1 mismatch: expected ${IRIS_JAR_SHA1}, got ${actual_sha1}" >&2
+    rm -f "${dest}"
+    exit 1
+  fi
+}
+
 build_and_collect_jars() {
   local out_dir="$1"
   local version sha jar module suffix
@@ -12,6 +37,7 @@ build_and_collect_jars() {
   version="$(read_version)"
   sha="${COMMIT_SHA}"
 
+  fetch_vendored_libs
   ./gradlew build mergeClientJars --console=plain
 
   while IFS= read -r jar; do
