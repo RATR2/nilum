@@ -1,6 +1,6 @@
 <div align="center">
 
-# <img width="200" height="200" alt="nilum-blender" src="https://github.com/user-attachments/assets/3da93e76-0dc4-426b-aefe-fb3b3b06e11f" /> Nilum
+# <img width="86" height="86" alt="nilum-blender" src="https://github.com/user-attachments/assets/3da93e76-0dc4-426b-aefe-fb3b3b06e11f" /> Nilum
 
 [![Release](https://img.shields.io/github/v/release/RATR2/nilum?display_name=release&style=for-the-badge&logo=github)](https://github.com/RATR2/nilum/releases/latest)
 [![Issues](https://img.shields.io/github/issues/RATR2/nilum?style=for-the-badge&logo=github)](https://github.com/RATR2/nilum/issues)
