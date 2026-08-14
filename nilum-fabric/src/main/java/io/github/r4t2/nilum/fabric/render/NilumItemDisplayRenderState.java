@@ -1,5 +1,6 @@
 package io.github.r4t2.nilum.fabric.render;
 
+import io.github.r4t2.nilum.common.model.AnimationPlaybackState;
 import io.github.r4t2.nilum.common.model.BbBakedQuad;
 import io.github.r4t2.nilum.common.model.BbModel;
 import net.minecraft.client.renderer.entity.state.ItemDisplayEntityRenderState;
@@ -12,13 +13,10 @@ public final class NilumItemDisplayRenderState extends ItemDisplayEntityRenderSt
 
     public String nilumModelId;
     public BbModel nilumModel;
-    public Map<Integer, List<BbBakedQuad>> nilumQuadsByTexture;
+    public Map<String, List<BbBakedQuad>> nilumQuadsByBone;
+    public AnimationPlaybackState nilumAnimationState;
 
-    /**
-     * Vanilla's DisplayRenderer.submit() only calls submitInner() when this returns true, and
-     * the vanilla item is always empty for a Nilum anchor entity. Without this override,
-     * submitInner() is never reached.
-     */
+    /** Vanilla's DisplayRenderer.submit() only calls submitInner() when this returns true; without it, submitInner() is never reached. */
     @Override
     public boolean hasSubState() {
         return super.hasSubState() || nilumModel != null;

@@ -2,11 +2,7 @@ package io.github.r4t2.nilum.common.model;
 
 import java.util.List;
 
-/**
- * Classifies a resolved collision shape into a simple vanilla-representable proxy. Only
- * recognizes a single box spanning the full block, or a half-height slab; anything else
- * (multiple boxes, partial footprint, stairs) falls back to BbProxyShape.COMPLEX.
- */
+/** Classifies a resolved collision shape into a simple vanilla-representable proxy, or BbProxyShape.COMPLEX otherwise. */
 public final class ProxyMaterialClassifier {
 
     private static final double EPSILON = 1.0 / 32.0;
@@ -15,7 +11,9 @@ public final class ProxyMaterialClassifier {
     }
 
     public static BbProxyShape classify(List<BbCollisionBox> boxes) {
-        if (boxes.size() != 1) {
+        // A PARTIAL box's reduced-resistance behavior can never be represented by a plain vanilla
+        // material's hitbox, so it always needs manual collision handling, same as COMPLEX.
+        if (boxes.size() != 1 || boxes.get(0).tier() == CollisionTier.PARTIAL) {
             return BbProxyShape.COMPLEX;
         }
 

@@ -167,10 +167,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         }
     }
 
-    /**
-     * Paper drops outgoing plugin messages sent before the client's own channel registration
-     * arrives, which can still be in flight right at join. Wait for it instead of racing it.
-     */
+    /** Waits for the client's channel registration instead of racing it; it can still be in flight right at join. */
     @EventHandler
     public void onChannelRegister(PlayerRegisterChannelEvent event) {
         if (NilumChannels.HELLO_QUALIFIED.equals(event.getChannel())

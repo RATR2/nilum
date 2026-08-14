@@ -11,11 +11,7 @@ import io.github.r4t2.nilum.common.protocol.SetHudTextPacket;
 import io.github.r4t2.nilum.paper.NilumPlugin;
 import org.bukkit.entity.Player;
 
-/**
- * Server-side entry point for driving HUD atlas elements. Frame/override state lives entirely
- * client-side; this is a thin fire-and-forget packet sender, gated on whether a given player
- * has completed the Nilum handshake.
- */
+/** Server-side entry point for driving HUD atlas elements; a thin fire-and-forget packet sender, gated on the Nilum handshake. */
 public final class HudAtlasService {
 
     private final NilumPlugin plugin;

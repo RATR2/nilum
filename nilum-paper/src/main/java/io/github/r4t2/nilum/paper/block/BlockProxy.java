@@ -18,12 +18,7 @@ public sealed interface BlockProxy {
         }
     }
 
-    /**
-     * No single vanilla material matches the desired mechanics, so they're enforced manually.
-     * wireBlock still has to be a real, breakable material (not barrier). Creative insta-break
-     * is always suppressed; survival timing mostly follows the chosen material's real hardness,
-     * with premature completions denied until breakTimeSeconds elapses.
-     */
+    /** Mechanics enforced manually; wireBlock must still be a real breakable material. Creative insta-break is always suppressed. */
     record Custom(Material wireBlock, double breakTimeSeconds, boolean explosionResistant) implements BlockProxy {
         @Override
         public Material wireMaterial() {

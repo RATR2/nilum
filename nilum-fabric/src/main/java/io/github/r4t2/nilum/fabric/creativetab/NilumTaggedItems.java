@@ -6,12 +6,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 
-/**
- * Builds representative ItemStacks for Nilum's creative tabs, tagged the same way Paper's
- * PersistentDataContainer serializes onto the wire (custom_data -> PublicBukkitValues ->
- * namespace:key), so picking one up via vanilla's creative-tab click handling round-trips
- * correctly.
- */
+/** Builds representative ItemStacks for Nilum's creative tabs, tagged the same way Paper serializes a PersistentDataContainer. */
 final class NilumTaggedItems {
 
     private static final String PUBLIC_BUKKIT_VALUES = "PublicBukkitValues";

@@ -35,7 +35,14 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        return switch (args[0].toLowerCase(Locale.ROOT)) {
+        String subcommand = args[0].toLowerCase(Locale.ROOT);
+        String permission = permissionFor(subcommand);
+        if (permission != null && !sender.hasPermission(permission)) {
+            sender.sendMessage(Component.text("You don't have permission to use /nilum " + subcommand + "."));
+            return true;
+        }
+
+        return switch (subcommand) {
             case "ver", "version" -> {
                 sendVersion(sender);
                 yield true;
@@ -53,11 +60,29 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             case "removeblock" -> removeBlock(sender, args);
             case "giveitemdef" -> giveItemDef(sender, args);
             case "shaderpack" -> shaderPack(sender, args);
+            case "giveskeleton" -> giveSkeleton(sender, args);
+            case "playanim" -> playAnim(sender, args);
+            case "stopanim" -> stopAnim(sender, args);
+            case "playblockanim" -> playBlockAnim(sender, args);
+            case "stopblockanim" -> stopBlockAnim(sender, args);
             default -> {
                 sender.sendMessage(Component.text(
                         "Unknown subcommand '" + args[0] + "'. Run /nilum help for a list of commands."));
                 yield true;
             }
+        };
+    }
+
+    /** null means no permission required (ver/help, and anything unrecognized falls through to the "unknown subcommand" message). */
+    private static String permissionFor(String subcommand) {
+        return switch (subcommand) {
+            case "reload" -> "nilum.command.reload";
+            case "placemodel", "giveskeleton", "playanim", "stopanim" -> "nilum.command.model";
+            case "giveitem", "giveicon", "giveitemdef" -> "nilum.command.item";
+            case "placeblock", "removeblock", "playblockanim", "stopblockanim" -> "nilum.command.block";
+            case "hudframe" -> "nilum.command.hud";
+            case "shaderpack" -> "nilum.command.shaderpack";
+            default -> null;
         };
     }
 
@@ -85,7 +110,18 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/nilum removeblock [x] [y] [z] - Remove a Nilum block."));
         sender.sendMessage(Component.text("/nilum giveitemdef <id> - Give yourself a defined item (name/lore/enchants included)."));
         sender.sendMessage(Component.text(
-                "/nilum shaderpack <id>|off - Switch yourself to a Nilum shaderpack, or back to normal. Needs Iris."));
+                "/nilum shaderpack <id>|off [player] - Switch yourself (or another online player) to a Nilum "
+                        + "shaderpack, or back to normal. Needs Iris."));
+        sender.sendMessage(Component.text(
+                "/nilum giveskeleton <modelId> - Render yourself with a Nilum model's skeleton instead of your usual avatar."));
+        sender.sendMessage(Component.text(
+                "/nilum playanim <self|entityUuid> <animationName> - Play a named animation on a skeleton or placed model."));
+        sender.sendMessage(Component.text(
+                "/nilum stopanim <self|entityUuid> - Stop a triggered animation, back to its rest pose."));
+        sender.sendMessage(Component.text(
+                "/nilum playblockanim <animationName> [x] [y] [z] - Play a named animation on a Nilum block."));
+        sender.sendMessage(Component.text(
+                "/nilum stopblockanim [x] [y] [z] - Stop a triggered animation on a Nilum block."));
     }
 
     private boolean reload(CommandSender sender, String[] args) {
@@ -153,6 +189,136 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Placed '" + modelId + "' (entity " + entityId + ")."));
         }
         return true;
+    }
+
+    private boolean giveSkeleton(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can be given a skeleton."));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /nilum giveskeleton <modelId>"));
+            return true;
+        }
+
+        String modelId = args[1];
+        if (plugin.modelDisplays().giveSkeleton(player, modelId)) {
+            sender.sendMessage(Component.text("You're now rendered with the '" + modelId + "' skeleton."));
+        } else {
+            sender.sendMessage(Component.text("No loaded model named '" + modelId
+                    + "' (drop a matching .bbmodel file into the plugin's models folder)."));
+        }
+        return true;
+    }
+
+    private boolean playAnim(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(Component.text("Usage: /nilum playanim <self|entityUuid> <animationName>"));
+            return true;
+        }
+
+        UUID entityId = resolveEntityTarget(sender, args[1]);
+        if (entityId == null) {
+            sender.sendMessage(Component.text("Unknown target '" + args[1] + "' - use 'self' or an entity UUID."));
+            return true;
+        }
+
+        String animationName = args[2];
+        plugin.animations().playEntityAnimation(entityId, animationName);
+        sender.sendMessage(Component.text("Told '" + entityId + "' to play animation '" + animationName + "'."));
+        return true;
+    }
+
+    private boolean stopAnim(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /nilum stopanim <self|entityUuid>"));
+            return true;
+        }
+
+        UUID entityId = resolveEntityTarget(sender, args[1]);
+        if (entityId == null) {
+            sender.sendMessage(Component.text("Unknown target '" + args[1] + "' - use 'self' or an entity UUID."));
+            return true;
+        }
+
+        plugin.animations().stopEntityAnimation(entityId);
+        sender.sendMessage(Component.text("Told '" + entityId + "' to stop animating."));
+        return true;
+    }
+
+    private static UUID resolveEntityTarget(CommandSender sender, String target) {
+        if (target.equalsIgnoreCase("self")) {
+            return sender instanceof Player player ? player.getUniqueId() : null;
+        }
+        try {
+            return UUID.fromString(target);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private boolean playBlockAnim(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can target a block (needs a location)."));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /nilum playblockanim <animationName> [x] [y] [z]"));
+            return true;
+        }
+
+        String animationName = args[1];
+        Location location;
+        try {
+            location = coordinateLocation(player, args, 2);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            return true;
+        }
+
+        if (plugin.customBlocks().blockTypeIdAt(location).isEmpty()) {
+            sender.sendMessage(Component.text("No Nilum block at that position."));
+            return true;
+        }
+
+        plugin.animations().playBlockAnimation(location, animationName);
+        sender.sendMessage(Component.text("Told the block at " + location.getBlockX() + ", " + location.getBlockY()
+                + ", " + location.getBlockZ() + " to play animation '" + animationName + "'."));
+        return true;
+    }
+
+    private boolean stopBlockAnim(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can target a block (needs a location)."));
+            return true;
+        }
+
+        Location location;
+        try {
+            location = coordinateLocation(player, args, 1);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            return true;
+        }
+
+        if (plugin.customBlocks().blockTypeIdAt(location).isEmpty()) {
+            sender.sendMessage(Component.text("No Nilum block at that position."));
+            return true;
+        }
+
+        plugin.animations().stopBlockAnimation(location);
+        sender.sendMessage(Component.text("Told the block at " + location.getBlockX() + ", " + location.getBlockY()
+                + ", " + location.getBlockZ() + " to stop animating."));
+        return true;
+    }
+
+    /** Parses optional trailing x/y/z args (defaulting to ~) starting at args[coordStart]. */
+    private static Location coordinateLocation(Player player, String[] args, int coordStart) {
+        Location base = player.getLocation();
+        double x = parseCoordinate(args.length > coordStart ? args[coordStart] : "~", base.getX());
+        double y = parseCoordinate(args.length > coordStart + 1 ? args[coordStart + 1] : "~", base.getY());
+        double z = parseCoordinate(args.length > coordStart + 2 ? args[coordStart + 2] : "~", base.getZ());
+        return new Location(base.getWorld(), x, y, z);
     }
 
     private boolean placeBlock(CommandSender sender, String[] args) {
@@ -350,19 +516,29 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean shaderPack(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(Component.text("Only a player can be switched to a shaderpack."));
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /nilum shaderpack <id>|off [player]"));
             return true;
         }
-        if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /nilum shaderpack <id>|off"));
+
+        Player target;
+        if (args.length >= 3) {
+            target = plugin.getServer().getPlayerExact(args[2]);
+            if (target == null) {
+                sender.sendMessage(Component.text("No online player named '" + args[2] + "'."));
+                return true;
+            }
+        } else if (sender instanceof Player player) {
+            target = player;
+        } else {
+            sender.sendMessage(Component.text("Console must specify a target player: /nilum shaderpack <id>|off <player>"));
             return true;
         }
 
         String id = args[1];
         if (id.equalsIgnoreCase("off")) {
-            plugin.shaderPackService().deactivate(player);
-            sender.sendMessage(Component.text("Told your client to restore its previous shaderpack state."));
+            plugin.shaderPackService().deactivate(target);
+            sender.sendMessage(Component.text("Told " + target.getName() + "'s client to restore its previous shaderpack state."));
             return true;
         }
 
@@ -371,8 +547,8 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        plugin.shaderPackService().activate(player, id);
-        sender.sendMessage(Component.text("Told your client to switch to shader pack '" + id + "'."));
+        plugin.shaderPackService().activate(target, id);
+        sender.sendMessage(Component.text("Told " + target.getName() + "'s client to switch to shader pack '" + id + "'."));
         return true;
     }
 
@@ -380,15 +556,17 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             return filterByPrefix(List.of("ver", "help", "reload", "placemodel", "giveitem", "giveicon",
-                    "hudframe", "placeblock", "removeblock", "giveitemdef", "shaderpack"), args[0]);
+                    "hudframe", "placeblock", "removeblock", "giveitemdef", "shaderpack", "giveskeleton",
+                    "playanim", "stopanim", "playblockanim", "stopblockanim"), args[0]);
         }
 
         if (args.length == 2) {
             return switch (args[0].toLowerCase(Locale.ROOT)) {
                 case "reload" -> filterByPrefix(
                         List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "tcp", "config"), args[1]);
-                case "placemodel", "giveitem" -> filterByPrefix(plugin.models().modelIds(), args[1]);
+                case "placemodel", "giveitem", "giveskeleton" -> filterByPrefix(plugin.models().modelIds(), args[1]);
                 case "placeblock" -> filterByPrefix(plugin.blockDefinitions().blockIds(), args[1]);
+                case "playanim", "stopanim" -> filterByPrefix(List.of("self"), args[1]);
                 case "giveicon" -> filterByPrefix(plugin.icons().iconIds(), args[1]);
                 case "giveitemdef" -> filterByPrefix(plugin.items().itemIds(), args[1]);
                 case "hudframe" -> filterByPrefix(plugin.hudAtlases().atlasIds().stream()
@@ -404,6 +582,10 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 3 && (args[0].equalsIgnoreCase("giveitem") || args[0].equalsIgnoreCase("giveicon"))) {
             return filterByPrefix(Arrays.stream(Material.values()).map(Material::name).toList(), args[2]);
+        }
+
+        if (args.length == 3 && args[0].equalsIgnoreCase("shaderpack")) {
+            return filterByPrefix(plugin.getServer().getOnlinePlayers().stream().map(Player::getName).toList(), args[2]);
         }
 
         if (args.length <= 7 && args[0].equalsIgnoreCase("placemodel")) {
@@ -430,6 +612,14 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length <= 4 && args[0].equalsIgnoreCase("removeblock")) {
+            return filterByPrefix(coordinateOptions(sender, args.length - 1, 1), args[args.length - 1]);
+        }
+
+        if (args.length <= 5 && args[0].equalsIgnoreCase("playblockanim")) {
+            return filterByPrefix(coordinateOptions(sender, args.length - 1, 2), args[args.length - 1]);
+        }
+
+        if (args.length <= 4 && args[0].equalsIgnoreCase("stopblockanim")) {
             return filterByPrefix(coordinateOptions(sender, args.length - 1, 1), args[args.length - 1]);
         }
 

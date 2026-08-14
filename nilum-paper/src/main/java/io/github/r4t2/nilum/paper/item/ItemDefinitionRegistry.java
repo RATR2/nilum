@@ -26,11 +26,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
-/**
- * Per-file item templates (items/<id>.yml), same convention as icons.yml. Resolving one builds
- * an ItemStack: base material (vanilla, or a Nilum model/icon tagged onto one) plus display
- * name, lore, and enchantments layered on top.
- */
+/** Per-file item templates (items/<id>.yml). Resolving one builds an ItemStack with display name, lore, and enchantments layered on. */
 public final class ItemDefinitionRegistry {
 
     private final NilumLogger logger;

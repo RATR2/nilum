@@ -4,6 +4,7 @@ import io.github.r4t2.nilum.common.config.ConfigSchema;
 import io.github.r4t2.nilum.common.config.LoggingConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
+import io.github.r4t2.nilum.common.hosting.NilumAssetHost;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.neoforge.handshake.NeoForgeServerHandshake;
 import io.github.r4t2.nilum.neoforge.logging.NeoForgeLogSink;
@@ -15,6 +16,7 @@ import io.github.r4t2.nilum.neoforge.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.neoforge.server.NilumNeoForgeServerModels;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -63,9 +65,20 @@ public final class NilumNeoForgeMod {
         this.logger = new NilumLogger(new NeoForgeLogSink(), configDir.resolve("logs").resolve("nilum.log"),
                 LoggingConfig.destinationLookup(configManager), configManager.get(LoggingConfig.MAX_LOG_FILES));
 
-        this.serverHandshake = FMLEnvironment.getDist() == Dist.DEDICATED_SERVER
-                ? NeoForgeServerHandshake.register(modEventBus, configManager, logger, modVersion)
-                : null;
+        if (FMLEnvironment.getDist() == Dist.DEDICATED_SERVER) {
+            NilumAssetHost assetHost = new NilumAssetHost(configDir, logger);
+            assetHost.loadAll();
+            logger.info("Loaded " + assetHost.models().modelIds().size() + " model(s), "
+                    + assetHost.icons().iconIds().size() + " icon(s), "
+                    + assetHost.hudAtlases().atlasIds().size() + " HUD atlas(es), "
+                    + assetHost.shaderPacks().packIds().size() + " shader pack(s), "
+                    + assetHost.fonts().fontIds().size() + " font(s) for this NeoForge-hosted server.");
+
+            this.serverHandshake = NeoForgeServerHandshake.register(modEventBus, configManager, logger, modVersion, assetHost);
+            NilumNeoForgeServerModels.register(assetHost, logger);
+        } else {
+            this.serverHandshake = null;
+        }
 
         modEventBus.addListener(this::onRegisterPayloadHandlers);
 

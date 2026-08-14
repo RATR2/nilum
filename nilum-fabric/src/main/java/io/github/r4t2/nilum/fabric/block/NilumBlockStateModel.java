@@ -15,11 +15,8 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * Wraps every baked block model. If the position being rendered is a registered Nilum block,
- * suppresses the proxy's vanilla appearance entirely (no quads at all); the real visible
- * geometry is drawn separately by NilumBlockRenderer, since block-terrain quads can only sample
- * vanilla's block/item atlases. Hiding the render here doesn't touch collision or hardness,
- * those come from BlockState, so the block stays mechanically "real" the whole time.
+ * Wraps every baked block model. Suppresses a Nilum block's vanilla appearance entirely (no
+ * quads); NilumBlockRenderer draws the real geometry separately. Collision/hardness are untouched.
  */
 public final class NilumBlockStateModel implements BlockStateModel, FabricBlockStateModel {
 

@@ -8,12 +8,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 
-/**
- * Sends Nilum's branded log lines directly to the console as an Adventure
- * Component, bypassing java.util.logging (Bukkit's plugin logger would
- * duplicate the branding prefix). The message is inserted as an unparsed
- * placeholder so it can't be reinterpreted as MiniMessage markup.
- */
+/** Sends branded log lines directly to the console as an Adventure Component, bypassing java.util.logging's own prefix. */
 public final class PaperConsoleSink implements NilumLogSink {
 
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();

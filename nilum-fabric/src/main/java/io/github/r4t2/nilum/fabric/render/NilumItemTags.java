@@ -5,19 +5,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Reads a Nilum tag back off an ItemStack, matching how Paper serializes a
- * PersistentDataContainer entry into the minecraft:custom_data component: a top-level
- * PublicBukkitValues compound, keyed by the full namespace:key string.
- */
-final class NilumItemTags {
+/** Reads a Nilum tag back off an ItemStack, matching how Paper serializes a PersistentDataContainer entry into minecraft:custom_data. */
+public final class NilumItemTags {
 
     private static final String PUBLIC_BUKKIT_VALUES = "PublicBukkitValues";
 
     private NilumItemTags() {
     }
 
-    static @Nullable String get(ItemStack itemStack, String key) {
+    public static @Nullable String get(ItemStack itemStack, String key) {
         CustomData customData = itemStack.get(DataComponents.CUSTOM_DATA);
         if (customData == null) {
             return null;

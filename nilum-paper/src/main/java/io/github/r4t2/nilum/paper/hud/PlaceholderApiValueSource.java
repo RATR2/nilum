@@ -5,9 +5,8 @@ import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.entity.Player;
 
 /**
- * Resolves placeholderapi(key) to a number for server_connector expressions, asking
- * PlaceholderAPI to expand %key% and parsing the result. Only ever constructed after
- * confirming PlaceholderAPI is installed (see HudTextService).
+ * Resolves server_connector value-source calls: placeholderapi(key) via PlaceholderAPI, java(key)
+ * via NilumPluginReflection (key has '#') or NilumValueRegistry otherwise.
  */
 public final class PlaceholderApiValueSource implements ValueSource {
 
@@ -18,7 +17,12 @@ public final class PlaceholderApiValueSource implements ValueSource {
     }
 
     @Override
-    public double resolve(String key) {
+    public double resolve(String function, String key) {
+        if (function.equals("java")) {
+            return key.indexOf('#') >= 0
+                    ? NilumPluginReflection.resolve(key, player).map(NilumPluginReflection::toDouble).orElse(0.0)
+                    : NilumValueRegistry.resolveNumeric(key, player);
+        }
         String resolved = PlaceholderAPI.setPlaceholders(player, "%" + key + "%");
         try {
             return Double.parseDouble(resolved.trim());

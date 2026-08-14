@@ -68,7 +68,9 @@ final class ExprLexer {
 
     private ExprToken readIdent() {
         int start = pos;
-        while (pos < source.length() && (Character.isLetterOrDigit(source.charAt(pos)) || source.charAt(pos) == '_')) {
+        while (pos < source.length() && (Character.isLetterOrDigit(source.charAt(pos))
+                || source.charAt(pos) == '_' || source.charAt(pos) == ':'
+                || source.charAt(pos) == '.' || source.charAt(pos) == '#')) {
             pos++;
         }
         return new ExprToken(ExprToken.Type.IDENT, source.substring(start, pos));

@@ -1,5 +1,6 @@
 package io.github.r4t2.nilum.fabric.block;
 
+import io.github.r4t2.nilum.common.model.AnimationPlaybackState;
 import io.github.r4t2.nilum.common.protocol.ChunkBlockEntry;
 import net.minecraft.core.BlockPos;
 
@@ -9,20 +10,18 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-/**
- * Which world positions are currently known to be Nilum custom blocks, and which model each one
- * renders. Populated by ChunkBlockEntry batches (a null modelId means removal), cleared
- * per-chunk on ClientChunkEvents.CHUNK_UNLOAD so it can't grow forever.
- */
+/** Which world positions are Nilum custom blocks and which model each renders; cleared per-chunk on CHUNK_UNLOAD. */
 public final class ClientBlockRegistry {
 
     private final ConcurrentMap<BlockPos, String> modelIdByPosition = new ConcurrentHashMap<>();
+    private final ConcurrentMap<BlockPos, AnimationPlaybackState> animationByPosition = new ConcurrentHashMap<>();
 
     public void apply(List<ChunkBlockEntry> entries) {
         for (ChunkBlockEntry entry : entries) {
             BlockPos pos = new BlockPos(entry.x(), entry.y(), entry.z());
             if (entry.modelId() == null) {
                 modelIdByPosition.remove(pos);
+                animationByPosition.remove(pos);
             } else {
                 modelIdByPosition.put(pos, entry.modelId());
             }
@@ -38,7 +37,13 @@ public final class ClientBlockRegistry {
         return modelIdByPosition;
     }
 
+    /** This block's current animation playback state, created on first access (auto-loop until a play/stop trigger arrives). */
+    public AnimationPlaybackState animationState(BlockPos pos) {
+        return animationByPosition.computeIfAbsent(pos, ignored -> new AnimationPlaybackState());
+    }
+
     public void onChunkUnload(int chunkX, int chunkZ) {
         modelIdByPosition.keySet().removeIf(pos -> (pos.getX() >> 4) == chunkX && (pos.getZ() >> 4) == chunkZ);
+        animationByPosition.keySet().removeIf(pos -> (pos.getX() >> 4) == chunkX && (pos.getZ() >> 4) == chunkZ);
     }
 }

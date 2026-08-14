@@ -9,12 +9,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Parses <head:identifier[:hat]> tags in a resolved render_text value into an inline
- * player-head glyph. identifier is a UUID or username, hat defaults to true. Same syntax as
- * Paper's MiniMessage head tag; builds the same vanilla Component.object(PlayerSprite)
- * directly, no Adventure/MiniMessage dependency needed.
- */
+/** Parses <head:identifier[:hat]> tags into an inline player-head glyph, same syntax as Paper's MiniMessage head tag. */
 public final class HudHeadText {
 
     private static final Pattern HEAD_TAG = Pattern.compile("<head:([^:>]+)(?::([^>]+))?>");

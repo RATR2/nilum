@@ -9,6 +9,7 @@ plugins {
 repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
+    maven("https://jitpack.io") // Skript isn't on Maven Central
 }
 
 dependencies {
@@ -17,6 +18,9 @@ dependencies {
     // Soft dependency (see plugin.yml); server_connector HUD text elements just stay blank
     // if it isn't actually installed, checked at runtime in HudTextService.
     compileOnly("me.clip:placeholderapi:2.11.6")
+    // Soft dependency (see plugin.yml); the Skript addon package is only ever registered at
+    // runtime after confirming it's actually installed, checked in NilumPlugin.onEnable().
+    compileOnly("com.github.SkriptLang:Skript:2.16.1")
 }
 
 // shadowJar is the real output (no classifier); the plain jar task's output is renamed

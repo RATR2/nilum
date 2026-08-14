@@ -2,13 +2,17 @@ package io.github.r4t2.nilum.neoforge.handshake;
 
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
+import io.github.r4t2.nilum.common.hosting.NilumAssetHost;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
+import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
+import io.github.r4t2.nilum.common.tcp.NilumTcpAssetServer;
 import io.github.r4t2.nilum.common.tcp.NilumTcpServer;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
+import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import net.minecraft.network.chat.Component;
@@ -39,6 +43,7 @@ public final class NeoForgeServerHandshake {
     private final NilumConfigManager configManager;
     private final NilumLogger logger;
     private final String serverModVersion;
+    private final NilumAssetHost assetHost;
 
     private final Map<UUID, PendingHandshake> pendingHandshakes = new ConcurrentHashMap<>();
     private final Map<UUID, HelloAckPacket> acknowledged = new ConcurrentHashMap<>();
@@ -52,15 +57,17 @@ public final class NeoForgeServerHandshake {
     private record PendingHandshake(ServerConfigurationPacketListenerImpl listener, long deadlineTick) {
     }
 
-    private NeoForgeServerHandshake(NilumConfigManager configManager, NilumLogger logger, String serverModVersion) {
+    private NeoForgeServerHandshake(NilumConfigManager configManager, NilumLogger logger, String serverModVersion,
+                                     NilumAssetHost assetHost) {
         this.configManager = configManager;
         this.logger = logger;
         this.serverModVersion = serverModVersion;
+        this.assetHost = assetHost;
     }
 
     public static NeoForgeServerHandshake register(IEventBus modEventBus, NilumConfigManager configManager,
-                                                     NilumLogger logger, String serverModVersion) {
-        NeoForgeServerHandshake handshake = new NeoForgeServerHandshake(configManager, logger, serverModVersion);
+                                                     NilumLogger logger, String serverModVersion, NilumAssetHost assetHost) {
+        NeoForgeServerHandshake handshake = new NeoForgeServerHandshake(configManager, logger, serverModVersion, assetHost);
         handshake.applyTcpConfig();
 
         modEventBus.addListener(RegisterConfigurationTasksEvent.class, handshake::onRegisterConfigurationTasks);
@@ -153,8 +160,8 @@ public final class NeoForgeServerHandshake {
 
     private void onTcpConnected(UUID playerId, Socket socket) {
         tcpConnections.put(playerId, socket);
-        logger.info("TCP side-channel connected for " + playerId
-                + " (nothing streams over it yet - no asset system built).");
+        logger.info("TCP side-channel connected for " + playerId + ", serving asset requests.");
+        NilumTcpAssetServer.serve(socket, assetHost::assetBytes);
     }
 
     private void onJoin(ServerPlayer player) {
@@ -165,6 +172,9 @@ public final class NeoForgeServerHandshake {
             PacketDistributor.sendToPlayer(player, new NilumTcpOfferPayload(
                     new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode()));
         }
+
+        PacketDistributor.sendToPlayer(player, new NilumAssetManifestPayload(
+                new AssetManifestPacket(assetHost.manifest()).encode()));
     }
 
     private void onDisconnect(UUID playerId) {

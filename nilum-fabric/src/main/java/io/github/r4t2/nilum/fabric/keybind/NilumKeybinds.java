@@ -9,10 +9,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
-/**
- * 4 general-purpose, unbound-by-default keybinds a server can turn into abilities. Polled once
- * per client tick for press/release edges, so a server can react to both, not just discrete presses.
- */
+/** 4 general-purpose, unbound-by-default keybinds a server can turn into abilities. Polled once per client tick for press/release edges. */
 public final class NilumKeybinds {
 
     private static final int SLOT_COUNT = 4;

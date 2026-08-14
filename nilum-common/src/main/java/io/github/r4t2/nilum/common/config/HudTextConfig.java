@@ -4,9 +4,9 @@ public final class HudTextConfig {
 
     public static final ConfigKey<Boolean> ENABLED = ConfigKey.ofBoolean(
             "hud-text", "enabled", true,
-            "Whether server_connector HUD text elements (PlaceholderAPI-backed) get\n"
-                    + "evaluated and pushed to clients at all. Has no effect if PlaceholderAPI\n"
-                    + "isn't installed - those elements just stay blank either way.", 5);
+            "Whether server_connector HUD text elements get evaluated and pushed to\n"
+                    + "clients at all: placeholderapi(...) calls (need PlaceholderAPI installed)\n"
+                    + "and java(...) calls (any plugin registered with NilumValueRegistry).", 5);
 
     public static final ConfigKey<Integer> UPDATE_INTERVAL_TICKS = ConfigKey.ofInt(
             "hud-text", "update-interval-ticks", 20,

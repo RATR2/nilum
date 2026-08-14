@@ -6,11 +6,7 @@ import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.paper.NilumPlugin;
 import org.bukkit.entity.Player;
 
-/**
- * Server-side entry point for switching a player's active Iris shaderpack. Thin fire-and-forget
- * packet sender, gated on handshake, same pattern as HudAtlasService. Only sends the
- * activate/deactivate signal; the pack itself streams via the normal asset manifest/TCP pipeline.
- */
+/** Thin fire-and-forget entry point for switching a player's active Iris shaderpack, gated on handshake. */
 public final class ShaderPackService {
 
     private final NilumPlugin plugin;

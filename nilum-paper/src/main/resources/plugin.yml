@@ -4,13 +4,37 @@ main: io.github.r4t2.nilum.paper.NilumPlugin
 api-version: '1.21'
 description: Live, per-player asset streaming server plugin.
 authors: [r4t2]
-softdepend: [PlaceholderAPI]
+softdepend: [PlaceholderAPI, Skript]
 commands:
   nilum:
     description: Nilum admin commands.
-    usage: /nilum <ver|help|reload|placemodel|giveitem|giveicon|hudframe|placeblock|removeblock|giveitemdef>
-    permission: nilum.admin
+    usage: /nilum <ver|help|reload|placemodel|giveitem|giveicon|hudframe|placeblock|removeblock|giveitemdef|shaderpack|giveskeleton>
 permissions:
   nilum.admin:
-    description: Access to Nilum admin commands.
+    description: Grants every Nilum command permission below.
     default: op
+    children:
+      nilum.command.reload: true
+      nilum.command.model: true
+      nilum.command.item: true
+      nilum.command.block: true
+      nilum.command.hud: true
+      nilum.command.shaderpack: true
+  nilum.command.reload:
+    description: Reload Nilum's models/icons/hud/items/blocks/shaderpacks/fonts/tcp/config folders.
+    default: false
+  nilum.command.model:
+    description: Place models, give yourself a player skeleton, play/stop entity animations.
+    default: false
+  nilum.command.item:
+    description: Give yourself Nilum items, icons, and item definitions.
+    default: false
+  nilum.command.block:
+    description: Place/remove Nilum blocks, play/stop block animations.
+    default: false
+  nilum.command.hud:
+    description: Push a HUD frame update to yourself.
+    default: false
+  nilum.command.shaderpack:
+    description: Switch yourself, or another player, to a Nilum shaderpack.
+    default: false

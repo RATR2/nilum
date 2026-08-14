@@ -5,48 +5,77 @@ import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
 import io.github.r4t2.nilum.common.util.SHA256;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
- * Server-side registry of HUD atlases, each a paired <id>.png spritesheet and <id>.atlas
- * descriptor sharing a base filename. Served/hashed as a HudAtlasAssetPayload bundling both
- * files' bytes, so a descriptor-only edit still triggers a client re-fetch.
+ * Server-side registry of HUD atlases: an <id>.atlas descriptor, an optional spritesheet, and
+ * any Image element textures. Served/hashed as a HudAtlasAssetPayload bundling all of it.
  */
 public final class HudAtlasRegistry {
 
     private final Map<String, byte[]> assetBytesById = new ConcurrentHashMap<>();
     private final Map<String, String> hashById = new ConcurrentHashMap<>();
 
-    public void loadDirectory(Path directory) throws IOException {
+    public void loadDirectory(Path hudDirectory, Path texturesDirectory, Consumer<String> onWarning) throws IOException {
         assetBytesById.clear();
         hashById.clear();
 
-        Files.createDirectories(directory);
+        Files.createDirectories(hudDirectory);
 
-        try (Stream<Path> files = Files.list(directory)) {
-            for (Path pngFile : files.filter(HudAtlasRegistry::isPngFile).toList()) {
-                String atlasId = stripExtension(pngFile.getFileName().toString(), ".png");
-                Path descriptorFile = directory.resolve(atlasId + ".atlas");
-                if (!Files.isRegularFile(descriptorFile)) {
-                    continue;
+        try (Stream<Path> files = Files.list(hudDirectory)) {
+            for (Path descriptorFile : files.filter(HudAtlasRegistry::isAtlasFile).toList()) {
+                String atlasId = stripExtension(descriptorFile.getFileName().toString(), ".atlas");
+                try {
+                    load(atlasId, descriptorFile, hudDirectory, texturesDirectory, onWarning);
+                } catch (RuntimeException | IOException e) {
+                    onWarning.accept("Failed to load HUD atlas '" + atlasId + "': " + e);
                 }
-
-                byte[] pngBytes = Files.readAllBytes(pngFile);
-                byte[] descriptorBytes = Files.readAllBytes(descriptorFile);
-                byte[] assetBytes = new HudAtlasAssetPayload(pngBytes, descriptorBytes).encode();
-
-                assetBytesById.put(atlasId, assetBytes);
-                hashById.put(atlasId, SHA256.of(assetBytes));
             }
         }
+    }
+
+    private void load(String atlasId, Path descriptorFile, Path hudDirectory, Path texturesDirectory,
+                       Consumer<String> onWarning) throws IOException {
+        byte[] descriptorBytes = Files.readAllBytes(descriptorFile);
+        HudAtlasDescriptor descriptor = HudAtlasParser.parse(new String(descriptorBytes, StandardCharsets.UTF_8));
+
+        Path sheetFile = hudDirectory.resolve(atlasId + ".png");
+        Optional<byte[]> spritesheetPngBytes = Files.isRegularFile(sheetFile)
+                ? Optional.of(Files.readAllBytes(sheetFile)) : Optional.empty();
+
+        Set<String> referencedTextures = new LinkedHashSet<>();
+        for (HudAtlasElement element : descriptor.elements().values()) {
+            if (element instanceof HudAtlasElement.Image image) {
+                referencedTextures.add(image.textureFile());
+            }
+        }
+
+        Map<String, byte[]> imageTextures = new LinkedHashMap<>();
+        for (String fileName : referencedTextures) {
+            Path textureFile = texturesDirectory.resolve(fileName);
+            if (!Files.isRegularFile(textureFile)) {
+                onWarning.accept("HUD atlas '" + atlasId + "' references texture '" + fileName
+                        + "', which doesn't exist in the textures folder.");
+                continue;
+            }
+            imageTextures.put(fileName, Files.readAllBytes(textureFile));
+        }
+
+        byte[] assetBytes = new HudAtlasAssetPayload(spritesheetPngBytes, imageTextures, descriptorBytes).encode();
+        assetBytesById.put(atlasId, assetBytes);
+        hashById.put(atlasId, SHA256.of(assetBytes));
     }
 
     public Optional<byte[]> assetBytes(String atlasId) {
@@ -65,8 +94,8 @@ public final class HudAtlasRegistry {
         return entries;
     }
 
-    private static boolean isPngFile(Path path) {
-        return Files.isRegularFile(path) && path.getFileName().toString().endsWith(".png");
+    private static boolean isAtlasFile(Path path) {
+        return Files.isRegularFile(path) && path.getFileName().toString().endsWith(".atlas");
     }
 
     private static String stripExtension(String fileName, String extension) {

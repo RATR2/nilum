@@ -20,11 +20,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Keeps CustomBlockRegistry honest against every way a Nilum block's proxy can be destroyed
- * (creative insta-break, survival mining, explosions), applies configured drops, and
- * approximates custom break timing for BlockProxy.Custom blocks.
- */
+/** Keeps CustomBlockRegistry honest against every way a Nilum block can be destroyed, applies drops, approximates break timing. */
 public final class CustomBlockInteractionListener implements Listener {
 
     private final NilumPlugin plugin;

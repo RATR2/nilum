@@ -3,12 +3,7 @@ package io.github.r4t2.nilum.common.model;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * Evaluates one BbAnimator channel (rotation/position/scale) at a point in time, per
- * Blockbench's interpolation modes. "step" holds the previous keyframe's value; "catmullrom"
- * is a 4-point Catmull-Rom spline; everything else, including bezier handle data (not yet
- * supported), falls back to linear interpolation between the surrounding keyframes.
- */
+/** Evaluates one BbAnimator channel at a point in time: step holds, catmullrom splines, everything else falls back to linear. */
 public final class BbAnimationEvaluator {
 
     private BbAnimationEvaluator() {

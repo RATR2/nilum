@@ -6,11 +6,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Every texture in the shared textures/ folder gets a companion <name>.yml recording which
- * systems reference it, self-maintained by whichever registry resolves a reference to it.
- * Best-effort; a failed write here never breaks a reload.
- */
+/** Every texture in textures/ gets a companion <name>.yml recording which systems reference it. Best-effort, never breaks a reload. */
 public final class TextureUsageTracker {
 
     private TextureUsageTracker() {

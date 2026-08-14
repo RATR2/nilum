@@ -9,11 +9,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.Optional;
 
-/**
- * Represents a Nilum icon-only custom item as an ItemStack carrying its icon id in
- * the item's PersistentDataContainer. Rendered client-side as a flat quad sampling
- * the shared icon atlas, rather than a full Blockbench model.
- */
+/** Represents a Nilum icon-only custom item as an ItemStack carrying its icon id in the PersistentDataContainer. */
 public final class IconItemService {
 
     private final IconRegistry iconRegistry;

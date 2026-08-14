@@ -2,13 +2,17 @@ package io.github.r4t2.nilum.fabric.handshake;
 
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
+import io.github.r4t2.nilum.common.hosting.NilumAssetHost;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
+import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
+import io.github.r4t2.nilum.common.tcp.NilumTcpAssetServer;
 import io.github.r4t2.nilum.common.tcp.NilumTcpServer;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
+import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
@@ -39,6 +43,7 @@ public final class FabricServerHandshake {
 
     private final NilumConfigManager configManager;
     private final NilumLogger logger;
+    private final NilumAssetHost assetHost;
 
     private final Map<UUID, PendingHandshake> pendingHandshakes = new ConcurrentHashMap<>();
     private final Map<UUID, HelloAckPacket> acknowledged = new ConcurrentHashMap<>();
@@ -53,13 +58,14 @@ public final class FabricServerHandshake {
     private record PendingHandshake(ServerConfigurationPacketListenerImpl handler, long deadlineTick) {
     }
 
-    private FabricServerHandshake(NilumConfigManager configManager, NilumLogger logger) {
+    private FabricServerHandshake(NilumConfigManager configManager, NilumLogger logger, NilumAssetHost assetHost) {
         this.configManager = configManager;
         this.logger = logger;
+        this.assetHost = assetHost;
     }
 
-    public static FabricServerHandshake register(NilumConfigManager configManager, NilumLogger logger) {
-        FabricServerHandshake handshake = new FabricServerHandshake(configManager, logger);
+    public static FabricServerHandshake register(NilumConfigManager configManager, NilumLogger logger, NilumAssetHost assetHost) {
+        FabricServerHandshake handshake = new FabricServerHandshake(configManager, logger, assetHost);
         handshake.applyTcpConfig();
 
         ServerConfigurationConnectionEvents.CONFIGURE.register(handshake::onConfigure);
@@ -158,6 +164,9 @@ public final class FabricServerHandshake {
             ServerPlayNetworking.send(player, new NilumTcpOfferPayload(
                     new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode()));
         }
+
+        ServerPlayNetworking.send(player, new NilumAssetManifestPayload(
+                new AssetManifestPacket(assetHost.manifest()).encode()));
     }
 
     private void onDisconnect(UUID playerId) {
@@ -194,8 +203,8 @@ public final class FabricServerHandshake {
 
     private void onTcpConnected(UUID playerId, Socket socket) {
         tcpConnections.put(playerId, socket);
-        logger.info("TCP side-channel connected for " + playerId
-                + " (nothing streams over it yet - no asset system built).");
+        logger.info("TCP side-channel connected for " + playerId + ", serving asset requests.");
+        NilumTcpAssetServer.serve(socket, assetHost::assetBytes);
     }
 
     private static void closeQuietly(Socket socket) {

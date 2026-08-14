@@ -11,6 +11,7 @@ import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.paper.NilumKeys;
 import io.github.r4t2.nilum.paper.NilumPlugin;
+import io.github.r4t2.nilum.paper.collision.NilumCollisionRegistry;
 import org.bukkit.Location;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
@@ -24,25 +25,24 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Spawns an invisible anchor entity for a loaded model and tells connected
- * clients which model it represents. Also resolves the model's collision
- * group into world-space bounding boxes at placement time.
- */
+/** Spawns an invisible anchor entity for a loaded model and tells clients which model it represents. */
 public final class ModelDisplayService {
 
     private final NilumPlugin plugin;
     private final NilumLogger logger;
     private final ModelRegistry modelRegistry;
+    private final NilumCollisionRegistry collisionRegistry;
 
     private final Map<UUID, String> placements = new ConcurrentHashMap<>();
     private final Map<UUID, List<BoundingBox>> collisionBoxes = new ConcurrentHashMap<>();
     private final Map<UUID, BbProxyShape> proxyShapes = new ConcurrentHashMap<>();
 
-    public ModelDisplayService(NilumPlugin plugin, NilumLogger logger, ModelRegistry modelRegistry) {
+    public ModelDisplayService(NilumPlugin plugin, NilumLogger logger, ModelRegistry modelRegistry,
+                                NilumCollisionRegistry collisionRegistry) {
         this.plugin = plugin;
         this.logger = logger;
         this.modelRegistry = modelRegistry;
+        this.collisionRegistry = collisionRegistry;
     }
 
     /** Spawns an anchor entity for modelId at location, or empty if that model isn't loaded. */
@@ -92,6 +92,9 @@ public final class ModelDisplayService {
             case BbCollisionResult.Found found -> {
                 List<BoundingBox> worldBoxes = CollisionShapes.toWorldBoundingBoxes(location, found.boxes());
                 collisionBoxes.put(entityId, worldBoxes);
+                // ItemDisplay anchors have no vanilla collision of their own, so every placement's
+                // boxes (solid and partial alike) need NilumCollisionListener's manual resolution.
+                collisionRegistry.set("model:" + entityId, CollisionShapes.toWorldEntries(location, found.boxes()));
 
                 BbProxyShape shape = ProxyMaterialClassifier.classify(found.boxes());
                 proxyShapes.put(entityId, shape);
@@ -104,6 +107,16 @@ public final class ModelDisplayService {
             case BbCollisionResult.MissingWarning ignored -> logger.warn("Nilum model '" + modelId
                     + "' has no collision group. It will be non-solid. Add a 'collision' group to define hitboxes.");
         }
+    }
+
+    /** Tells every client to render player with modelId's skeleton, keyed by the player's own entity UUID. */
+    public boolean giveSkeleton(Player player, String modelId) {
+        if (modelRegistry.get(modelId).isEmpty()) {
+            return false;
+        }
+        broadcast(new ModelSpawnPacket(player.getUniqueId(), modelId));
+        logger.info("Gave '" + player.getName() + "' the '" + modelId + "' skeleton.");
+        return true;
     }
 
     /** Sends every currently-tracked placement to one player; called once they complete the handshake. */

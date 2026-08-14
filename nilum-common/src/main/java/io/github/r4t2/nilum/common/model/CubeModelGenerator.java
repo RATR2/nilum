@@ -8,12 +8,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Synthesizes a plain .bbmodel JSON (the format BbModelParser reads) for a full 0..16 cube with
- * one texture per face, the "default retexture" block model for a solid block reskinned per-face
- * without authoring an actual Blockbench model. Downstream systems treat the output identically
- * to a hand-authored model.
- */
+/** Synthesizes a plain .bbmodel JSON for a full 0..16 cube with one texture per face, the "default retexture" block model. */
 public final class CubeModelGenerator {
 
     private static final String[] FACES = {"north", "south", "east", "west", "up", "down"};

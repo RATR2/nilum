@@ -16,11 +16,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Shared, growable texture atlas for icon-only custom items, packed left-to-right into
- * shelves. Icons larger than MAX_ICON_DIMENSION are downscaled to fit. All packing/upload
- * work must happen on the render thread, via Minecraft.execute.
- */
+/** Shared, growable texture atlas for icon-only custom items, packed left-to-right into shelves. Must be used on the render thread. */
 public final class IconAtlas {
 
     private static final int CANVAS_WIDTH = 256;

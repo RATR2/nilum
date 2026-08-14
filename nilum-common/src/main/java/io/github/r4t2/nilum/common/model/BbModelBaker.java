@@ -1,11 +1,15 @@
 package io.github.r4t2.nilum.common.model;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 
 public final class BbModelBaker {
+
+    /** Key used by bakeByBone for elements not directly owned by any outliner group. */
+    public static final String NO_BONE = "";
 
     private BbModelBaker() {
     }
@@ -16,6 +20,35 @@ public final class BbModelBaker {
             bakeElement(model, element, quads);
         }
         return quads;
+    }
+
+    /** Bakes every element in the model, grouped by the outliner group that directly references it. */
+    public static Map<String, List<BbBakedQuad>> bakeByBone(BbModel model) {
+        Map<String, List<BbElement>> elementsByBone = new HashMap<>();
+        for (BbOutlinerNode node : model.outliner()) {
+            collectByBone(node, NO_BONE, model, elementsByBone);
+        }
+
+        Map<String, List<BbBakedQuad>> quadsByBone = new HashMap<>();
+        elementsByBone.forEach((boneUuid, elements) -> quadsByBone.put(boneUuid, bake(model, elements)));
+        return quadsByBone;
+    }
+
+    private static void collectByBone(BbOutlinerNode node, String owningBoneUuid, BbModel model,
+                                       Map<String, List<BbElement>> out) {
+        switch (node) {
+            case BbOutlinerElementRef ref -> {
+                BbElement element = model.elementsByUuid().get(ref.elementUuid());
+                if (element != null) {
+                    out.computeIfAbsent(owningBoneUuid, key -> new ArrayList<>()).add(element);
+                }
+            }
+            case BbOutlinerGroup group -> {
+                for (BbOutlinerNode child : group.children()) {
+                    collectByBone(child, group.uuid(), model, out);
+                }
+            }
+        }
     }
 
     private static void bakeElement(BbModel model, BbElement element, List<BbBakedQuad> out) {
@@ -48,11 +81,7 @@ public final class BbModelBaker {
         }
     }
 
-    /**
-     * Blockbench's per-element rotation vector is applied intrinsically X, then Y, then Z, around
-     * the element's own origin point. Positions rotate around that origin; normals rotate in
-     * place (direction only, no translation).
-     */
+    /** Blockbench's per-element rotation is applied intrinsically X, then Y, then Z, around the element's own origin point. */
     private static BbBakedQuad rotateQuad(BbBakedQuad quad, float rx, float ry, float rz,
                                            float originX, float originY, float originZ) {
         return new BbBakedQuad(

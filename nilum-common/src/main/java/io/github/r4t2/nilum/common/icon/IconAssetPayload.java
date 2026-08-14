@@ -11,11 +11,7 @@ import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * What travels over the wire for an icon asset: the PNG bytes plus its fully-resolved
- * IconDisplay, bundled into one payload so the existing manifest/TCP asset-fetch transport
- * can carry both without protocol changes.
- */
+/** What travels over the wire for an icon asset: the PNG bytes plus its fully-resolved IconDisplay, bundled into one payload. */
 public record IconAssetPayload(byte[] pngBytes, IconDisplay display) {
 
     public byte[] encode() {

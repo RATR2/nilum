@@ -17,11 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Four fixed Nilum creative tabs, registered once at mod init. Items and Models populate from
- * whatever's currently loaded. Blocks stays empty until Nilum has a custom block system. Custom
- * Items stays empty until something calls addCustomItem, an API surface for other code to feed into.
- */
+/** Four fixed Nilum creative tabs. Custom Items stays empty until something calls addCustomItem. */
 public final class NilumCreativeTabs {
 
     private static final List<ItemStack> CUSTOM_ITEMS = new CopyOnWriteArrayList<>();

@@ -11,12 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Server-side registry of icon-only custom item textures. What's served/hashed is an
- * IconAssetPayload, the PNG bundled with its resolved IconDisplay, so a display-only change
- * still triggers a client re-fetch. load() alone leaves the icon's display at identity;
- * call applyDisplay() once it's resolved.
- */
+/** Server-side registry of icon-only custom item textures. load() leaves display at identity; call applyDisplay() once resolved. */
 public final class IconRegistry {
 
     private final Map<String, byte[]> pngBytesById = new ConcurrentHashMap<>();

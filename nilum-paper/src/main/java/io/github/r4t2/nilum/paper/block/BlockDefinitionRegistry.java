@@ -135,11 +135,7 @@ public final class BlockDefinitionRegistry {
         };
     }
 
-    /**
-     * "Default retexture" mode: a full 0..16 cube reskinned per face, without authoring an
-     * actual Blockbench model. Always generates the same synthetic id for a given block id, so
-     * reload-time regeneration replaces the previous version in ModelRegistry.
-     */
+    /** "Default retexture" mode: a full 0..16 cube reskinned per face, generating the same synthetic id per block id. */
     private String generateCubeModel(String id, ConfigurationSection texturesSection) {
         Map<String, byte[]> bytesByFileName = new HashMap<>();
         Map<String, byte[]> facePngBytes = new LinkedHashMap<>();

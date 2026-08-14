@@ -8,12 +8,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * Iris integration via its real public API: getShaderpacksDirectoryManager to install a pack
- * file, IrisConfig plus loadShaderpackWhenPossible to switch to it. Switching packs makes Iris
- * rebuild its whole rendering pipeline. Every caller MUST check FabricLoader.isModLoaded("iris")
- * first; loading this class without Iris installed throws NoClassDefFoundError.
- */
+/** Iris integration via its real public API. Every caller MUST check FabricLoader.isModLoaded("iris") first, or risk NoClassDefFoundError. */
 public final class NilumIrisIntegration {
 
     private String previousPackName;

@@ -3,24 +3,16 @@ package io.github.r4t2.nilum.common.expr;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Walks a parsed ExprNode tree every render tick. counter/pulse are pure functions of
- * timeSeconds, not internal mutable state, so the same tree can be re-evaluated from scratch
- * each tick.
- */
+/** Walks a parsed ExprNode tree every render tick. counter/pulse are pure functions of timeSeconds, no internal mutable state. */
 public final class ExprEvaluator {
 
     /** Leaf functions that resolve to a string via TextValueSource, only meaningful through evaluateText. */
-    private static final Set<String> TEXT_FUNCTIONS = Set.of("name", "placeholderapi", "head");
+    private static final Set<String> TEXT_FUNCTIONS = Set.of("name", "placeholderapi", "head", "java");
 
     private ExprEvaluator() {
     }
 
-    /**
-     * Entry point for render_text HUD elements. Unlike evaluate, string literals and text
-     * functions are meaningful results here, not just value-source arguments. Falls back to
-     * the normal numeric evaluator for anything else.
-     */
+    /** Entry point for render_text HUD elements; string literals and text functions are meaningful results here, not just arguments. */
     public static String evaluateText(ExprNode node, ValueSource valueSource, TextValueSource textSource, double timeSeconds) {
         if (node instanceof ExprNode.StringLiteral literal) {
             return literal.value();
@@ -34,6 +26,14 @@ public final class ExprEvaluator {
                     joined.append(evaluateText(argument, valueSource, textSource, timeSeconds));
                 }
                 return joined.toString();
+            }
+            // if's own numeric evaluateCall() always resolves both branches through the plain
+            // numeric evaluator, so a string branch would throw there; the condition still needs
+            // to be numeric, but the taken branch should stay text-evaluated, matching text()'s
+            // arguments.
+            if (call.name().equals("if")) {
+                boolean condition = evaluate(call.arguments().get(0), valueSource, timeSeconds) != 0;
+                return evaluateText(call.arguments().get(condition ? 1 : 2), valueSource, textSource, timeSeconds);
             }
             if (TEXT_FUNCTIONS.contains(call.name())) {
                 return textSource.resolve(call.name(), requireStringArg(call, call.arguments(), 0));
@@ -105,10 +105,11 @@ public final class ExprEvaluator {
     private static double evaluateCall(ExprNode.FunctionCall node, ValueSource valueSource, double timeSeconds) {
         List<ExprNode> args = node.arguments();
         return switch (node.name()) {
-            // placeholderapi(...) only produces a meaningful value server-side (evaluateText with
-            // a PlaceholderAPI-backed ValueSource); client-side it falls through to
-            // NilumHudValueSource's "unknown key" warning and resolves to 0, same as any typo.
-            case "number", "boolean", "placeholderapi" -> valueSource.resolve(requireStringArg(node, args, 0));
+            // placeholderapi(...)/java(...) only produce a meaningful value server-side; client-side
+            // they fall through to NilumHudValueSource's "unknown key" warning and resolve to 0,
+            // same as any typo.
+            case "number", "boolean", "placeholderapi", "java" ->
+                    valueSource.resolve(node.name(), requireStringArg(node, args, 0));
 
             case "round" -> Math.round(arg(args, valueSource, timeSeconds, 0));
             case "floor" -> Math.floor(arg(args, valueSource, timeSeconds, 0));

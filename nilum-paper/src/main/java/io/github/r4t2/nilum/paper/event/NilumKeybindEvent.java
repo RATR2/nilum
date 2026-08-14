@@ -4,11 +4,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
-/**
- * Fired when a player presses or releases one of Nilum's 4 general-purpose client keybinds.
- * There's no built-in behavior for any slot; a plugin decides what each one does by listening
- * to this event, like any other Bukkit event.
- */
+/** Fired when a player presses or releases one of Nilum's 4 general-purpose client keybinds. */
 public final class NilumKeybindEvent extends Event {
 
     private static final HandlerList HANDLERS = new HandlerList();

@@ -2,11 +2,7 @@ package io.github.r4t2.nilum.fabric.render;
 
 import net.fabricmc.loader.api.FabricLoader;
 
-/**
- * Iris/Sodium/vanilla detection for the handshake capability report. Iris present: full
- * pipeline access. Sodium present (no Iris): restricted to the Sodium-safe set. Otherwise
- * vanilla: full core shader access.
- */
+/** Iris/Sodium/vanilla detection for the handshake capability report: full access, Sodium-safe set, or full core access. */
 public final class ShaderCapability {
 
     public enum Renderer {

@@ -3,11 +3,7 @@ package io.github.r4t2.nilum.common.expr;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Recursive-descent parser for the HUD expression DSL. Parsed once at atlas load time into an
- * AST, never re-parsed per frame. Depth and total-node limits are safety backstops against a
- * pathological expression, not a security measure.
- */
+/** Recursive-descent parser for the HUD expression DSL, parsed once at atlas load time. Depth/node limits guard pathological expressions. */
 public final class ExprParser {
 
     private static final int MAX_DEPTH = 64;
@@ -118,7 +114,7 @@ public final class ExprParser {
                 advance();
                 yield node(depth, new ExprNode.StringLiteral(token.text()));
             }
-            case IDENT -> parseFunctionCall(depth, token);
+            case IDENT -> parseIdent(depth, token);
             case LPAREN -> {
                 advance();
                 ExprNode inner = parseOr(nextDepth(depth));
@@ -127,6 +123,19 @@ public final class ExprParser {
             }
             default -> throw new ExprParseException("Unexpected token: " + token.type());
         };
+    }
+
+    /** IDENT followed by '(' is a function call; a bare IDENT is sugar for a string literal, e.g. head(client) instead of head("client"). true/false are the two exceptions, evaluating as 1/0. */
+    private ExprNode parseIdent(int depth, ExprToken token) {
+        if (peekNext().type() != ExprToken.Type.LPAREN) {
+            advance();
+            return switch (token.text()) {
+                case "true" -> node(depth, new ExprNode.NumberLiteral(1));
+                case "false" -> node(depth, new ExprNode.NumberLiteral(0));
+                default -> node(depth, new ExprNode.StringLiteral(token.text()));
+            };
+        }
+        return parseFunctionCall(depth, token);
     }
 
     private ExprNode parseFunctionCall(int depth, ExprToken nameToken) {
@@ -164,6 +173,10 @@ public final class ExprParser {
 
     private ExprToken peek() {
         return tokens.get(index);
+    }
+
+    private ExprToken peekNext() {
+        return tokens.get(index + 1);
     }
 
     private boolean check(ExprToken.Type type) {

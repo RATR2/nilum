@@ -6,10 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Thin CustomPacketPayload wrapper around a raw HelloPacket. The field encoding lives in
- * nilum-common; this adapts it to NeoForge's payload registration API.
- */
+/** Thin CustomPacketPayload wrapper around a raw HelloPacket; the field encoding lives in nilum-common for a shared wire format. */
 public record NilumHelloPayload(byte[] data) implements CustomPacketPayload {
 
     public static final Type<NilumHelloPayload> TYPE =

@@ -5,10 +5,27 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.r4t2.nilum.common.model.BbBakedQuad;
 import io.github.r4t2.nilum.common.model.BbBakedVertex;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /** Shared baked-quad vertex emission, used by in-world entity rendering, held-item rendering, and block rendering. */
 public final class NilumModelGeometry {
 
     private NilumModelGeometry() {
+    }
+
+    /** Regroups a posed mesh (BbPosedModel.apply's flat output) back by texture index for per-texture draw calls. */
+    public static Map<Integer, List<BbBakedQuad>> groupByTexture(List<BbBakedQuad> quads) {
+        Map<Integer, List<BbBakedQuad>> byTexture = new HashMap<>();
+        for (BbBakedQuad quad : quads) {
+            if (quad.textureIndex() == null) {
+                continue;
+            }
+            byTexture.computeIfAbsent(quad.textureIndex(), key -> new ArrayList<>()).add(quad);
+        }
+        return byTexture;
     }
 
     public static void emitQuad(VertexConsumer consumer, PoseStack.Pose pose, BbBakedQuad quad, int light, int overlay) {

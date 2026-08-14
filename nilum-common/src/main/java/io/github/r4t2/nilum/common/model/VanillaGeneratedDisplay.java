@@ -3,11 +3,7 @@ package io.github.r4t2.nilum.common.model;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Vanilla's assets/minecraft/models/item/generated.json flat-item display defaults. Shared
- * between icons.yml resolution (server) and full .bbmodel item display resolution (client), so
- * both fall back to the same numbers for any context/field they don't specify.
- */
+/** Vanilla's generated.json flat-item display defaults, shared between icon and full-model display resolution. */
 public final class VanillaGeneratedDisplay {
 
     public static final Map<String, BbDisplayTransform> DEFAULTS = Map.of(

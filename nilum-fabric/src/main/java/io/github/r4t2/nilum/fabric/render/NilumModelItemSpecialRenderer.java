@@ -4,7 +4,10 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
 import io.github.r4t2.nilum.common.model.BbBakedQuad;
 import io.github.r4t2.nilum.common.model.BbBakedVertex;
+import io.github.r4t2.nilum.common.model.BbBonePose;
+import io.github.r4t2.nilum.common.model.BbMatrix4;
 import io.github.r4t2.nilum.common.model.BbModel;
+import io.github.r4t2.nilum.common.model.BbPosedModel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
@@ -40,10 +43,14 @@ public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer
         }
 
         BbModel model = modelStore.model(modelId).orElse(null);
-        Map<Integer, List<BbBakedQuad>> quadsByTexture = modelStore.bakedQuadsByTexture(modelId).orElse(null);
-        if (model == null || quadsByTexture == null) {
+        Map<String, List<BbBakedQuad>> quadsByBone = modelStore.bakedQuadsByBone(modelId).orElse(null);
+        if (model == null || quadsByBone == null) {
             return;
         }
+
+        Map<String, BbMatrix4> bonePose = BbBonePose.computeAutoLoop(model);
+        List<BbBakedQuad> posed = BbPosedModel.apply(quadsByBone, bonePose);
+        Map<Integer, List<BbBakedQuad>> quadsByTexture = NilumModelGeometry.groupByTexture(posed);
 
         for (Map.Entry<Integer, List<BbBakedQuad>> entry : quadsByTexture.entrySet()) {
             int textureIndex = entry.getKey();
@@ -63,12 +70,7 @@ public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer
         }
     }
 
-    /**
-     * SpecialModelRenderer.getExtents has no per-argument parameter, so it can't report a
-     * distinct box per modelId through this hook alone. Real per-model wiring happens via
-     * extentsOf(String), called directly by NilumModelItemModel. Left empty since nothing
-     * invokes it through the shared-instance path.
-     */
+    /** Left empty; real per-model extents wiring happens via extentsOf(String), called directly by NilumModelItemModel. */
     @Override
     public void getExtents(Consumer<Vector3fc> consumer) {
     }

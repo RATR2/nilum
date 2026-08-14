@@ -8,11 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
-/**
- * Resolves number("minecraft:...")/boolean("minecraft:...") against the local player,
- * server:name against a ClientVarStore, and anything else against values other client mods
- * have registered via register(String, Supplier).
- */
+/** Resolves minecraft:... against the local player, server:name against ClientVarStore, and anything else via register(String, Supplier). */
 public final class NilumHudValueSource implements ValueSource {
 
     private static final Map<String, Supplier<Double>> externalValues = new ConcurrentHashMap<>();
@@ -31,7 +27,7 @@ public final class NilumHudValueSource implements ValueSource {
     }
 
     @Override
-    public double resolve(String key) {
+    public double resolve(String function, String key) {
         if (key.startsWith("minecraft:")) {
             return resolveVanilla(key.substring("minecraft:".length()));
         }
@@ -53,13 +49,16 @@ public final class NilumHudValueSource implements ValueSource {
             case "health" -> player.getHealth();
             case "max_health" -> player.getMaxHealth();
             case "food_level" -> player.getFoodData().getFoodLevel();
+            case "saturation" -> player.getFoodData().getSaturationLevel();
             case "air" -> player.getAirSupply();
+            case "max_air" -> player.getMaxAirSupply();
             case "armor" -> player.getArmorValue();
             case "xp_level" -> player.experienceLevel;
             case "xp_progress" -> player.experienceProgress;
             case "absorption" -> player.getAbsorptionAmount();
             case "on_fire" -> player.isOnFire() ? 1 : 0;
             case "in_water" -> player.isInWater() ? 1 : 0;
+            case "swimming" -> player.isSwimming() ? 1 : 0;
             case "sneaking" -> player.isCrouching() ? 1 : 0;
             case "sprinting" -> player.isSprinting() ? 1 : 0;
             case "flying" -> player.getAbilities().flying ? 1 : 0;

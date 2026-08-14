@@ -9,12 +9,7 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Server -> client: which positions within one chunk are Nilum custom blocks. Sent as a
- * companion to the vanilla chunk packet, not embedded in it. Also reused for live single-block
- * placement/removal (a one-entry batch), and doubles as a removal notice when
- * ChunkBlockEntry.modelId() is null.
- */
+/** Server -> client: which positions in one chunk are Nilum custom blocks. Also reused for live single-block placement/removal. */
 public record ChunkBlocksPacket(int chunkX, int chunkZ, List<ChunkBlockEntry> entries) {
 
     public byte[] encode() {

@@ -14,10 +14,8 @@ import org.joml.Vector3fc;
 import java.util.function.Consumer;
 
 /**
- * Draws a per-item custom glint: the base layer's quads redrawn with a scrolled UV sampling a
- * glint texture, additively blended; "suppress and replace," not a modification of vanilla's
- * glint shaders (Sodium crashes if those are touched). Scroll is computed per-vertex on the
- * CPU, so this works identically on vanilla, Sodium, and Iris.
+ * Draws a per-item custom glint: base-layer quads redrawn with a scrolled UV, additively
+ * blended. "Suppress and replace," never a modification of vanilla's glint shaders.
  */
 public final class NilumGlintSpecialRenderer implements SpecialModelRenderer<GlintRenderData> {
 

@@ -15,11 +15,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
-/**
- * Server-side registry of Iris/OptiFine-format shaderpack zips (shaderpacks/<id>.zip). Streamed
- * to the client the same way models/icons are, then written into Iris's own shaderpacks folder
- * so Iris can load them through its normal, unmodified pipeline.
- */
+/** Server-side registry of Iris/OptiFine-format shaderpack zips, streamed to the client the same way models/icons are. */
 public final class ShaderPackRegistry {
 
     private final Map<String, byte[]> rawBytesById = new ConcurrentHashMap<>();

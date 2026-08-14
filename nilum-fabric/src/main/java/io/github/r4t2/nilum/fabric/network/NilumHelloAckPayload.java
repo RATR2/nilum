@@ -6,10 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Thin CustomPacketPayload wrapper around a raw HelloAckPacket. See NilumHelloPayload for why
- * the field encoding lives in nilum-common.
- */
+/** Thin CustomPacketPayload wrapper around a raw HelloAckPacket. See NilumHelloPayload. */
 public record NilumHelloAckPayload(byte[] data) implements CustomPacketPayload {
 
     public static final Type<NilumHelloAckPayload> TYPE =

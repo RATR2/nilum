@@ -69,11 +69,7 @@ public final class NilumLogger {
         route(NilumLogLevel.MODERATION, message);
     }
 
-    /**
-     * Throwable#toString() alone drops everything past the outermost wrapper, e.g. an
-     * UncheckedIOException hiding the real IOException that explains why. Walks the full cause
-     * chain instead.
-     */
+    /** Walks the full cause chain; Throwable#toString() alone drops everything past the outermost wrapper. */
     private static String causeChain(Throwable cause) {
         StringBuilder chain = new StringBuilder(String.valueOf(cause));
         Throwable next = cause.getCause();

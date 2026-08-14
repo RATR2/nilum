@@ -20,12 +20,8 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Owns each icon's icons/<iconId>.yml: which texture file it uses and how it's
- * positioned/scaled/rotated per ItemDisplayContext. Auto-creates missing files/fields
- * on reload without touching values an admin already set.
- *
- * <p>Each context field is either "generated" (vanilla's flat-item default),
- * "blockbench" (pulled from blockbench-reference), or a literal {x, y, z}.
+ * Owns each icon's icons/<iconId>.yml: which texture file it uses and how it's positioned per
+ * ItemDisplayContext. Auto-creates missing files/fields without touching existing values.
  */
 public final class IconsYamlManager {
 
@@ -37,11 +33,7 @@ public final class IconsYamlManager {
         this.logger = logger;
     }
 
-    /**
-     * Scans iconsDirectory for <iconId>.yml files (creating missing files/fields with defaults,
-     * without touching existing values), and returns each icon's texture filename plus its
-     * fully-resolved IconDisplay.
-     */
+    /** Scans iconsDirectory for <iconId>.yml files, creating missing files/fields with defaults without touching existing values. */
     public Map<String, IconYamlConfig> reload(ModelRegistry modelRegistry) throws IOException {
         Files.createDirectories(iconsDirectory);
         Map<String, IconYamlConfig> resolved = new HashMap<>();

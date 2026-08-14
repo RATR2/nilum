@@ -16,7 +16,13 @@ import io.github.r4t2.nilum.common.model.ModelLoadError;
 import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.common.shader.ShaderPackRegistry;
+import io.github.r4t2.nilum.paper.animation.AnimationService;
+import io.github.r4t2.nilum.paper.api.NilumAPI;
+import io.github.r4t2.nilum.paper.api.NilumAPIImpl;
 import io.github.r4t2.nilum.paper.block.BlockDefinitionRegistry;
+import io.github.r4t2.nilum.paper.collision.NilumCollisionListener;
+import io.github.r4t2.nilum.paper.skript.NilumSkriptAddon;
+import io.github.r4t2.nilum.paper.collision.NilumCollisionRegistry;
 import io.github.r4t2.nilum.paper.docs.ReadmeGenerator;
 import io.github.r4t2.nilum.paper.block.CustomBlockChunkSync;
 import io.github.r4t2.nilum.paper.block.CustomBlockInteractionListener;
@@ -33,6 +39,7 @@ import io.github.r4t2.nilum.paper.logging.PaperConsoleSink;
 import io.github.r4t2.nilum.paper.model.ModelDisplayService;
 import io.github.r4t2.nilum.paper.shader.ShaderPackService;
 import io.github.r4t2.nilum.paper.texture.TextureUsageTracker;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -63,6 +70,8 @@ public final class NilumPlugin extends JavaPlugin {
     private ShaderPackRegistry shaderPackRegistry;
     private ShaderPackService shaderPackService;
     private FontRegistry fontRegistry;
+    private AnimationService animationService;
+    private NilumCollisionRegistry collisionRegistry;
     private String buildCommit = "unknown";
 
     @Override
@@ -118,7 +127,8 @@ public final class NilumPlugin extends JavaPlugin {
         reloadModels();
         reloadIcons();
         reloadHudAtlases();
-        modelDisplayService = new ModelDisplayService(this, logger, modelRegistry);
+        collisionRegistry = new NilumCollisionRegistry();
+        modelDisplayService = new ModelDisplayService(this, logger, modelRegistry, collisionRegistry);
         customItemService = new CustomItemService(modelRegistry);
         iconItemService = new IconItemService(iconRegistry);
         hudAtlasService = new HudAtlasService(this);
@@ -126,9 +136,10 @@ public final class NilumPlugin extends JavaPlugin {
         reloadItems();
         blockDefinitionRegistry = new BlockDefinitionRegistry(logger, modelRegistry);
         reloadBlocks();
-        customBlockRegistry = new CustomBlockRegistry(blockDefinitionRegistry);
+        customBlockRegistry = new CustomBlockRegistry(blockDefinitionRegistry, modelRegistry, collisionRegistry, logger);
         reloadShaderPacks();
         shaderPackService = new ShaderPackService(this);
+        animationService = new AnimationService(this);
         reloadFonts();
         hudTextService.start(configManager.get(HudTextConfig.ENABLED), configManager.get(HudTextConfig.UPDATE_INTERVAL_TICKS));
 
@@ -147,6 +158,10 @@ public final class NilumPlugin extends JavaPlugin {
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.CHUNK_BLOCKS_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ACTIVATE_SHADER_PACK_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.DEACTIVATE_SHADER_PACK_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ENTITY_ANIMATION_PLAY_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ENTITY_ANIMATION_STOP_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.BLOCK_ANIMATION_PLAY_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.BLOCK_ANIMATION_STOP_QUALIFIED);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.HELLO_ACK_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.TCP_UNAVAILABLE_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.MOD_LIST_QUALIFIED, handshakeListener);
@@ -155,12 +170,21 @@ public final class NilumPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new CustomBlockChunkSync(this, customBlockRegistry), this);
         getServer().getPluginManager().registerEvents(
                 new CustomBlockInteractionListener(this, customBlockRegistry, itemDefinitionRegistry), this);
+        getServer().getPluginManager().registerEvents(new NilumCollisionListener(collisionRegistry), this);
 
         var command = getCommand("nilum");
         if (command != null) {
             NilumCommand executor = new NilumCommand(this);
             command.setExecutor(executor);
             command.setTabCompleter(executor);
+        }
+
+        getServer().getServicesManager().register(NilumAPI.class, new NilumAPIImpl(this), this, ServicePriority.Normal);
+
+        // Only ever calls into Skript's own classes once confirmed installed, same discipline
+        // already used for the Iris/PlaceholderAPI integrations.
+        if (getServer().getPluginManager().isPluginEnabled("Skript")) {
+            NilumSkriptAddon.register(this);
         }
 
         logger.info("Nilum enabled.");
@@ -263,7 +287,8 @@ public final class NilumPlugin extends JavaPlugin {
     /** @return true if the reload succeeded. */
     public boolean reloadHudAtlases() {
         try {
-            hudAtlasRegistry.loadDirectory(getDataFolder().toPath().resolve("hud"));
+            hudAtlasRegistry.loadDirectory(getDataFolder().toPath().resolve("hud"),
+                    getDataFolder().toPath().resolve("textures"), logger::warn);
             logger.info("Loaded " + hudAtlasRegistry.atlasIds().size() + " HUD atlas(es) from the hud folder.");
             hudTextService.refresh();
             handshakeListener.broadcastAssetManifest();
@@ -392,6 +417,14 @@ public final class NilumPlugin extends JavaPlugin {
 
     public FontRegistry fonts() {
         return fontRegistry;
+    }
+
+    public AnimationService animations() {
+        return animationService;
+    }
+
+    public NilumCollisionRegistry collisions() {
+        return collisionRegistry;
     }
 
     public BlockDefinitionRegistry blockDefinitions() {

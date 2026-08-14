@@ -9,11 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 
-/**
- * One entry in a block's drops list. itemRef is either nilum:<id> (an ItemDefinition) or
- * minecraft:<id> (a raw material). chance 1.0 always drops, 0.5 drops half the time, with a
- * count in [minCount, maxCount] inclusive.
- */
+/** One entry in a block's drops list. itemRef is nilum:<id> or minecraft:<id>; count is in [minCount, maxCount]. */
 public record DropEntry(String itemRef, double chance, int minCount, int maxCount) {
 
     /** @return the rolled stack(s), or empty if the chance roll failed or the item couldn't be resolved. */

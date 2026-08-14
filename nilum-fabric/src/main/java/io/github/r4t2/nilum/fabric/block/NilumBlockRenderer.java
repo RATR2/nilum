@@ -4,7 +4,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
 import io.github.r4t2.nilum.common.model.BbBakedQuad;
 import io.github.r4t2.nilum.common.model.BbBakedVertex;
+import io.github.r4t2.nilum.common.model.BbMatrix4;
 import io.github.r4t2.nilum.common.model.BbModel;
+import io.github.r4t2.nilum.common.model.BbPosedModel;
 import io.github.r4t2.nilum.fabric.render.NilumModelGeometry;
 import io.github.r4t2.nilum.fabric.render.TextureUploader;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
@@ -28,11 +30,7 @@ import org.joml.Quaternionf;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Draws every visible Nilum block's real geometry as its own render pass, separate from
- * vanilla's terrain mesh (see NilumBlockStateModel). Not Sodium-batched, so it does its own
- * distance/frustum/neighbor-face culling, and samples lighting per-quad.
- */
+/** Draws every visible Nilum block's real geometry as its own render pass. Not Sodium-batched, does its own culling and per-quad lighting. */
 public final class NilumBlockRenderer {
 
     private static final double MAX_RENDER_DISTANCE = 64.0;
@@ -100,10 +98,14 @@ public final class NilumBlockRenderer {
     private void renderBlock(ClientLevel level, BlockPos pos, String modelId, PoseStack poseStack,
                               WorldRenderContext context, Vec3 cameraPos) {
         BbModel model = modelStore.model(modelId).orElse(null);
-        Map<Integer, List<BbBakedQuad>> quadsByTexture = modelStore.bakedQuadsByTexture(modelId).orElse(null);
-        if (model == null || quadsByTexture == null) {
+        Map<String, List<BbBakedQuad>> quadsByBone = modelStore.bakedQuadsByBone(modelId).orElse(null);
+        if (model == null || quadsByBone == null) {
             return;
         }
+
+        Map<String, BbMatrix4> bonePose = blockRegistry.animationState(pos).pose(model, System.currentTimeMillis());
+        List<BbBakedQuad> posed = BbPosedModel.apply(quadsByBone, bonePose);
+        Map<Integer, List<BbBakedQuad>> quadsByTexture = NilumModelGeometry.groupByTexture(posed);
 
         poseStack.pushPose();
         poseStack.translate(pos.getX() - cameraPos.x, pos.getY() - cameraPos.y, pos.getZ() - cameraPos.z);
@@ -137,12 +139,7 @@ public final class NilumBlockRenderer {
         poseStack.popPose();
     }
 
-    /**
-     * True only if every vertex of this face sits on the block's boundary plane in that
-     * direction (within a small tolerance), not just facing that way. Needed for partial
-     * geometry (a tabletop's underside, an inset corner post) where a face can point at a
-     * solid neighbor without actually touching it.
-     */
+    /** True only if every vertex of this face sits on the block's boundary plane in that direction, not just facing that way. */
     private static boolean isFlushWithBoundary(BbBakedQuad quad, Direction face) {
         float epsilon = 0.01f;
         for (BbBakedVertex vertex : new BbBakedVertex[]{quad.v0(), quad.v1(), quad.v2(), quad.v3()}) {

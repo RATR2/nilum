@@ -8,6 +8,7 @@ public final class BbCollisionParser {
 
     private static final String COLLISION_GROUP_NAME = "collision";
     private static final String NO_COLLISION_INTENT = "none";
+    private static final String PARTIAL_ELEMENT_NAME = "partial";
 
     private BbCollisionParser() {
     }
@@ -37,8 +38,10 @@ public final class BbCollisionParser {
         double y1 = element.to().y() / 16.0;
         double z1 = element.to().z() / 16.0;
 
+        CollisionTier tier = PARTIAL_ELEMENT_NAME.equalsIgnoreCase(element.name()) ? CollisionTier.PARTIAL : CollisionTier.SOLID;
+
         return new BbCollisionBox(
                 Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1),
-                Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1));
+                Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1), tier);
     }
 }

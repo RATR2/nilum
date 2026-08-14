@@ -9,8 +9,12 @@ import io.github.r4t2.nilum.fabric.logging.FabricLogSink;
 import io.github.r4t2.nilum.fabric.network.NilumActivateShaderPackPayload;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumAtlasPatchPayload;
+import io.github.r4t2.nilum.fabric.network.NilumBlockAnimationPlayPayload;
+import io.github.r4t2.nilum.fabric.network.NilumBlockAnimationStopPayload;
 import io.github.r4t2.nilum.fabric.network.NilumDeactivateShaderPackPayload;
 import io.github.r4t2.nilum.fabric.network.NilumChunkBlocksPayload;
+import io.github.r4t2.nilum.fabric.network.NilumEntityAnimationPlayPayload;
+import io.github.r4t2.nilum.fabric.network.NilumEntityAnimationStopPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHudFrameOverridePayload;
@@ -86,6 +90,10 @@ public final class NilumFabricMod implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(NilumChunkBlocksPayload.TYPE, NilumChunkBlocksPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumActivateShaderPackPayload.TYPE, NilumActivateShaderPackPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumDeactivateShaderPackPayload.TYPE, NilumDeactivateShaderPackPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumEntityAnimationPlayPayload.TYPE, NilumEntityAnimationPlayPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumEntityAnimationStopPayload.TYPE, NilumEntityAnimationStopPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumBlockAnimationPlayPayload.TYPE, NilumBlockAnimationPlayPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumBlockAnimationStopPayload.TYPE, NilumBlockAnimationStopPayload.CODEC);
 
         LOGGER.info("Nilum initialized.");
     }

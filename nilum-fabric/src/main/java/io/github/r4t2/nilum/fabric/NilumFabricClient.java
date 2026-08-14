@@ -3,11 +3,16 @@ package io.github.r4t2.nilum.fabric;
 import io.github.r4t2.nilum.common.asset.AssetCache;
 import io.github.r4t2.nilum.common.asset.AssetSyncSession;
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
+import io.github.r4t2.nilum.common.model.BbModel;
 import io.github.r4t2.nilum.common.model.ClientModelPlacements;
 import io.github.r4t2.nilum.common.protocol.ActivateShaderPackPacket;
 import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.AtlasPatchPacket;
+import io.github.r4t2.nilum.common.protocol.BlockAnimationPlayPacket;
+import io.github.r4t2.nilum.common.protocol.BlockAnimationStopPacket;
 import io.github.r4t2.nilum.common.protocol.ChunkBlocksPacket;
+import io.github.r4t2.nilum.common.protocol.EntityAnimationPlayPacket;
+import io.github.r4t2.nilum.common.protocol.EntityAnimationStopPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
@@ -25,6 +30,7 @@ import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.fabric.block.ClientBlockRegistry;
+import io.github.r4t2.nilum.fabric.font.ClientFontStore;
 import io.github.r4t2.nilum.fabric.font.FontInstaller;
 import io.github.r4t2.nilum.fabric.block.NilumBlockRenderer;
 import io.github.r4t2.nilum.fabric.block.NilumBlockStateModel;
@@ -36,8 +42,12 @@ import io.github.r4t2.nilum.fabric.keybind.NilumKeybinds;
 import io.github.r4t2.nilum.fabric.network.NilumActivateShaderPackPayload;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumAtlasPatchPayload;
+import io.github.r4t2.nilum.fabric.network.NilumBlockAnimationPlayPayload;
+import io.github.r4t2.nilum.fabric.network.NilumBlockAnimationStopPayload;
 import io.github.r4t2.nilum.fabric.network.NilumChunkBlocksPayload;
 import io.github.r4t2.nilum.fabric.network.NilumDeactivateShaderPackPayload;
+import io.github.r4t2.nilum.fabric.network.NilumEntityAnimationPlayPayload;
+import io.github.r4t2.nilum.fabric.network.NilumEntityAnimationStopPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHudFrameOverridePayload;
@@ -70,6 +80,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EntityType;
@@ -77,6 +88,7 @@ import net.minecraft.world.entity.EntityType;
 import java.net.Socket;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -84,11 +96,20 @@ public final class NilumFabricClient implements ClientModInitializer {
 
     private static final int TCP_CONNECT_TIMEOUT_MILLIS = 5000;
 
+    // Mixins have no constructor to receive these through, so they're exposed statically here,
+    // same pattern NilumFabricMod already uses for CONFIG/LOGGER.
+    public static ClientModelStore MODEL_STORE;
+    public static ClientModelPlacements PLACEMENTS;
+    public static TextureUploader TEXTURE_UPLOADER;
+    public static ClientFontStore FONT_STORE;
+
     @Override
     public void onInitializeClient() {
         AssetCache assetCache = new AssetCache(FabricLoader.getInstance().getConfigDir().resolve("nilum-cache"));
         ClientModelStore modelStore = new ClientModelStore();
         ClientModelPlacements placements = new ClientModelPlacements();
+        MODEL_STORE = modelStore;
+        PLACEMENTS = placements;
         IconAtlas iconAtlas = new IconAtlas(
                 FabricLoader.getInstance().getConfigDir().resolve("nilum-cache").resolve("icon_atlas_debug.png"));
         ClientHudAtlasStore hudAtlases = new ClientHudAtlasStore();
@@ -116,11 +137,17 @@ public final class NilumFabricClient implements ClientModInitializer {
         }
 
         Path fontDirectory = FabricLoader.getInstance().getConfigDir().resolve("nilum").resolve("font");
-        BiConsumer<String, byte[]> fontSink = (fontId, data) -> FontInstaller.install(fontId, data, fontDirectory);
+        ClientFontStore fontStore = new ClientFontStore();
+        FONT_STORE = fontStore;
+        BiConsumer<String, byte[]> fontSink = (fontId, data) -> {
+            FontInstaller.install(fontId, data, fontDirectory);
+            fontStore.install(fontId, data);
+        };
 
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
                 shaderPackSink, fontSink, NilumFabricMod.LOGGER);
         TextureUploader textureUploader = new TextureUploader();
+        TEXTURE_UPLOADER = textureUploader;
         // A model reloading with new bytes under the same id (e.g. a default-retexture block
         // after a blocktextures/ edit) must drop any already-uploaded GPU textures for it, or
         // getOrUpload's cache would keep serving the old ones forever.
@@ -235,6 +262,50 @@ public final class NilumFabricClient implements ClientModInitializer {
             ChunkBlocksPacket packet = ChunkBlocksPacket.decode(payload.data());
             blockRegistry.apply(packet.entries());
         });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumEntityAnimationPlayPayload.TYPE, (payload, context) -> {
+            EntityAnimationPlayPacket packet = EntityAnimationPlayPacket.decode(payload.data());
+            BbModel model = modelForEntity(modelStore, placements, packet.entityId());
+            if (model != null) {
+                placements.animationState(packet.entityId())
+                        .play(model, packet.animationName(), packet.startTimeMillis(), System.currentTimeMillis());
+            }
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumEntityAnimationStopPayload.TYPE, (payload, context) -> {
+            EntityAnimationStopPacket packet = EntityAnimationStopPacket.decode(payload.data());
+            BbModel model = modelForEntity(modelStore, placements, packet.entityId());
+            if (model != null) {
+                placements.animationState(packet.entityId()).stop(model, System.currentTimeMillis());
+            }
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumBlockAnimationPlayPayload.TYPE, (payload, context) -> {
+            BlockAnimationPlayPacket packet = BlockAnimationPlayPacket.decode(payload.data());
+            BlockPos pos = new BlockPos(packet.x(), packet.y(), packet.z());
+            BbModel model = modelForBlock(modelStore, blockRegistry, pos);
+            if (model != null) {
+                blockRegistry.animationState(pos).play(model, packet.animationName(), packet.startTimeMillis(), System.currentTimeMillis());
+            }
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumBlockAnimationStopPayload.TYPE, (payload, context) -> {
+            BlockAnimationStopPacket packet = BlockAnimationStopPacket.decode(payload.data());
+            BlockPos pos = new BlockPos(packet.x(), packet.y(), packet.z());
+            BbModel model = modelForBlock(modelStore, blockRegistry, pos);
+            if (model != null) {
+                blockRegistry.animationState(pos).stop(model, System.currentTimeMillis());
+            }
+        });
+    }
+
+    private static BbModel modelForEntity(ClientModelStore modelStore, ClientModelPlacements placements, UUID entityId) {
+        String modelId = placements.get(entityId);
+        return modelId == null ? null : modelStore.model(modelId).orElse(null);
+    }
+
+    private static BbModel modelForBlock(ClientModelStore modelStore, ClientBlockRegistry blockRegistry, BlockPos pos) {
+        return blockRegistry.modelIdAt(pos).flatMap(modelStore::model).orElse(null);
     }
 
     private static void handleHello(NilumHelloPayload payload, Consumer<CustomPacketPayload> sender) {

@@ -61,6 +61,18 @@ public final class NilumChannels {
     public static final String DEACTIVATE_SHADER_PACK = "deactivate_shader_pack";
     public static final String DEACTIVATE_SHADER_PACK_QUALIFIED = NAMESPACE + ":" + DEACTIVATE_SHADER_PACK;
 
+    public static final String ENTITY_ANIMATION_PLAY = "entity_animation_play";
+    public static final String ENTITY_ANIMATION_PLAY_QUALIFIED = NAMESPACE + ":" + ENTITY_ANIMATION_PLAY;
+
+    public static final String ENTITY_ANIMATION_STOP = "entity_animation_stop";
+    public static final String ENTITY_ANIMATION_STOP_QUALIFIED = NAMESPACE + ":" + ENTITY_ANIMATION_STOP;
+
+    public static final String BLOCK_ANIMATION_PLAY = "block_animation_play";
+    public static final String BLOCK_ANIMATION_PLAY_QUALIFIED = NAMESPACE + ":" + BLOCK_ANIMATION_PLAY;
+
+    public static final String BLOCK_ANIMATION_STOP = "block_animation_stop";
+    public static final String BLOCK_ANIMATION_STOP_QUALIFIED = NAMESPACE + ":" + BLOCK_ANIMATION_STOP;
+
     private NilumChannels() {
     }
 }

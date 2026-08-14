@@ -22,11 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Periodically evaluates every loaded HUD atlas's server_connector text elements per online
- * player and pushes the resolved string via HudAtlasService.setHudText. Runs on an interval on
- * the main thread, since PAPI placeholders can be expensive, and only re-sends changed values.
- */
+/** Periodically evaluates every loaded HUD atlas's server_connector text elements and pushes changed values via HudAtlasService. */
 public final class HudTextService {
 
     private record ServerTextElement(String elementId, ExprNode expression) {
@@ -85,8 +81,7 @@ public final class HudTextService {
             return;
         }
         if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            logger.info("PlaceholderAPI isn't installed - server_connector HUD text elements will stay blank.");
-            return;
+            logger.info("PlaceholderAPI isn't installed - placeholderapi(...) server_connector calls will resolve to nothing, java(...) still works.");
         }
         task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, intervalTicks, intervalTicks);
     }
@@ -104,6 +99,7 @@ public final class HudTextService {
             return;
         }
 
+        boolean placeholderApiAvailable = Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
         double timeSeconds = System.nanoTime() / 1_000_000_000.0;
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             UUID playerId = player.getUniqueId();
@@ -111,8 +107,12 @@ public final class HudTextService {
                 continue;
             }
 
-            ValueSource valueSource = new PlaceholderApiValueSource(player);
-            TextValueSource textSource = new PlaceholderApiTextValueSource(player);
+            // Only ever construct the PlaceholderAPI-backed pair once it's confirmed installed;
+            // referencing its classes at all with the plugin absent risks a NoClassDefFoundError.
+            ValueSource valueSource = placeholderApiAvailable
+                    ? new PlaceholderApiValueSource(player) : new NilumJavaValueSource(player);
+            TextValueSource textSource = placeholderApiAvailable
+                    ? new PlaceholderApiTextValueSource(player) : new NilumJavaTextValueSource(player);
 
             for (Map.Entry<String, List<ServerTextElement>> entry : elementsByAtlas.entrySet()) {
                 String atlasId = entry.getKey();

@@ -1,6 +1,14 @@
 package io.github.r4t2.nilum.paper.block;
 
+import io.github.r4t2.nilum.common.logging.NilumLogger;
+import io.github.r4t2.nilum.common.model.BbCollisionParser;
+import io.github.r4t2.nilum.common.model.BbCollisionResult;
+import io.github.r4t2.nilum.common.model.BbModel;
+import io.github.r4t2.nilum.common.model.CollisionTier;
+import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.ChunkBlockEntry;
+import io.github.r4t2.nilum.paper.collision.NilumCollisionRegistry;
+import io.github.r4t2.nilum.paper.model.CollisionShapes;
 import org.bukkit.Location;
 import org.bukkit.Material;
 
@@ -12,17 +20,22 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Tracks which world positions are Nilum custom blocks and which BlockDefinition each one is.
- * In-memory only for now, doesn't survive a server restart yet. The wire block is whatever
- * vanilla material the block type's BlockProxy specifies; the client renders the real .bbmodel
- * geometry over that position via a dynamic block model (see nilum-fabric's NilumBlockStateModel).
+ * In-memory only for now, doesn't survive a server restart yet.
  */
 public final class CustomBlockRegistry {
 
     private final BlockDefinitionRegistry blockDefinitions;
+    private final ModelRegistry modelRegistry;
+    private final NilumCollisionRegistry collisionRegistry;
+    private final NilumLogger logger;
     private final Map<BlockKey, String> blockTypeIdByPosition = new ConcurrentHashMap<>();
 
-    public CustomBlockRegistry(BlockDefinitionRegistry blockDefinitions) {
+    public CustomBlockRegistry(BlockDefinitionRegistry blockDefinitions, ModelRegistry modelRegistry,
+                                NilumCollisionRegistry collisionRegistry, NilumLogger logger) {
         this.blockDefinitions = blockDefinitions;
+        this.modelRegistry = modelRegistry;
+        this.collisionRegistry = collisionRegistry;
+        this.logger = logger;
     }
 
     /** @return the placed definition, or empty if blockTypeId isn't a loaded block type. */
@@ -33,8 +46,38 @@ public final class CustomBlockRegistry {
         }
 
         location.getBlock().setType(definition.get().proxy().wireMaterial());
-        blockTypeIdByPosition.put(BlockKey.of(location), blockTypeId);
+        BlockKey key = BlockKey.of(location);
+        blockTypeIdByPosition.put(key, blockTypeId);
+        registerCollision(key, location, definition.get());
         return definition;
+    }
+
+    /**
+     * Only registers manual collision for a block whose collision group has a PARTIAL box; a
+     * uniformly SOLID shape is already handled by the wire block's own vanilla hitbox.
+     */
+    private void registerCollision(BlockKey key, Location location, BlockDefinition definition) {
+        Optional<BbModel> model = modelRegistry.get(definition.modelId());
+        if (model.isEmpty()) {
+            return;
+        }
+
+        if (!(BbCollisionParser.resolve(model.get()) instanceof BbCollisionResult.Found found)) {
+            return;
+        }
+        boolean hasPartial = found.boxes().stream().anyMatch(box -> box.tier() == CollisionTier.PARTIAL);
+        if (!hasPartial) {
+            return;
+        }
+
+        if (definition.proxy().wireMaterial().isSolid()) {
+            logger.warn("Block definition '" + definition.id() + "' has a 'partial' collision box but its wire "
+                    + "block (" + definition.proxy().wireMaterial() + ") is solid - pick a non-solid material "
+                    + "(e.g. tripwire, a carpet) so Nilum's manual collision isn't fighting the wire block's own.");
+        }
+
+        Location origin = location.getBlock().getLocation();
+        collisionRegistry.set("block:" + key, CollisionShapes.toWorldEntries(origin, found.boxes()));
     }
 
     /** @return the block type id that was there, if any. Always leaves the actual block as AIR. */
@@ -43,13 +86,16 @@ public final class CustomBlockRegistry {
         String blockTypeId = blockTypeIdByPosition.remove(key);
         if (blockTypeId != null) {
             location.getBlock().setType(Material.AIR);
+            collisionRegistry.remove("block:" + key);
         }
         return Optional.ofNullable(blockTypeId);
     }
 
     /** Like remove(Location), but doesn't touch the actual block; for when the caller already will. */
     public Optional<String> forget(Location location) {
-        return Optional.ofNullable(blockTypeIdByPosition.remove(BlockKey.of(location)));
+        BlockKey key = BlockKey.of(location);
+        collisionRegistry.remove("block:" + key);
+        return Optional.ofNullable(blockTypeIdByPosition.remove(key));
     }
 
     public Optional<String> blockTypeIdAt(Location location) {

@@ -3,11 +3,7 @@ package io.github.r4t2.nilum.neoforge.network;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 
-/**
- * Reads/writes a byte array as the entire remainder of the packet, with no length prefix,
- * matching Paper's raw plugin-message wire format. Unlike ByteBufCodecs.BYTE_ARRAY, which
- * prefixes a VarInt length and is only wire-compatible when both ends are NeoForge.
- */
+/** Reads/writes a byte array as the entire packet remainder, no length prefix, matching Paper's raw plugin-message wire format. */
 final class RawByteArrayCodec {
 
     static final StreamCodec<ByteBuf, byte[]> INSTANCE = StreamCodec.of(

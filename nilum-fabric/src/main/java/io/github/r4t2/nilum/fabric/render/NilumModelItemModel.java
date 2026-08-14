@@ -15,12 +15,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Wraps a (possibly already icon-wrapped) ItemModel. If the stack carries a Nilum full-model
- * tag, draws the model's baked geometry using its authored Display panel data; otherwise
- * delegates to the wrapped model. Icon and model tags are mutually exclusive per item, so
- * wrapping order between the two doesn't matter.
- */
+/** Wraps an ItemModel. Draws the model's baked geometry if the stack carries a Nilum full-model tag, otherwise delegates to the wrapped model. */
 public final class NilumModelItemModel implements ItemModel {
 
     private final ItemModel original;
