@@ -3,6 +3,8 @@ name: Build
 on:
   push:
     branches: ["**"]
+    paths-ignore:
+      - "**.md"
 
 permissions:
   contents: write
@@ -23,16 +25,22 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Detects a bot version-bump commit (avoids an infinite loop), whether this
-      # commit requested a version bump via "version=X.Y.Z", and whether it opted
-      # out of mirroring via "workflows.ignore=true".
+      # Detects a bot version-bump commit (avoids an infinite loop), and reads
+      # tags from the commit message's own "Tags:" section:
+      #   workflow          required for anything below to run at all
+      #   build             build and mirror this commit to nilum-builds
+      #   version="X.Y.Z"   bump to this version and cut a release build
+      # No "workflow" tag means the job does nothing beyond checkout, silently -
+      # that's the deliberate replacement for the old "workflows.ignore=true"
+      # opt-out, now that everything is opt-in instead. Bot commits skip this
+      # check entirely, since their fixed [ci-bump] subject never contains it.
       - name: Classify commit
         id: classify
         run: |
-          # Both flags must be their own line (like a git trailer), not just a
-          # substring anywhere in the message - otherwise a commit that merely
-          # *talks about* "version=X.Y.Z" or "workflows.ignore=true" in prose
-          # (e.g. this very line) would trigger itself by accident.
+          # Tags must each be their own line, not just a substring anywhere in
+          # the message - otherwise a commit that merely *talks about* "build"
+          # or "workflow" in prose (e.g. this very comment) would trigger itself
+          # by accident.
           MSG=$(git log -1 --pretty=%B)
 
           # Bot detection can't key off github.actor: bump-version.sh pushes with
@@ -49,46 +57,40 @@ jobs:
           fi
 
           VERSION=""
-          if echo "$MSG" | grep -qxE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?'; then
-            VERSION=$(echo "$MSG" | grep -oxE 'version=[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?' | head -1 | cut -d= -f2)
+          if echo "$MSG" | grep -qxE 'version="[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?"'; then
+            VERSION=$(echo "$MSG" | grep -oxE 'version="[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?"' | head -1 | cut -d'"' -f2)
           fi
 
-          IGNORE="false"
-          if echo "$MSG" | grep -qxE 'workflows\.ignore=true'; then
-            IGNORE="true"
+          HAS_WORKFLOW="false"
+          if echo "$MSG" | grep -qixE 'workflow'; then
+            HAS_WORKFLOW="true"
+          fi
+
+          HAS_BUILD="false"
+          if echo "$MSG" | grep -qixE 'build'; then
+            HAS_BUILD="true"
           fi
 
           echo "is_bot=$IS_BOT" >> "$GITHUB_OUTPUT"
           echo "requested_version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "ignore=$IGNORE" >> "$GITHUB_OUTPUT"
+          echo "has_workflow=$HAS_WORKFLOW" >> "$GITHUB_OUTPUT"
+          echo "has_build=$HAS_BUILD" >> "$GITHUB_OUTPUT"
           echo "sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Bump version
-        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.requested_version != '' && steps.classify.outputs.ignore != 'true'
+        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.has_workflow == 'true' && steps.classify.outputs.requested_version != ''
         env:
           NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
         run: scripts/ci/bump-version.sh "${{ steps.classify.outputs.requested_version }}"
 
       - name: Build and mirror commit to nilum-builds
-        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.requested_version == '' && steps.classify.outputs.ignore != 'true'
+        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.has_workflow == 'true' && steps.classify.outputs.requested_version == '' && steps.classify.outputs.has_build == 'true'
         env:
           NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
           COMMIT_SHA: ${{ steps.classify.outputs.sha }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           BRANCH_NAME: ${{ github.ref_name }}
         run: scripts/ci/build-and-mirror.sh
-
-      # Doesn't build anything - just records that this commit exists, so
-      # nilum-builds' "Last Commit" can outpace "Last Build" when a commit
-      # is intentionally skipped.
-      - name: Record ignored commit in nilum-builds
-        if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.ignore == 'true'
-        env:
-          NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
-          COMMIT_SHA: ${{ steps.classify.outputs.sha }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          BRANCH_NAME: ${{ github.ref_name }}
-        run: scripts/ci/record-ignored-commit.sh
 
       - name: Build and publish release branch to nilum-builds
         if: steps.classify.outputs.is_bot == 'true'

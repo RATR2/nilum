@@ -53,24 +53,13 @@ build_and_collect_jars() {
   fi
 }
 
-# Rewrites README.md with the last actually-built commit and the given commit.
-# $4 (is_build) records $2/$3 as the new "last build" first when "true" - when
-# "false" (an ignored commit), the existing last-build record is left alone, so
-# "Last Build" and "Last Commit" can legitimately point at different commits.
+# Rewrites README.md with the given commit as the last build. Every caller now
+# corresponds to a real build (see build.yml's "workflow"/"build" tag gating),
+# so there's no more distinct "last commit that wasn't built" to track.
 update_readme() {
-  local dir="$1" sha="$2" subject="$3" is_build="$4"
-  local state_file="${dir}/builds/.last-build"
-
-  if [ "${is_build}" = "true" ]; then
-    mkdir -p "${dir}/builds"
-    printf '%s\n%s\n' "${sha}" "${subject}" > "${state_file}"
-  fi
-
-  local build_sha="" build_subject=""
-  if [ -f "${state_file}" ]; then
-    build_sha="$(sed -n '1p' "${state_file}")"
-    build_subject="$(sed -n '2p' "${state_file}")"
-  fi
+  local dir="$1" sha="$2" subject="$3"
+  mkdir -p "${dir}/builds"
+  printf '%s\n%s\n' "${sha}" "${subject}" > "${dir}/builds/.last-build"
 
   cat > "${dir}/README.md" <<EOF
 ---
@@ -80,9 +69,7 @@ update_readme() {
 
 Builds for https://github.com/RATR2/nilum
 
-  Last Build: [\`${build_sha}\`](https://github.com/RATR2/nilum/commit/${build_sha}) ${build_subject}
-
-  Last Commit: [\`${sha}\`](https://github.com/RATR2/nilum/commit/${sha}) ${subject}
+  Last Build: [\`${sha}\`](https://github.com/RATR2/nilum/commit/${sha}) ${subject}
 </div>
 EOF
 }
