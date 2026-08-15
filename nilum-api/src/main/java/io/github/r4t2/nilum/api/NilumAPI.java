@@ -1,4 +1,4 @@
-package io.github.r4t2.nilum.paper.api;
+package io.github.r4t2.nilum.api;
 
 import org.bukkit.Location;
 import org.bukkit.Material;

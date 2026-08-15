@@ -1,5 +1,6 @@
 package io.github.r4t2.nilum.common.hosting;
 
+import io.github.r4t2.nilum.common.block.BlockDefinitionRegistry;
 import io.github.r4t2.nilum.common.font.FontRegistry;
 import io.github.r4t2.nilum.common.hud.HudAtlasRegistry;
 import io.github.r4t2.nilum.common.icon.IconFileConfig;
@@ -27,6 +28,7 @@ public final class NilumAssetHost {
     private final HudAtlasRegistry hudAtlases = new HudAtlasRegistry();
     private final ShaderPackRegistry shaderPacks = new ShaderPackRegistry();
     private final FontRegistry fonts = new FontRegistry();
+    private final BlockDefinitionRegistry blocks;
 
     private final Path modelsDirectory;
     private final IconsFileManager iconsFileManager;
@@ -34,6 +36,7 @@ public final class NilumAssetHost {
     private final Path texturesDirectory;
     private final Path shaderPacksDirectory;
     private final Path fontsDirectory;
+    private final Path blocksDirectory;
     private final NilumLogger logger;
 
     public NilumAssetHost(Path configDir, NilumLogger logger) {
@@ -43,7 +46,9 @@ public final class NilumAssetHost {
         this.texturesDirectory = configDir.resolve("textures");
         this.shaderPacksDirectory = configDir.resolve("shaderpacks");
         this.fontsDirectory = configDir.resolve("fonts");
+        this.blocksDirectory = configDir.resolve("blocks");
         this.logger = logger;
+        this.blocks = new BlockDefinitionRegistry(logger, models);
     }
 
     /** Loads (or reloads) every registry from disk; a folder that fails to load keeps its previous contents. */
@@ -57,6 +62,12 @@ public final class NilumAssetHost {
         }
 
         loadIcons();
+
+        try {
+            blocks.loadDirectory(blocksDirectory, texturesDirectory);
+        } catch (IOException e) {
+            logger.error("Failed to load the blocks folder", e);
+        }
 
         try {
             hudAtlases.loadDirectory(hudDirectory, texturesDirectory, logger::warn);
@@ -138,5 +149,9 @@ public final class NilumAssetHost {
 
     public FontRegistry fonts() {
         return fonts;
+    }
+
+    public BlockDefinitionRegistry blocks() {
+        return blocks;
     }
 }

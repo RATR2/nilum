@@ -5,6 +5,7 @@ import io.github.r4t2.nilum.common.config.LoggingConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
+import io.github.r4t2.nilum.fabric.block.NilumBlocks;
 import io.github.r4t2.nilum.fabric.logging.FabricLogSink;
 import io.github.r4t2.nilum.fabric.network.NilumActivateShaderPackPayload;
 import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
@@ -66,6 +67,8 @@ public final class NilumFabricMod implements ModInitializer {
 
         LOGGER = new NilumLogger(new FabricLogSink(), configDir.resolve("logs").resolve("nilum.log"),
                 LoggingConfig.destinationLookup(CONFIG), CONFIG.get(LoggingConfig.MAX_LOG_FILES));
+
+        NilumBlocks.register();
 
         // Registered on both phases: a Paper server sends hello in PLAY (see HandshakeListener),
         // a Fabric-hosted server sends it during configuration (see FabricServerHandshake).

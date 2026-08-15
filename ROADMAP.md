@@ -9,7 +9,7 @@ Status tracker
 - [x] Hash-based asset cache
 - [x] Paper plugin (handshake, rejection)
 - [x] Fabric client mod
-- [x] NeoForge client mod (channels only, no rendering parity with Fabric)
+- [x] NeoForge client mod, full rendering parity with Fabric (see Modded Server Hosting)
 - [x] Common library
 
 ## Models & Items
@@ -93,14 +93,24 @@ Status tracker
 
 ## Modded Server Hosting
 
+Intended support matrix: Paper is the one server type both client loaders must fully support
+(including custom blocks), since it's the only tier where the client loader doesn't have to
+match the server loader. A Fabric-hosted server only ever needs to support a Fabric client; a
+NeoForge-hosted server only ever needs to support a NeoForge client.
+
 - [x] Handshake + capability negotiation on both loaders, hosted server side
 - [x] Asset streaming (models, HUD atlases, shader packs, fonts) on both loaders, hosted server side
 - [x] Icon streaming on both loaders, hosted server side
 - [x] Placing standalone models on both loaders, hosted server side
-- [ ] Custom blocks on both loaders, hosted server side
-- [ ] Collision on both loaders, hosted server side
+- [x] Custom blocks on both loaders, hosted server side (real registered `NilumBlock`/`NilumBlockEntity` per loader, not a proxy; `explosion_resistance` is parsed but not yet enforced per-block; now renders on NeoForge too, see below)
+- [x] Collision on both loaders, hosted server side (real per-position `VoxelShape` from the placed model's `collision` group; PARTIAL boxes dampen movement via `entityInside`, matching the existing Paper behavior)
 - [ ] Custom items, animation triggering, PlaceholderAPI-equivalent HUD text on both loaders, hosted server side
-- [ ] NeoForge client rendering parity with Fabric
+- [x] NeoForge client rendering parity with Fabric: real `NilumBlock` models/entity display/held-dropped-inventory items/icon-atlas rendering plus glints (`EntityRenderersEvent.RegisterRenderers`, `ModelEvent.ModifyBakingResult` wrapping every baked `ItemModel`), HUD atlas rendering (`RegisterGuiLayersEvent`, `GuiLayer.render` has the exact same signature as Fabric's `HudElement.render` so `HudAtlasRenderer` needed no logic changes), custom font streaming, fake creative tabs (`DeferredRegister<CreativeModeTab>` + `BuildCreativeModeTabContentsEvent`), and real Iris integration (`iris-neoforge-1.10.7+mc1.21.11.jar` vendored the same way `iris-fabric` is; same `net.irisshaders.iris` API on both loaders, ports verbatim; a one-time log recommends Iris if Oculus is installed without it). Plus the Paper-compatibility path both client loaders need regardless of hosted-server work: `ClientBlockRegistry`/`NilumBlockRenderer`/`NilumBlockStateModel`, ported using NeoForge's own `BlockStateModelExtension` position-aware `collectParts` in place of Fabric's FRAPI, and `RenderLevelStageEvent.AfterEntities` with immediate-mode `MultiBufferSource` rendering in place of Fabric's `SubmitNodeCollector`-based one (NeoForge's render-stage event doesn't hand one out). `NilumChunkBlocksPayload` came back after being deleted during the custom-blocks rework; that deletion was correct for NeoForge-hosted servers (real blocks, vanilla sync) but wrongly also removed a NeoForge client's ability to render Paper's wire-block overlay blocks. Almost the rest of the port was near-verbatim since nilum-fabric's `render/`/`hud/`/`font/`/`creativetab/` packages turned out to be vanilla-API only; only files touching a static `NilumFabricMod.LOGGER`/`NilumFabricClient.FONT_STORE` field needed real changes (NeoForge's mod class uses instance fields, so those became constructor parameters instead). The held-item hand-IK mixin is still unported, but that's not a parity gap since it's still unfinished on Fabric itself (see Animation)
+
+## Distribution
+
+- [ ] Client-only jar for playtesting, so it can't be decompiled into a working Paper plugin or a hosted Fabric/NeoForge server (`nilum-common-client` split off and wired into both loaders; the server-only half is blocked on `NilumAssetHost`'s dependency chain moving as one unit; still needs an actual client-only build variant and splitting `NilumNeoForgeMod` into client/dedicated-server classes)
+- [x] Move `NilumAPI` out of nilum-paper into its own module (`nilum-api`), so other plugins can compile against it without depending on the whole plugin jar
 
 ## Web Tools
 

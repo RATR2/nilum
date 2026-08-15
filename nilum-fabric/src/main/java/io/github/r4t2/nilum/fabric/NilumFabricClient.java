@@ -32,8 +32,11 @@ import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.fabric.block.ClientBlockRegistry;
 import io.github.r4t2.nilum.fabric.font.ClientFontStore;
 import io.github.r4t2.nilum.fabric.font.FontInstaller;
+import io.github.r4t2.nilum.fabric.block.NilumBlockEntity;
+import io.github.r4t2.nilum.fabric.block.NilumBlockEntityRenderer;
 import io.github.r4t2.nilum.fabric.block.NilumBlockRenderer;
 import io.github.r4t2.nilum.fabric.block.NilumBlockStateModel;
+import io.github.r4t2.nilum.fabric.block.NilumBlocks;
 import io.github.r4t2.nilum.fabric.creativetab.NilumCreativeTabs;
 import io.github.r4t2.nilum.fabric.hud.ClientHudAtlasStore;
 import io.github.r4t2.nilum.fabric.hud.ClientVarStore;
@@ -80,6 +83,8 @@ import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
@@ -88,6 +93,7 @@ import net.minecraft.world.entity.EntityType;
 import java.net.Socket;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -180,6 +186,11 @@ public final class NilumFabricClient implements ClientModInitializer {
                 blockRegistry.onChunkUnload(chunk.getPos().x, chunk.getPos().z));
         NilumBlockRenderer blockRenderer = new NilumBlockRenderer(modelStore, blockRegistry, textureUploader);
         WorldRenderEvents.AFTER_ENTITIES.register(blockRenderer::render);
+
+        // Real blocks on a Fabric/NeoForge-hosted server: rendered via a genuine
+        // BlockEntityRenderer, not the wire-block overlay pass above (that stays for Paper).
+        BlockEntityRenderers.register(NilumBlocks.BLOCK_ENTITY_TYPE,
+                context -> new NilumBlockEntityRenderer(modelStore, blockRegistry, textureUploader));
 
         // Registered on both phases: a Paper server sends hello in PLAY, a Fabric-hosted
         // server sends it during configuration (see FabricServerHandshake).
@@ -305,7 +316,18 @@ public final class NilumFabricClient implements ClientModInitializer {
     }
 
     private static BbModel modelForBlock(ClientModelStore modelStore, ClientBlockRegistry blockRegistry, BlockPos pos) {
-        return blockRegistry.modelIdAt(pos).flatMap(modelStore::model).orElse(null);
+        Optional<String> wireOverlayModelId = blockRegistry.modelIdAt(pos);
+        if (wireOverlayModelId.isPresent()) {
+            return modelStore.model(wireOverlayModelId.get()).orElse(null);
+        }
+
+        // A real Nilum block from a Fabric/NeoForge-hosted server isn't tracked in
+        // ClientBlockRegistry at all, its model id lives on its own block entity.
+        var level = Minecraft.getInstance().level;
+        if (level != null && level.getBlockEntity(pos) instanceof NilumBlockEntity blockEntity) {
+            return modelStore.model(blockEntity.definitionId()).orElse(null);
+        }
+        return null;
     }
 
     private static void handleHello(NilumHelloPayload payload, Consumer<CustomPacketPayload> sender) {

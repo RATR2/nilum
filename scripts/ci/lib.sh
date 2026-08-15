@@ -5,29 +5,42 @@ read_version() {
   grep -oE 'version = "[^"]*"' build.gradle.kts | head -1 | cut -d'"' -f2
 }
 
-# nilum-fabric/libs/*.jar is gitignored (see nilum-fabric/libs/attach.md), so CI has to fetch
-# it itself before Gradle configures nilum-fabric. Bumping the vendored version means updating
-# both the filename in nilum-fabric/build.gradle.kts and the URL/hash here together.
-IRIS_JAR_NAME="iris-fabric-1.10.7+mc1.21.11.jar"
-IRIS_JAR_URL="https://cdn.modrinth.com/data/YL57xq9U/versions/fDpuVzVr/iris-fabric-1.10.7%2Bmc1.21.11.jar"
-IRIS_JAR_SHA1="aae8567bd9ea397d50aff1d0b680a82ffe67040c"
+# nilum-fabric/libs/*.jar and nilum-neoforge/libs/*.jar are gitignored (see
+# nilum-fabric/libs/attach.md), so CI has to fetch them itself before Gradle configures those
+# modules. Bumping a vendored version means updating its filename in the module's
+# build.gradle.kts and the URL/hash below together.
+FABRIC_IRIS_JAR_DIR="nilum-fabric/libs"
+FABRIC_IRIS_JAR_NAME="iris-fabric-1.10.7+mc1.21.11.jar"
+FABRIC_IRIS_JAR_URL="https://cdn.modrinth.com/data/YL57xq9U/versions/fDpuVzVr/iris-fabric-1.10.7%2Bmc1.21.11.jar"
+FABRIC_IRIS_JAR_SHA1="aae8567bd9ea397d50aff1d0b680a82ffe67040c"
 
-fetch_vendored_libs() {
-  local dest="nilum-fabric/libs/${IRIS_JAR_NAME}"
+NEOFORGE_IRIS_JAR_DIR="nilum-neoforge/libs"
+NEOFORGE_IRIS_JAR_NAME="iris-neoforge-1.10.7+mc1.21.11.jar"
+NEOFORGE_IRIS_JAR_URL="https://cdn.modrinth.com/data/YL57xq9U/versions/v6TgIIUM/iris-neoforge-1.10.7%2Bmc1.21.11.jar"
+NEOFORGE_IRIS_JAR_SHA1="3483a33e4b4895473a23bd9f4b0268d0807c19ef"
+
+fetch_vendored_jar() {
+  local dir="$1" name="$2" url="$3" expected_sha1="$4"
+  local dest="${dir}/${name}"
   if [ -f "${dest}" ]; then
     return
   fi
 
-  mkdir -p nilum-fabric/libs
-  curl -fsSL -o "${dest}" "${IRIS_JAR_URL}"
+  mkdir -p "${dir}"
+  curl -fsSL -o "${dest}" "${url}"
 
   local actual_sha1
   actual_sha1="$(sha1sum "${dest}" | cut -d' ' -f1)"
-  if [ "${actual_sha1}" != "${IRIS_JAR_SHA1}" ]; then
-    echo "iris-fabric jar sha1 mismatch: expected ${IRIS_JAR_SHA1}, got ${actual_sha1}" >&2
+  if [ "${actual_sha1}" != "${expected_sha1}" ]; then
+    echo "${name} sha1 mismatch: expected ${expected_sha1}, got ${actual_sha1}" >&2
     rm -f "${dest}"
     exit 1
   fi
+}
+
+fetch_vendored_libs() {
+  fetch_vendored_jar "${FABRIC_IRIS_JAR_DIR}" "${FABRIC_IRIS_JAR_NAME}" "${FABRIC_IRIS_JAR_URL}" "${FABRIC_IRIS_JAR_SHA1}"
+  fetch_vendored_jar "${NEOFORGE_IRIS_JAR_DIR}" "${NEOFORGE_IRIS_JAR_NAME}" "${NEOFORGE_IRIS_JAR_URL}" "${NEOFORGE_IRIS_JAR_SHA1}"
 }
 
 build_and_collect_jars() {

@@ -24,4 +24,9 @@ neoForge {
 dependencies {
     implementation(project(":nilum-common"))
     jarJar(project(":nilum-common"))
+    implementation(project(":nilum-common-client"))
+    jarJar(project(":nilum-common-client"))
+
+    // Compile-only, optional at runtime; Iris integration is behind ModList.get().isLoaded("iris")
+    compileOnly(files("libs/iris-neoforge-1.10.7+mc1.21.11.jar"))
 }

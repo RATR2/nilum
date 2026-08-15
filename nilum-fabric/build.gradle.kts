@@ -8,6 +8,8 @@ plugins {
 dependencies {
     implementation(project(":nilum-common"))
     include(project(":nilum-common"))
+    implementation(project(":nilum-common-client"))
+    include(project(":nilum-common-client"))
 
     minecraft("com.mojang:minecraft:1.21.11")
     mappings(loom.officialMojangMappings())

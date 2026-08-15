@@ -1,5 +1,6 @@
 package io.github.r4t2.nilum.paper.api;
 
+import io.github.r4t2.nilum.api.NilumAPI;
 import io.github.r4t2.nilum.paper.NilumPlugin;
 import io.github.r4t2.nilum.paper.block.CustomBlockBroadcaster;
 import org.bukkit.Location;

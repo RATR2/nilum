@@ -6,8 +6,9 @@ build/
 out/
 *.class
 
-# Third-party binaries we don't ship in-repo - see nilum-fabric/libs/attach.md
+# Third-party binaries we don't ship in-repo, see nilum-fabric/libs/attach.md
 nilum-fabric/libs/*.jar
+nilum-neoforge/libs/*.jar
 
 # IDE
 .idea/

@@ -17,7 +17,7 @@ import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.common.shader.ShaderPackRegistry;
 import io.github.r4t2.nilum.paper.animation.AnimationService;
-import io.github.r4t2.nilum.paper.api.NilumAPI;
+import io.github.r4t2.nilum.api.NilumAPI;
 import io.github.r4t2.nilum.paper.api.NilumAPIImpl;
 import io.github.r4t2.nilum.paper.block.BlockDefinitionRegistry;
 import io.github.r4t2.nilum.paper.collision.NilumCollisionListener;

@@ -6,16 +6,33 @@ import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
 import io.github.r4t2.nilum.common.hosting.NilumAssetHost;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
+import io.github.r4t2.nilum.neoforge.block.NilumBlocks;
 import io.github.r4t2.nilum.neoforge.handshake.NeoForgeServerHandshake;
 import io.github.r4t2.nilum.neoforge.logging.NeoForgeLogSink;
+import io.github.r4t2.nilum.neoforge.network.NilumActivateShaderPackPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumAtlasPatchPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationPlayPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationStopPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumChunkBlocksPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumDeactivateShaderPackPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumEntityAnimationPlayPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumEntityAnimationStopPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumHudFrameOverridePayload;
+import io.github.r4t2.nilum.neoforge.network.NilumHudFramePayload;
+import io.github.r4t2.nilum.neoforge.network.NilumHudFrameReleasePayload;
+import io.github.r4t2.nilum.neoforge.network.NilumKeybindPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModListPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumRegisterClientVarPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetClientVarPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetHudTextPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.neoforge.server.NilumNeoForgeServerBlocks;
 import io.github.r4t2.nilum.neoforge.server.NilumNeoForgeServerModels;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
@@ -65,6 +82,8 @@ public final class NilumNeoForgeMod {
         this.logger = new NilumLogger(new NeoForgeLogSink(), configDir.resolve("logs").resolve("nilum.log"),
                 LoggingConfig.destinationLookup(configManager), configManager.get(LoggingConfig.MAX_LOG_FILES));
 
+        NilumBlocks.register(modEventBus);
+
         if (FMLEnvironment.getDist() == Dist.DEDICATED_SERVER) {
             NilumAssetHost assetHost = new NilumAssetHost(configDir, logger);
             assetHost.loadAll();
@@ -72,10 +91,12 @@ public final class NilumNeoForgeMod {
                     + assetHost.icons().iconIds().size() + " icon(s), "
                     + assetHost.hudAtlases().atlasIds().size() + " HUD atlas(es), "
                     + assetHost.shaderPacks().packIds().size() + " shader pack(s), "
-                    + assetHost.fonts().fontIds().size() + " font(s) for this NeoForge-hosted server.");
+                    + assetHost.fonts().fontIds().size() + " font(s), "
+                    + assetHost.blocks().blockIds().size() + " block type(s) for this NeoForge-hosted server.");
 
             this.serverHandshake = NeoForgeServerHandshake.register(modEventBus, configManager, logger, modVersion, assetHost);
             NilumNeoForgeServerModels.register(assetHost, logger);
+            NilumNeoForgeServerBlocks.register(assetHost, logger);
         } else {
             this.serverHandshake = null;
         }
@@ -108,5 +129,22 @@ public final class NilumNeoForgeMod {
         // Only Paper's HandshakeListener currently requests/processes mod lists; a NeoForge-hosted
         // server never sends the request, so this handler is unreachable there.
         registrar.playToServer(NilumModListPayload.TYPE, NilumModListPayload.CODEC, (payload, context) -> { });
+        registrar.playToClient(NilumHudFramePayload.TYPE, NilumHudFramePayload.CODEC);
+        registrar.playToClient(NilumAtlasPatchPayload.TYPE, NilumAtlasPatchPayload.CODEC);
+        registrar.playToClient(NilumHudFrameOverridePayload.TYPE, NilumHudFrameOverridePayload.CODEC);
+        registrar.playToClient(NilumHudFrameReleasePayload.TYPE, NilumHudFrameReleasePayload.CODEC);
+        registrar.playToClient(NilumRegisterClientVarPayload.TYPE, NilumRegisterClientVarPayload.CODEC);
+        registrar.playToClient(NilumSetClientVarPayload.TYPE, NilumSetClientVarPayload.CODEC);
+        registrar.playToClient(NilumSetHudTextPayload.TYPE, NilumSetHudTextPayload.CODEC);
+        registrar.playToClient(NilumActivateShaderPackPayload.TYPE, NilumActivateShaderPackPayload.CODEC);
+        registrar.playToClient(NilumDeactivateShaderPackPayload.TYPE, NilumDeactivateShaderPackPayload.CODEC);
+        registrar.playToClient(NilumEntityAnimationPlayPayload.TYPE, NilumEntityAnimationPlayPayload.CODEC);
+        registrar.playToClient(NilumEntityAnimationStopPayload.TYPE, NilumEntityAnimationStopPayload.CODEC);
+        registrar.playToClient(NilumBlockAnimationPlayPayload.TYPE, NilumBlockAnimationPlayPayload.CODEC);
+        registrar.playToClient(NilumBlockAnimationStopPayload.TYPE, NilumBlockAnimationStopPayload.CODEC);
+        registrar.playToServer(NilumKeybindPayload.TYPE, NilumKeybindPayload.CODEC, (payload, context) -> { });
+        // Paper still needs this: real registry access doesn't exist there, so it always proxies a
+        // vanilla material and streams the overlay position/model over this same wire format.
+        registrar.playToClient(NilumChunkBlocksPayload.TYPE, NilumChunkBlocksPayload.CODEC);
     }
 }

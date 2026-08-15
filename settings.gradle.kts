@@ -10,7 +10,9 @@ rootProject.name = "nilum"
 
 include(
     "nilum-common",
+    "nilum-common-client",
     "nilum-neoforge",
     "nilum-fabric",
-    "nilum-paper"
+    "nilum-paper",
+    "nilum-api"
 )

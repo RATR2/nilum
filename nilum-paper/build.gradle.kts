@@ -14,6 +14,7 @@ repositories {
 
 dependencies {
     implementation(project(":nilum-common"))
+    implementation(project(":nilum-api"))
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     // Soft dependency (see plugin.yml); server_connector HUD text elements just stay blank
     // if it isn't actually installed, checked at runtime in HudTextService.
