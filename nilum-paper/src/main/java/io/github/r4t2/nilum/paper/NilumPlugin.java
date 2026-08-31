@@ -38,7 +38,9 @@ import io.github.r4t2.nilum.paper.item.ItemDefinitionRegistry;
 import io.github.r4t2.nilum.paper.logging.PaperConsoleSink;
 import io.github.r4t2.nilum.paper.model.ModelDisplayService;
 import io.github.r4t2.nilum.paper.shader.ShaderPackService;
+import io.github.r4t2.nilum.common.ui.UiRegistry;
 import io.github.r4t2.nilum.paper.texture.TextureUsageTracker;
+import io.github.r4t2.nilum.paper.ui.UiSessionService;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -72,6 +74,8 @@ public final class NilumPlugin extends JavaPlugin {
     private FontRegistry fontRegistry;
     private AnimationService animationService;
     private NilumCollisionRegistry collisionRegistry;
+    private UiRegistry uiRegistry;
+    private UiSessionService uiSessionService;
     private String buildCommit = "unknown";
 
     @Override
@@ -124,6 +128,8 @@ public final class NilumPlugin extends JavaPlugin {
         // broadcast, and combinedManifest() reads every registry unconditionally.
         shaderPackRegistry = new ShaderPackRegistry();
         fontRegistry = new FontRegistry();
+        uiRegistry = new UiRegistry();
+        uiSessionService = new UiSessionService(this);
         reloadModels();
         reloadIcons();
         reloadHudAtlases();
@@ -141,6 +147,7 @@ public final class NilumPlugin extends JavaPlugin {
         shaderPackService = new ShaderPackService(this);
         animationService = new AnimationService(this);
         reloadFonts();
+        reloadUis();
         hudTextService.start(configManager.get(HudTextConfig.ENABLED), configManager.get(HudTextConfig.UPDATE_INTERVAL_TICKS));
 
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.HELLO_QUALIFIED);
@@ -162,10 +169,14 @@ public final class NilumPlugin extends JavaPlugin {
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ENTITY_ANIMATION_STOP_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.BLOCK_ANIMATION_PLAY_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.BLOCK_ANIMATION_STOP_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.OPEN_UI_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_HUD_ATLAS_VISIBILITY_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_HUD_ELEMENT_VISIBILITY_QUALIFIED);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.HELLO_ACK_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.TCP_UNAVAILABLE_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.MOD_LIST_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.KEYBIND_QUALIFIED, handshakeListener);
+        getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.UI_CLOSED_QUALIFIED, handshakeListener);
         getServer().getPluginManager().registerEvents(handshakeListener, this);
         getServer().getPluginManager().registerEvents(new CustomBlockChunkSync(this, customBlockRegistry), this);
         getServer().getPluginManager().registerEvents(
@@ -300,6 +311,20 @@ public final class NilumPlugin extends JavaPlugin {
     }
 
     /** @return true if the reload succeeded. */
+    public boolean reloadUis() {
+        try {
+            uiRegistry.loadDirectory(getDataFolder().toPath().resolve("ui"),
+                    getDataFolder().toPath().resolve("textures"), logger::warn);
+            logger.info("Loaded " + uiRegistry.uiIds().size() + " custom UI(s) from the ui folder.");
+            handshakeListener.broadcastAssetManifest();
+            return true;
+        } catch (IOException e) {
+            logger.error("Failed to reload the ui folder", e);
+            return false;
+        }
+    }
+
+    /** @return true if the reload succeeded. */
     public boolean reloadItems() {
         try {
             itemDefinitionRegistry.loadDirectory(getDataFolder().toPath().resolve("items"));
@@ -401,6 +426,14 @@ public final class NilumPlugin extends JavaPlugin {
 
     public HudAtlasService hud() {
         return hudAtlasService;
+    }
+
+    public UiRegistry uis() {
+        return uiRegistry;
+    }
+
+    public UiSessionService uiSessions() {
+        return uiSessionService;
     }
 
     public CustomBlockRegistry customBlocks() {

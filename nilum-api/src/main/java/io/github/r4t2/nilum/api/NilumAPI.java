@@ -45,11 +45,23 @@ public interface NilumAPI {
     /** Pushes a HUD atlas frame update to player. */
     void setHudFrame(Player player, String atlasId, String elementId, int frame);
 
+    /** Shows or hides an entire HUD atlas for player. */
+    void setHudAtlasVisible(Player player, String atlasId, boolean visible);
+
+    /** Shows or hides one HUD atlas element for player. */
+    void setHudElementVisible(Player player, String atlasId, String elementId, boolean visible);
+
     /** Switches player's client to a Nilum shaderpack. Needs Iris on their client. */
     void activateShaderPack(Player player, String packId);
 
     /** Restores player's client to its previous shaderpack state. */
     void deactivateShaderPack(Player player);
+
+    /** Opens a custom UI for player. False if uiId isn't a loaded custom UI. */
+    boolean openCustomUi(Player player, String uiId);
+
+    /** The custom UI id currently open for player, if any. */
+    Optional<String> openCustomUiFor(Player player);
 
     Set<String> modelIds();
 
@@ -60,4 +72,6 @@ public interface NilumAPI {
     Set<String> itemDefinitionIds();
 
     Set<String> shaderPackIds();
+
+    Set<String> uiIds();
 }

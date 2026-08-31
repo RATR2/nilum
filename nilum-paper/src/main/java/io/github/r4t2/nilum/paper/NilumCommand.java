@@ -95,38 +95,38 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("Nilum commands:"));
-        sender.sendMessage(Component.text("/nilum ver - Show the plugin version."));
-        sender.sendMessage(Component.text("/nilum help - Show this message."));
+        sender.sendMessage(Component.text("/nilum ver -> Show the plugin version."));
+        sender.sendMessage(Component.text("/nilum help -> Show this message."));
         sender.sendMessage(Component.text(
-                "/nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config> - Reload part of Nilum."));
+                "/nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config|ui> -> Reload part of Nilum."));
         sender.sendMessage(Component.text(
-                "/nilum placemodel <modelId> [x] [y] [z] [yaw] [pitch] - Place a model. "
+                "/nilum placemodel <modelId> [x] [y] [z] [yaw] [pitch] -> Place a model. "
                         + "Coordinates and rotation default to ~ (your position/facing)."));
-        sender.sendMessage(Component.text("/nilum giveitem <modelId> [material] - Give yourself a custom item."));
-        sender.sendMessage(Component.text("/nilum giveicon <iconId> [material] - Give yourself an icon-only custom item."));
-        sender.sendMessage(Component.text("/nilum hudframe <atlasId>:<elementId> <frame> - Set a HUD frame for yourself."));
+        sender.sendMessage(Component.text("/nilum giveitem <modelId> [material] -> Give yourself a custom item."));
+        sender.sendMessage(Component.text("/nilum giveicon <iconId> [material] -> Give yourself an icon-only custom item."));
+        sender.sendMessage(Component.text("/nilum hudframe <atlasId>:<elementId> <frame> -> Set a HUD frame for yourself."));
         sender.sendMessage(Component.text(
-                "/nilum placeblock <blockId> [x] [y] [z] - Place a real, rendered custom block."));
-        sender.sendMessage(Component.text("/nilum removeblock [x] [y] [z] - Remove a Nilum block."));
-        sender.sendMessage(Component.text("/nilum giveitemdef <id> - Give yourself a defined item (name/lore/enchants included)."));
+                "/nilum placeblock <blockId> [x] [y] [z] -> Place a real, rendered custom block."));
+        sender.sendMessage(Component.text("/nilum removeblock [x] [y] [z] -> Remove a Nilum block."));
+        sender.sendMessage(Component.text("/nilum giveitemdef <id> -> Give yourself a defined item (name/lore/enchants included)."));
         sender.sendMessage(Component.text(
-                "/nilum shaderpack <id>|off [player] - Switch yourself (or another online player) to a Nilum "
+                "/nilum shaderpack <id>|off [player] -> Switch yourself (or another online player) to a Nilum "
                         + "shaderpack, or back to normal. Needs Iris."));
         sender.sendMessage(Component.text(
-                "/nilum giveskeleton <modelId> - Render yourself with a Nilum model's skeleton instead of your usual avatar."));
+                "/nilum giveskeleton <modelId> -> Render yourself with a Nilum model's skeleton instead of your usual avatar."));
         sender.sendMessage(Component.text(
-                "/nilum playanim <self|entityUuid> <animationName> - Play a named animation on a skeleton or placed model."));
+                "/nilum playanim <self|entityUuid> <animationName> -> Play a named animation on a skeleton or placed model."));
         sender.sendMessage(Component.text(
-                "/nilum stopanim <self|entityUuid> - Stop a triggered animation, back to its rest pose."));
+                "/nilum stopanim <self|entityUuid> -> Stop a triggered animation, back to its rest pose."));
         sender.sendMessage(Component.text(
-                "/nilum playblockanim <animationName> [x] [y] [z] - Play a named animation on a Nilum block."));
+                "/nilum playblockanim <animationName> [x] [y] [z] -> Play a named animation on a Nilum block."));
         sender.sendMessage(Component.text(
-                "/nilum stopblockanim [x] [y] [z] - Stop a triggered animation on a Nilum block."));
+                "/nilum stopblockanim [x] [y] [z] -> Stop a triggered animation on a Nilum block."));
     }
 
     private boolean reload(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config>"));
+            sender.sendMessage(Component.text("Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config|ui>"));
             return true;
         }
 
@@ -140,9 +140,10 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             case "fonts" -> reloadAndReport(sender, plugin.reloadFonts(), "Fonts", "reload the fonts folder");
             case "tcp" -> reloadAndReport(sender, plugin.reloadTcp(), "TCP side-channel", "reload the TCP side-channel");
             case "config" -> reloadAndReport(sender, plugin.reloadSettings(), "Config", "reload the config");
+            case "ui" -> reloadAndReport(sender, plugin.reloadUis(), "Custom UIs", "reload the ui folder");
             default -> {
                 sender.sendMessage(Component.text(
-                        "Unknown reload target '" + args[1] + "'. Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config>"));
+                        "Unknown reload target '" + args[1] + "'. Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config|ui>"));
                 yield true;
             }
         };
@@ -563,7 +564,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2) {
             return switch (args[0].toLowerCase(Locale.ROOT)) {
                 case "reload" -> filterByPrefix(
-                        List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "tcp", "config"), args[1]);
+                        List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "tcp", "config", "ui"), args[1]);
                 case "placemodel", "giveitem", "giveskeleton" -> filterByPrefix(plugin.models().modelIds(), args[1]);
                 case "placeblock" -> filterByPrefix(plugin.blockDefinitions().blockIds(), args[1]);
                 case "playanim", "stopanim" -> filterByPrefix(List.of("self"), args[1]);

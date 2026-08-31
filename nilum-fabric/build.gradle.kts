@@ -10,6 +10,8 @@ dependencies {
     include(project(":nilum-common"))
     implementation(project(":nilum-common-client"))
     include(project(":nilum-common-client"))
+    implementation(project(":nilum-common-server"))
+    include(project(":nilum-common-server"))
 
     minecraft("com.mojang:minecraft:1.21.11")
     mappings(loom.officialMojangMappings())
@@ -31,4 +33,46 @@ tasks.processResources {
     filesMatching("fabric.mod.json") {
         expand("version" to project.version)
     }
+}
+
+// Client-only jar: takes the already-remapped full jar and strips out dedicated-server hosting
+// code (NilumFabricDedicatedServer never gets any static reference from NilumFabricMod/Client,
+// Fabric Loader only looks it up by name via the "server" entrypoint key, so removing the class
+// and that key is enough) plus the embedded nilum-common-server nested jar.
+val clientOnlyModJson by tasks.registering {
+    val remapJarTask = tasks.named<AbstractArchiveTask>("remapJar")
+    dependsOn(remapJarTask)
+    val outputFile = layout.buildDirectory.file("generated/clientOnly/fabric.mod.json")
+    outputs.file(outputFile)
+    doLast {
+        val jarFile = remapJarTask.get().archiveFile.get().asFile
+        val jsonText = zipTree(jarFile).matching { include("fabric.mod.json") }.singleFile.readText()
+        @Suppress("UNCHECKED_CAST")
+        val json = groovy.json.JsonSlurper().parseText(jsonText) as MutableMap<String, Any?>
+        @Suppress("UNCHECKED_CAST")
+        val entrypoints = json["entrypoints"] as MutableMap<String, Any?>
+        entrypoints.remove("server")
+        @Suppress("UNCHECKED_CAST")
+        val jars = json["jars"] as MutableList<Map<String, Any?>>
+        jars.removeIf { (it["file"] as String).contains("nilum-common-server") }
+        val out = outputFile.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(groovy.json.JsonOutput.toJson(json))
+    }
+}
+
+val clientOnlyJar by tasks.registering(Jar::class) {
+    group = "build"
+    description = "Client-only jar with dedicated-server hosting code and nilum-common-server stripped out."
+    val remapJarTask = tasks.named<AbstractArchiveTask>("remapJar")
+    dependsOn(remapJarTask, clientOnlyModJson)
+    archiveClassifier.set("client-only")
+    from({ zipTree(remapJarTask.get().archiveFile.get().asFile) }) {
+        exclude("io/github/r4t2/nilum/fabric/NilumFabricDedicatedServer*.class")
+        exclude("io/github/r4t2/nilum/fabric/handshake/FabricServerHandshake*.class")
+        exclude("io/github/r4t2/nilum/fabric/server/**")
+        exclude("META-INF/jars/nilum-common-server-*.jar")
+        exclude("fabric.mod.json")
+    }
+    from(clientOnlyModJson.map { it.outputs.files.singleFile })
 }

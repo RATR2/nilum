@@ -7,7 +7,7 @@ import java.util.Set;
 public final class ExprEvaluator {
 
     /** Leaf functions that resolve to a string via TextValueSource, only meaningful through evaluateText. */
-    private static final Set<String> TEXT_FUNCTIONS = Set.of("name", "placeholderapi", "head", "java");
+    private static final Set<String> TEXT_FUNCTIONS = Set.of("name", "placeholderapi", "head", "java", "skriptvar");
 
     private ExprEvaluator() {
     }
@@ -105,10 +105,10 @@ public final class ExprEvaluator {
     private static double evaluateCall(ExprNode.FunctionCall node, ValueSource valueSource, double timeSeconds) {
         List<ExprNode> args = node.arguments();
         return switch (node.name()) {
-            // placeholderapi(...)/java(...) only produce a meaningful value server-side; client-side
-            // they fall through to NilumHudValueSource's "unknown key" warning and resolve to 0,
-            // same as any typo.
-            case "number", "boolean", "placeholderapi", "java" ->
+            // placeholderapi(...)/java(...)/skriptvar(...) only produce a meaningful value
+            // server-side; client-side they fall through to NilumHudValueSource's "unknown key"
+            // warning and resolve to 0, same as any typo.
+            case "number", "boolean", "placeholderapi", "java", "skriptvar" ->
                     valueSource.resolve(node.name(), requireStringArg(node, args, 0));
 
             case "round" -> Math.round(arg(args, valueSource, timeSeconds, 0));

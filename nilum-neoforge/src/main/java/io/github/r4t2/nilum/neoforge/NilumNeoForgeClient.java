@@ -25,6 +25,9 @@ import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
 import io.github.r4t2.nilum.common.protocol.RegisterClientVarPacket;
 import io.github.r4t2.nilum.common.protocol.SetClientVarPacket;
+import io.github.r4t2.nilum.common.protocol.OpenUiPacket;
+import io.github.r4t2.nilum.common.protocol.SetHudAtlasVisibilityPacket;
+import io.github.r4t2.nilum.common.protocol.SetHudElementVisibilityPacket;
 import io.github.r4t2.nilum.common.protocol.SetHudTextPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
@@ -40,6 +43,11 @@ import io.github.r4t2.nilum.neoforge.creativetab.NilumCreativeTabs;
 import io.github.r4t2.nilum.neoforge.font.ClientFontStore;
 import io.github.r4t2.nilum.neoforge.font.FontInstaller;
 import io.github.r4t2.nilum.neoforge.hud.ClientHudAtlasStore;
+import io.github.r4t2.nilum.neoforge.network.NilumOpenUiPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetHudAtlasVisibilityPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetHudElementVisibilityPayload;
+import io.github.r4t2.nilum.neoforge.ui.ClientCustomUiStore;
+import io.github.r4t2.nilum.neoforge.ui.NilumCustomUiScreen;
 import io.github.r4t2.nilum.neoforge.hud.ClientVarStore;
 import io.github.r4t2.nilum.neoforge.hud.HudAtlasRenderer;
 import io.github.r4t2.nilum.neoforge.keybind.NilumKeybinds;
@@ -118,6 +126,7 @@ final class NilumNeoForgeClient {
                 FMLPaths.CONFIGDIR.get().resolve("nilum-cache").resolve("icon_atlas_debug.png"), logger);
         ClientHudAtlasStore hudAtlases = new ClientHudAtlasStore(logger);
         ClientVarStore clientVars = new ClientVarStore();
+        ClientCustomUiStore customUiStore = new ClientCustomUiStore(logger);
 
         if (ModList.get().isLoaded("oculus") && !ModList.get().isLoaded("iris")) {
             logger.warn("Oculus is installed without Iris. Nilum's shader/glint features integrate with Iris "
@@ -140,7 +149,7 @@ final class NilumNeoForgeClient {
                 event.register(NilumDeactivateShaderPackPayload.TYPE, (payload, context) -> irisIntegration.deactivate());
             });
         } else {
-            shaderPackSink = (packId, data) -> logger.warn("Shader pack '" + packId + "' received but Iris isn't installed - ignoring.");
+            shaderPackSink = (packId, data) -> logger.warn("Shader pack '" + packId + "' received but Iris isn't installed, ignoring.");
             modEventBus.addListener((RegisterClientPayloadHandlersEvent event) -> {
                 event.register(NilumActivateShaderPackPayload.TYPE, (payload, context) -> { });
                 event.register(NilumDeactivateShaderPackPayload.TYPE, (payload, context) -> { });
@@ -155,7 +164,7 @@ final class NilumNeoForgeClient {
         };
 
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
-                shaderPackSink, fontSink, logger);
+                shaderPackSink, fontSink, customUiStore::add, logger);
         TextureUploader textureUploader = new TextureUploader();
         // A model reloading with new bytes under the same id (e.g. a default-retexture block
         // after a blocktextures/ edit) must drop any already-uploaded GPU textures for it, or
@@ -247,6 +256,21 @@ final class NilumNeoForgeClient {
                 SetHudTextPacket packet = SetHudTextPacket.decode(payload.data());
                 hudAtlases.onHudText(packet.atlasId(), packet.elementId(), packet.text());
             });
+            event.register(NilumOpenUiPayload.TYPE, (payload, context) -> {
+                OpenUiPacket packet = OpenUiPacket.decode(payload.data());
+                customUiStore.get(packet.uiId()).ifPresentOrElse(
+                        ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui)),
+                        () -> logger.warn("Server opened custom UI '" + packet.uiId()
+                                + "' but it isn't cached on this client yet."));
+            });
+            event.register(NilumSetHudAtlasVisibilityPayload.TYPE, (payload, context) -> {
+                SetHudAtlasVisibilityPacket packet = SetHudAtlasVisibilityPacket.decode(payload.data());
+                hudAtlases.setAtlasVisible(packet.atlasId(), packet.visible());
+            });
+            event.register(NilumSetHudElementVisibilityPayload.TYPE, (payload, context) -> {
+                SetHudElementVisibilityPacket packet = SetHudElementVisibilityPacket.decode(payload.data());
+                hudAtlases.setElementVisible(packet.atlasId(), packet.elementId(), packet.visible());
+            });
             event.register(NilumEntityAnimationPlayPayload.TYPE, (payload, context) -> {
                 EntityAnimationPlayPacket packet = EntityAnimationPlayPacket.decode(payload.data());
                 BbModel model = modelForEntity(modelStore, placements, packet.entityId());
@@ -310,7 +334,7 @@ final class NilumNeoForgeClient {
 
         if (SemanticVersions.isNewer(modVersion, hello.serverModVersion())) {
             logger.warn("This Nilum client (" + modVersion + ") is newer than the server ("
-                    + hello.serverModVersion() + ") - some features may not be available.");
+                    + hello.serverModVersion() + "), some features may not be available.");
         }
 
         ShaderCapability.Renderer shaderRenderer = ShaderCapability.detect();

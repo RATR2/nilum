@@ -44,6 +44,7 @@ public final class AssetCache {
             case HUD_ATLAS -> ".hudatlas";
             case SHADER_PACK -> ".zip";
             case FONT -> ".ttf";
+            case CUSTOM_UI -> ".nilumui";
         };
         return root.resolve(assetId + extension);
     }

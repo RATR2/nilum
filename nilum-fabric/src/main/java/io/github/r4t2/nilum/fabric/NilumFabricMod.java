@@ -25,11 +25,15 @@ import io.github.r4t2.nilum.fabric.network.NilumKeybindPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
+import io.github.r4t2.nilum.fabric.network.NilumOpenUiPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetHudAtlasVisibilityPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetHudElementVisibilityPayload;
 import io.github.r4t2.nilum.fabric.network.NilumRegisterClientVarPayload;
 import io.github.r4t2.nilum.fabric.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.fabric.network.NilumSetHudTextPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.fabric.network.NilumUiClosedPayload;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.loader.api.FabricLoader;
@@ -97,6 +101,10 @@ public final class NilumFabricMod implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(NilumEntityAnimationStopPayload.TYPE, NilumEntityAnimationStopPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumBlockAnimationPlayPayload.TYPE, NilumBlockAnimationPlayPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumBlockAnimationStopPayload.TYPE, NilumBlockAnimationStopPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumOpenUiPayload.TYPE, NilumOpenUiPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(NilumUiClosedPayload.TYPE, NilumUiClosedPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumSetHudAtlasVisibilityPayload.TYPE, NilumSetHudAtlasVisibilityPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumSetHudElementVisibilityPayload.TYPE, NilumSetHudElementVisibilityPayload.CODEC);
 
         LOGGER.info("Nilum initialized.");
     }

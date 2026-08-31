@@ -7,6 +7,8 @@ import io.github.r4t2.nilum.common.protocol.HudFrameReleasePacket;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.common.protocol.RegisterClientVarPacket;
 import io.github.r4t2.nilum.common.protocol.SetClientVarPacket;
+import io.github.r4t2.nilum.common.protocol.SetHudAtlasVisibilityPacket;
+import io.github.r4t2.nilum.common.protocol.SetHudElementVisibilityPacket;
 import io.github.r4t2.nilum.common.protocol.SetHudTextPacket;
 import io.github.r4t2.nilum.paper.NilumPlugin;
 import org.bukkit.entity.Player;
@@ -63,6 +65,16 @@ public final class HudAtlasService {
 
     public void setHudText(Player player, String atlasId, String elementId, String text) {
         send(player, NilumChannels.SET_HUD_TEXT_QUALIFIED, new SetHudTextPacket(atlasId, elementId, text).encode());
+    }
+
+    public void setAtlasVisible(Player player, String atlasId, boolean visible) {
+        send(player, NilumChannels.SET_HUD_ATLAS_VISIBILITY_QUALIFIED,
+                new SetHudAtlasVisibilityPacket(atlasId, visible).encode());
+    }
+
+    public void setElementVisible(Player player, String atlasId, String elementId, boolean visible) {
+        send(player, NilumChannels.SET_HUD_ELEMENT_VISIBILITY_QUALIFIED,
+                new SetHudElementVisibilityPacket(atlasId, elementId, visible).encode());
     }
 
     private void send(Player player, String channel, byte[] data) {

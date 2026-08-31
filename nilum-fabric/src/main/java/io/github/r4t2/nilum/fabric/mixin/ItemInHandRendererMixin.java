@@ -9,6 +9,7 @@ import io.github.r4t2.nilum.common.model.BbModel;
 import io.github.r4t2.nilum.common.model.BbOutlinerGroup;
 import io.github.r4t2.nilum.common.model.BbVector3;
 import io.github.r4t2.nilum.fabric.NilumFabricClient;
+import io.github.r4t2.nilum.fabric.debug.HandTuneCorrection;
 import io.github.r4t2.nilum.fabric.render.NilumDisplayTransforms;
 import io.github.r4t2.nilum.fabric.render.NilumItemTags;
 import net.minecraft.client.Minecraft;
@@ -42,6 +43,22 @@ public abstract class ItemInHandRendererMixin {
     private static final float ITEM_POS_Y = -0.52F;
     private static final float ITEM_POS_Z = -0.72F;
 
+    // PlayerModel's own right_arm/left_arm box (width, height, depth), Blockbench-unit scale.
+    // Uses the normal (non-slim) 4-wide variant as the reference regardless of the player's
+    // actual skin type; slim arms are 3 wide, a difference too small to bother distinguishing.
+    private static final float VANILLA_ARM_WIDTH = 4.0F;
+    private static final float VANILLA_ARM_HEIGHT = 12.0F;
+    private static final float VANILLA_ARM_DEPTH = 4.0F;
+
+    // Where PlayerModel's own pivot sits within its arm box, as a fraction from the box's own
+    // "from" corner (right_arm local box is (-3,-2,-2) to (1,10,2), pivot at local (0,0,0), so
+    // 3/4 across width, 2/12 down height, 2/4 across depth). Not centered on any axis, closest to
+    // the shoulder end along height. Mirrored across width for the left arm.
+    private static final float VANILLA_PIVOT_FRACTION_WIDTH_RIGHT = 0.75F;
+    private static final float VANILLA_PIVOT_FRACTION_WIDTH_LEFT = 0.25F;
+    private static final float VANILLA_PIVOT_FRACTION_HEIGHT = 2.0F / 12.0F;
+    private static final float VANILLA_PIVOT_FRACTION_DEPTH = 0.5F;
+
     @Inject(method = "renderArmWithItem(Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;"
             + "FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;"
             + "Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V", at = @At("HEAD"), cancellable = true)
@@ -74,6 +91,12 @@ public abstract class ItemInHandRendererMixin {
         BbElement marker = armElements.get(0);
         BbVector3 markerOrigin = marker.origin();
         BbVector3 markerRotation = marker.rotation();
+        BbVector3 markerSize = marker.size();
+        float widthFraction = rightArm ? VANILLA_PIVOT_FRACTION_WIDTH_RIGHT : VANILLA_PIVOT_FRACTION_WIDTH_LEFT;
+        BbVector3 markerPivotEquivalent = new BbVector3(
+                marker.from().x() + widthFraction * markerSize.x(),
+                marker.from().y() + VANILLA_PIVOT_FRACTION_HEIGHT * markerSize.y(),
+                marker.from().z() + VANILLA_PIVOT_FRACTION_DEPTH * markerSize.z());
 
         Map<String, BbMatrix4> bonePose = BbBonePose.computeAutoLoop(model);
         BbMatrix4 boneWorld = bonePose.get(armBone.get().uuid());
@@ -81,8 +104,21 @@ public abstract class ItemInHandRendererMixin {
             return;
         }
 
-        float[] attachPoint = boneWorld.transformPoint(
-                (float) (markerOrigin.x() / 16.0), (float) (markerOrigin.y() / 16.0), (float) (markerOrigin.z() / 16.0));
+        // The marker's own "origin" is a Blockbench rotation pivot, not necessarily where the
+        // hand should attach. Use the point within the marker's own box that sits at the same
+        // fractional position vanilla's own pivot sits within its arm box instead (not the
+        // center; vanilla's pivot is off-center on every axis), rotated around the marker's own
+        // pivot by the marker's own rotation, matching how Blockbench itself places the cube.
+        BbMatrix4 pivotRotation = BbMatrix4.translation(
+                        (float) (markerOrigin.x() / 16.0), (float) (markerOrigin.y() / 16.0), (float) (markerOrigin.z() / 16.0))
+                .multiply(BbMatrix4.rotationXYZDegrees(
+                        (float) markerRotation.x(), (float) markerRotation.y(), (float) markerRotation.z()))
+                .multiply(BbMatrix4.translation(
+                        (float) (-markerOrigin.x() / 16.0), (float) (-markerOrigin.y() / 16.0), (float) (-markerOrigin.z() / 16.0)));
+        float[] localAttach = pivotRotation.transformPoint(
+                (float) (markerPivotEquivalent.x() / 16.0), (float) (markerPivotEquivalent.y() / 16.0), (float) (markerPivotEquivalent.z() / 16.0));
+
+        float[] attachPoint = boneWorld.transformPoint(localAttach[0], localAttach[1], localAttach[2]);
         Matrix4f attachRotation = toJoml(boneWorld);
         attachRotation.setTranslation(0, 0, 0);
         Matrix4f markerRotationJoml = toJoml(BbMatrix4.rotationXYZDegrees(
@@ -114,6 +150,33 @@ public abstract class ItemInHandRendererMixin {
         poseStack.translate(attachPoint[0], attachPoint[1], attachPoint[2]);
         poseStack.mulPose(attachRotation);
         poseStack.mulPose(markerRotationJoml);
+
+        // Scales the vanilla hand mesh to match the marker's own bounding size instead of
+        // always rendering at vanilla's fixed proportions, so a marker drawn bigger or smaller
+        // than a normal arm actually looks bigger or smaller in-game.
+        poseStack.scale((float) (markerSize.x() / VANILLA_ARM_WIDTH),
+                (float) (markerSize.y() / VANILLA_ARM_HEIGHT),
+                (float) (markerSize.z() / VANILLA_ARM_DEPTH));
+
+        // Corrects the marker's own rotation to match vanilla's first-person hand exactly,
+        // tuned via NilumHandTuneScreen against a neutral origin-0,0 test rig. Still
+        // live-adjustable via HandTuneKeybind if a future model needs a different fit.
+        // Rotation MUST come before the position translate below, or it pivots around
+        // (attach point + position offset) instead of the attach point itself, which makes the
+        // sliders behave completely differently from one model's marker origin to another's.
+        poseStack.mulPose(Axis.XP.rotationDegrees(HandTuneCorrection.rotX));
+        poseStack.mulPose(Axis.YP.rotationDegrees(HandTuneCorrection.rotY));
+        poseStack.mulPose(Axis.ZP.rotationDegrees(HandTuneCorrection.rotZ));
+        poseStack.translate(HandTuneCorrection.posX, HandTuneCorrection.posY, HandTuneCorrection.posZ);
+
+        // AvatarRenderer.renderRightHand/renderLeftHand draws playerModel.rightArm/leftArm at
+        // its own baked-in vanilla pivot (PartPose.offset(-5, 2, 0) for the right arm, mirrored
+        // for the left, in HumanoidModel/PlayerModel), not wherever our poseStack currently is.
+        // We've never accounted for that pivot, so the mesh always rendered offset from our
+        // attach point by that amount. Counter-translate here so vanilla's own re-application
+        // of it cancels out, landing the ModelPart's origin exactly at our attach point instead.
+        float vanillaPivotX = rightArm ? -5.0F : 5.0F;
+        poseStack.translate(-vanillaPivotX / 16.0F, -2.0F / 16.0F, 0.0F);
 
         EntityRenderDispatcher dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
         AvatarRenderer<AbstractClientPlayer> avatarRenderer = dispatcher.getPlayerRenderer(player);

@@ -73,6 +73,18 @@ public final class NilumChannels {
     public static final String BLOCK_ANIMATION_STOP = "block_animation_stop";
     public static final String BLOCK_ANIMATION_STOP_QUALIFIED = NAMESPACE + ":" + BLOCK_ANIMATION_STOP;
 
+    public static final String OPEN_UI = "open_ui";
+    public static final String OPEN_UI_QUALIFIED = NAMESPACE + ":" + OPEN_UI;
+
+    public static final String UI_CLOSED = "ui_closed";
+    public static final String UI_CLOSED_QUALIFIED = NAMESPACE + ":" + UI_CLOSED;
+
+    public static final String SET_HUD_ATLAS_VISIBILITY = "set_hud_atlas_visibility";
+    public static final String SET_HUD_ATLAS_VISIBILITY_QUALIFIED = NAMESPACE + ":" + SET_HUD_ATLAS_VISIBILITY;
+
+    public static final String SET_HUD_ELEMENT_VISIBILITY = "set_hud_element_visibility";
+    public static final String SET_HUD_ELEMENT_VISIBILITY_QUALIFIED = NAMESPACE + ":" + SET_HUD_ELEMENT_VISIBILITY;
+
     private NilumChannels() {
     }
 }

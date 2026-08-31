@@ -6,5 +6,6 @@ public enum AssetKind {
     ICON,
     HUD_ATLAS,
     SHADER_PACK,
-    FONT
+    FONT,
+    CUSTOM_UI
 }

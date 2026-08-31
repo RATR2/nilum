@@ -23,7 +23,8 @@ public final class NilumFabricDedicatedServer implements DedicatedServerModIniti
                 + assetHost.hudAtlases().atlasIds().size() + " HUD atlas(es), "
                 + assetHost.shaderPacks().packIds().size() + " shader pack(s), "
                 + assetHost.fonts().fontIds().size() + " font(s), "
-                + assetHost.blocks().blockIds().size() + " block type(s) for this Fabric-hosted server.");
+                + assetHost.blocks().blockIds().size() + " block type(s), "
+                + assetHost.uis().uiIds().size() + " custom UI(s) for this Fabric-hosted server.");
 
         FabricServerHandshake.register(NilumFabricMod.CONFIG, NilumFabricMod.LOGGER, assetHost);
         NilumFabricServerModels.register(assetHost, NilumFabricMod.LOGGER);

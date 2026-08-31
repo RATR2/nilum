@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** One server-streamed HUD atlas: its texture(s), parsed .atlas descriptor, and client-side per-frame state. */
@@ -50,6 +51,7 @@ public final class HudAtlas {
     private final Map<String, Integer> serverFrameByElement = new ConcurrentHashMap<>();
     private final Map<String, FrameOverride> overrideByElement = new ConcurrentHashMap<>();
     private final Map<String, String> serverTextByElement = new ConcurrentHashMap<>();
+    private final Set<String> hiddenElements = ConcurrentHashMap.newKeySet();
 
     private HudAtlas(String atlasId, HudAtlasDescriptor descriptor, Map<String, ExprNode> parsedAutoExpressions,
                       Map<String, LoadedTexture> texturesByKey) {
@@ -140,7 +142,7 @@ public final class HudAtlas {
         if (patch.getWidth() != element.frameWidth() || patch.getHeight() != element.frameHeight()) {
             NilumFabricMod.LOGGER.warn("Atlas patch for '" + atlasId + ":" + elementId + "' is "
                     + patch.getWidth() + "x" + patch.getHeight() + ", expected "
-                    + element.frameWidth() + "x" + element.frameHeight() + " - discarding, existing frame kept.");
+                    + element.frameWidth() + "x" + element.frameHeight() + ", discarding, existing frame kept.");
             patch.close();
             return;
         }
@@ -154,6 +156,22 @@ public final class HudAtlas {
         }
         patch.close();
         sheet.gpuTexture().upload();
+    }
+
+    public String atlasId() {
+        return atlasId;
+    }
+
+    void setElementVisible(String elementId, boolean visible) {
+        if (visible) {
+            hiddenElements.remove(elementId);
+        } else {
+            hiddenElements.add(elementId);
+        }
+    }
+
+    public boolean isElementVisible(String elementId) {
+        return !hiddenElements.contains(elementId);
     }
 
     void setServerFrame(String elementId, int frame) {

@@ -48,8 +48,14 @@ public final class HudAtlasRenderer implements GuiLayer {
         double timeSeconds = System.nanoTime() / 1_000_000_000.0;
 
         for (HudAtlas atlas : atlases.all()) {
+            if (!atlases.isAtlasVisible(atlas.atlasId())) {
+                continue;
+            }
             for (var entry : atlas.descriptor().elements().entrySet()) {
                 String elementId = entry.getKey();
+                if (!atlas.isElementVisible(elementId)) {
+                    continue;
+                }
 
                 switch (entry.getValue()) {
                     case HudAtlasElement.Sprite sprite -> atlas.textureFor(Optional.empty()).ifPresent(tex -> {

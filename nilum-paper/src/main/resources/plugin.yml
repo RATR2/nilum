@@ -21,7 +21,7 @@ permissions:
       nilum.command.hud: true
       nilum.command.shaderpack: true
   nilum.command.reload:
-    description: Reload Nilum's models/icons/hud/items/blocks/shaderpacks/fonts/tcp/config folders.
+    description: Reload Nilum's models/icons/hud/items/blocks/shaderpacks/fonts/tcp/config/ui folders.
     default: false
   nilum.command.model:
     description: Place models, give yourself a player skeleton, play/stop entity animations.

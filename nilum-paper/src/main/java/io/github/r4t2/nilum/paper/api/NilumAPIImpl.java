@@ -83,6 +83,16 @@ public final class NilumAPIImpl implements NilumAPI {
     }
 
     @Override
+    public void setHudAtlasVisible(Player player, String atlasId, boolean visible) {
+        plugin.hud().setAtlasVisible(player, atlasId, visible);
+    }
+
+    @Override
+    public void setHudElementVisible(Player player, String atlasId, String elementId, boolean visible) {
+        plugin.hud().setElementVisible(player, atlasId, elementId, visible);
+    }
+
+    @Override
     public void activateShaderPack(Player player, String packId) {
         plugin.shaderPackService().activate(player, packId);
     }
@@ -90,6 +100,16 @@ public final class NilumAPIImpl implements NilumAPI {
     @Override
     public void deactivateShaderPack(Player player) {
         plugin.shaderPackService().deactivate(player);
+    }
+
+    @Override
+    public boolean openCustomUi(Player player, String uiId) {
+        return plugin.uiSessions().open(player, uiId);
+    }
+
+    @Override
+    public Optional<String> openCustomUiFor(Player player) {
+        return plugin.uiSessions().openUiFor(player);
     }
 
     @Override
@@ -115,5 +135,10 @@ public final class NilumAPIImpl implements NilumAPI {
     @Override
     public Set<String> shaderPackIds() {
         return plugin.shaderPacks().packIds();
+    }
+
+    @Override
+    public Set<String> uiIds() {
+        return plugin.uis().uiIds();
     }
 }

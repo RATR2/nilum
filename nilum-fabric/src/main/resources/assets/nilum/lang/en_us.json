@@ -7,5 +7,7 @@
   "key.nilum.keybind_1": "Nilum Keybind 1",
   "key.nilum.keybind_2": "Nilum Keybind 2",
   "key.nilum.keybind_3": "Nilum Keybind 3",
-  "key.nilum.keybind_4": "Nilum Keybind 4"
+  "key.nilum.keybind_4": "Nilum Keybind 4",
+  "key.category.nilum.debug": "Nilum Debug",
+  "key.nilum.hand_tune": "Open Hand Tuning"
 }

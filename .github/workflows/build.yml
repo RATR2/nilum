@@ -38,7 +38,7 @@ jobs:
         id: classify
         run: |
           # Tags must each be their own line, not just a substring anywhere in
-          # the message - otherwise a commit that merely *talks about* "build"
+          # the message; otherwise a commit that merely *talks about* "build"
           # or "workflow" in prose (e.g. this very comment) would trigger itself
           # by accident.
           MSG=$(git log -1 --pretty=%B)
@@ -47,7 +47,7 @@ jobs:
           # a real PAT (not the default GITHUB_TOKEN) so its commit actually
           # retriggers a run, but that means GitHub attributes the push to the
           # PAT's owner, not github-actions[bot]. Match bump-version.sh's exact
-          # commit *subject* instead - a plain substring check on the full
+          # commit *subject* instead; a plain substring check on the full
           # message would also match any commit that merely *talks about*
           # "[ci-bump]" in prose (as this comment itself now does).
           SUBJECT=$(git log -1 --pretty=%s)

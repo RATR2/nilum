@@ -24,6 +24,9 @@ import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
 import io.github.r4t2.nilum.common.protocol.RegisterClientVarPacket;
 import io.github.r4t2.nilum.common.protocol.SetClientVarPacket;
+import io.github.r4t2.nilum.common.protocol.OpenUiPacket;
+import io.github.r4t2.nilum.common.protocol.SetHudAtlasVisibilityPacket;
+import io.github.r4t2.nilum.common.protocol.SetHudElementVisibilityPacket;
 import io.github.r4t2.nilum.common.protocol.SetHudTextPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
@@ -39,6 +42,12 @@ import io.github.r4t2.nilum.fabric.block.NilumBlockStateModel;
 import io.github.r4t2.nilum.fabric.block.NilumBlocks;
 import io.github.r4t2.nilum.fabric.creativetab.NilumCreativeTabs;
 import io.github.r4t2.nilum.fabric.hud.ClientHudAtlasStore;
+import io.github.r4t2.nilum.fabric.network.NilumOpenUiPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetHudAtlasVisibilityPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetHudElementVisibilityPayload;
+import io.github.r4t2.nilum.fabric.ui.ClientCustomUiStore;
+import io.github.r4t2.nilum.fabric.ui.NilumCustomUiScreen;
+import io.github.r4t2.nilum.fabric.debug.HandTuneKeybind;
 import io.github.r4t2.nilum.fabric.hud.ClientVarStore;
 import io.github.r4t2.nilum.fabric.hud.HudAtlasRenderer;
 import io.github.r4t2.nilum.fabric.keybind.NilumKeybinds;
@@ -108,6 +117,7 @@ public final class NilumFabricClient implements ClientModInitializer {
     public static ClientModelPlacements PLACEMENTS;
     public static TextureUploader TEXTURE_UPLOADER;
     public static ClientFontStore FONT_STORE;
+    public static ClientCustomUiStore CUSTOM_UI_STORE;
 
     @Override
     public void onInitializeClient() {
@@ -120,6 +130,8 @@ public final class NilumFabricClient implements ClientModInitializer {
                 FabricLoader.getInstance().getConfigDir().resolve("nilum-cache").resolve("icon_atlas_debug.png"));
         ClientHudAtlasStore hudAtlases = new ClientHudAtlasStore();
         ClientVarStore clientVars = new ClientVarStore();
+        ClientCustomUiStore customUiStore = new ClientCustomUiStore();
+        CUSTOM_UI_STORE = customUiStore;
 
         // NilumIrisIntegration references Iris's own classes directly, so it (and anything that
         // touches it) must never be constructed/called unless Iris is actually installed; merely
@@ -137,7 +149,7 @@ public final class NilumFabricClient implements ClientModInitializer {
                     irisIntegration.deactivate());
         } else {
             shaderPackSink = (packId, data) ->
-                    NilumFabricMod.LOGGER.warn("Shader pack '" + packId + "' received but Iris isn't installed - ignoring.");
+                    NilumFabricMod.LOGGER.warn("Shader pack '" + packId + "' received but Iris isn't installed, ignoring.");
             ClientPlayNetworking.registerGlobalReceiver(NilumActivateShaderPackPayload.TYPE, (payload, context) -> { });
             ClientPlayNetworking.registerGlobalReceiver(NilumDeactivateShaderPackPayload.TYPE, (payload, context) -> { });
         }
@@ -151,7 +163,7 @@ public final class NilumFabricClient implements ClientModInitializer {
         };
 
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
-                shaderPackSink, fontSink, NilumFabricMod.LOGGER);
+                shaderPackSink, fontSink, customUiStore::add, NilumFabricMod.LOGGER);
         TextureUploader textureUploader = new TextureUploader();
         TEXTURE_UPLOADER = textureUploader;
         // A model reloading with new bytes under the same id (e.g. a default-retexture block
@@ -178,6 +190,7 @@ public final class NilumFabricClient implements ClientModInitializer {
                 new HudAtlasRenderer(hudAtlases, clientVars));
 
         NilumKeybinds.register();
+        HandTuneKeybind.register();
 
         ClientBlockRegistry blockRegistry = new ClientBlockRegistry();
         ModelLoadingPlugin.register(blockContext -> blockContext.modifyBlockModelAfterBake().register(
@@ -269,6 +282,24 @@ public final class NilumFabricClient implements ClientModInitializer {
             hudAtlases.onHudText(packet.atlasId(), packet.elementId(), packet.text());
         });
 
+        ClientPlayNetworking.registerGlobalReceiver(NilumOpenUiPayload.TYPE, (payload, context) -> {
+            OpenUiPacket packet = OpenUiPacket.decode(payload.data());
+            customUiStore.get(packet.uiId()).ifPresentOrElse(
+                    ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui)),
+                    () -> NilumFabricMod.LOGGER.warn("Server opened custom UI '" + packet.uiId()
+                            + "' but it isn't cached on this client yet."));
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumSetHudAtlasVisibilityPayload.TYPE, (payload, context) -> {
+            SetHudAtlasVisibilityPacket packet = SetHudAtlasVisibilityPacket.decode(payload.data());
+            hudAtlases.setAtlasVisible(packet.atlasId(), packet.visible());
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NilumSetHudElementVisibilityPayload.TYPE, (payload, context) -> {
+            SetHudElementVisibilityPacket packet = SetHudElementVisibilityPacket.decode(payload.data());
+            hudAtlases.setElementVisible(packet.atlasId(), packet.elementId(), packet.visible());
+        });
+
         ClientPlayNetworking.registerGlobalReceiver(NilumChunkBlocksPayload.TYPE, (payload, context) -> {
             ChunkBlocksPacket packet = ChunkBlocksPacket.decode(payload.data());
             blockRegistry.apply(packet.entries());
@@ -340,7 +371,7 @@ public final class NilumFabricClient implements ClientModInitializer {
 
         if (SemanticVersions.isNewer(modVersion, hello.serverModVersion())) {
             NilumFabricMod.LOGGER.warn("This Nilum client (" + modVersion + ") is newer than the server ("
-                    + hello.serverModVersion() + ") - some features may not be available.");
+                    + hello.serverModVersion() + "), some features may not be available.");
         }
 
         ShaderCapability.Renderer shaderRenderer = ShaderCapability.detect();

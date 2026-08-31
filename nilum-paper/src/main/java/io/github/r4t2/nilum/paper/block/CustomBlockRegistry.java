@@ -72,7 +72,7 @@ public final class CustomBlockRegistry {
 
         if (definition.proxy().wireMaterial().isSolid()) {
             logger.warn("Block definition '" + definition.id() + "' has a 'partial' collision box but its wire "
-                    + "block (" + definition.proxy().wireMaterial() + ") is solid - pick a non-solid material "
+                    + "block (" + definition.proxy().wireMaterial() + ") is solid; pick a non-solid material "
                     + "(e.g. tripwire, a carpet) so Nilum's manual collision isn't fighting the wire block's own.");
         }
 

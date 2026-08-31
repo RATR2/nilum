@@ -12,6 +12,7 @@ import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.AssetKind;
 import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
 import io.github.r4t2.nilum.common.shader.ShaderPackRegistry;
+import io.github.r4t2.nilum.common.ui.UiRegistry;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,6 +29,7 @@ public final class NilumAssetHost {
     private final HudAtlasRegistry hudAtlases = new HudAtlasRegistry();
     private final ShaderPackRegistry shaderPacks = new ShaderPackRegistry();
     private final FontRegistry fonts = new FontRegistry();
+    private final UiRegistry uis = new UiRegistry();
     private final BlockDefinitionRegistry blocks;
 
     private final Path modelsDirectory;
@@ -36,6 +38,7 @@ public final class NilumAssetHost {
     private final Path texturesDirectory;
     private final Path shaderPacksDirectory;
     private final Path fontsDirectory;
+    private final Path uiDirectory;
     private final Path blocksDirectory;
     private final NilumLogger logger;
 
@@ -46,6 +49,7 @@ public final class NilumAssetHost {
         this.texturesDirectory = configDir.resolve("textures");
         this.shaderPacksDirectory = configDir.resolve("shaderpacks");
         this.fontsDirectory = configDir.resolve("fonts");
+        this.uiDirectory = configDir.resolve("ui");
         this.blocksDirectory = configDir.resolve("blocks");
         this.logger = logger;
         this.blocks = new BlockDefinitionRegistry(logger, models);
@@ -86,6 +90,12 @@ public final class NilumAssetHost {
         } catch (IOException e) {
             logger.error("Failed to load the fonts folder", e);
         }
+
+        try {
+            uis.loadDirectory(uiDirectory, texturesDirectory, logger::warn);
+        } catch (IOException e) {
+            logger.error("Failed to load the ui folder", e);
+        }
     }
 
     private void loadIcons() {
@@ -117,6 +127,7 @@ public final class NilumAssetHost {
         entries.addAll(hudAtlases.manifest());
         entries.addAll(shaderPacks.manifest());
         entries.addAll(fonts.manifest());
+        entries.addAll(uis.manifest());
         return entries;
     }
 
@@ -128,6 +139,7 @@ public final class NilumAssetHost {
             case HUD_ATLAS -> hudAtlases.assetBytes(id).orElse(null);
             case SHADER_PACK -> shaderPacks.rawBytes(id).orElse(null);
             case FONT -> fonts.rawBytes(id).orElse(null);
+            case CUSTOM_UI -> uis.assetBytes(id).orElse(null);
         };
     }
 
@@ -149,6 +161,10 @@ public final class NilumAssetHost {
 
     public FontRegistry fonts() {
         return fonts;
+    }
+
+    public UiRegistry uis() {
+        return uis;
     }
 
     public BlockDefinitionRegistry blocks() {

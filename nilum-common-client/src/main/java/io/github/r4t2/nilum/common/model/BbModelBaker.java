@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
 public final class BbModelBaker {
@@ -22,11 +23,12 @@ public final class BbModelBaker {
         return quads;
     }
 
-    /** Bakes every element in the model, grouped by the outliner group that directly references it. */
+    /** Bakes every element in the model except hand-IK markers, grouped by the outliner group that directly references it. */
     public static Map<String, List<BbBakedQuad>> bakeByBone(BbModel model) {
+        Set<String> handMarkerUuids = model.handMarkerElementUuids();
         Map<String, List<BbElement>> elementsByBone = new HashMap<>();
         for (BbOutlinerNode node : model.outliner()) {
-            collectByBone(node, NO_BONE, model, elementsByBone);
+            collectByBone(node, NO_BONE, model, handMarkerUuids, elementsByBone);
         }
 
         Map<String, List<BbBakedQuad>> quadsByBone = new HashMap<>();
@@ -35,17 +37,17 @@ public final class BbModelBaker {
     }
 
     private static void collectByBone(BbOutlinerNode node, String owningBoneUuid, BbModel model,
-                                       Map<String, List<BbElement>> out) {
+                                       Set<String> handMarkerUuids, Map<String, List<BbElement>> out) {
         switch (node) {
             case BbOutlinerElementRef ref -> {
                 BbElement element = model.elementsByUuid().get(ref.elementUuid());
-                if (element != null) {
+                if (element != null && !handMarkerUuids.contains(element.uuid())) {
                     out.computeIfAbsent(owningBoneUuid, key -> new ArrayList<>()).add(element);
                 }
             }
             case BbOutlinerGroup group -> {
                 for (BbOutlinerNode child : group.children()) {
-                    collectByBone(child, group.uuid(), model, out);
+                    collectByBone(child, group.uuid(), model, handMarkerUuids, out);
                 }
             }
         }

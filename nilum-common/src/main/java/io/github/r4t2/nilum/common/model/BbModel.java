@@ -1,8 +1,11 @@
 package io.github.r4t2.nilum.common.model;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public record BbModel(
@@ -38,6 +41,27 @@ public record BbModel(
             }
         }
         return Optional.empty();
+    }
+
+    private static final Set<String> HAND_MARKER_GROUP_NAMES = Set.of("right arm", "left arm");
+
+    /** Elements under the hand-IK "Right arm"/"Left arm" marker groups, hidden from normal rendering (see ItemInHandRendererMixin). */
+    public Set<String> handMarkerElementUuids() {
+        Set<String> uuids = new HashSet<>();
+        collectHandMarkerUuids(outliner, uuids);
+        return uuids;
+    }
+
+    private static void collectHandMarkerUuids(List<BbOutlinerNode> nodes, Set<String> out) {
+        for (BbOutlinerNode node : nodes) {
+            if (node instanceof BbOutlinerGroup group) {
+                if (HAND_MARKER_GROUP_NAMES.contains(group.name().toLowerCase(Locale.ROOT))) {
+                    out.addAll(collectElementUuids(group.children()));
+                } else {
+                    collectHandMarkerUuids(group.children(), out);
+                }
+            }
+        }
     }
 
     public List<BbElement> resolveElements(BbOutlinerGroup group) {

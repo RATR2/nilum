@@ -12,6 +12,7 @@ import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
 import io.github.r4t2.nilum.common.protocol.KeybindPacket;
+import io.github.r4t2.nilum.common.protocol.UiClosedPacket;
 import io.github.r4t2.nilum.common.protocol.ModEntry;
 import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModListRequestPacket;
@@ -97,6 +98,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         entries.addAll(plugin.hudAtlases().manifest());
         entries.addAll(plugin.shaderPacks().manifest());
         entries.addAll(plugin.fonts().manifest());
+        entries.addAll(plugin.uis().manifest());
         return entries;
     }
 
@@ -154,7 +156,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
                 return;
             }
             if (configManager.get(HandshakeConfig.ALLOW_VANILLA_CLIENTS)) {
-                logger.info(player.getName() + " joined without Nilum - allowed by config, no custom content for them.");
+                logger.info(player.getName() + " joined without Nilum, allowed by config, no custom content for them.");
                 return;
             }
             logger.warn(player.getName() + " didn't respond to the handshake in time, kicking.");
@@ -212,6 +214,8 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
             onModList(player, message);
         } else if (NilumChannels.KEYBIND_QUALIFIED.equals(channel)) {
             onKeybind(player, message);
+        } else if (NilumChannels.UI_CLOSED_QUALIFIED.equals(channel)) {
+            onUiClosed(player, message);
         }
     }
 
@@ -221,6 +225,11 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
                 + " Nilum keybind " + (packet.slot() + 1) + ".");
         plugin.getServer().getPluginManager().callEvent(
                 new NilumKeybindEvent(player, packet.slot(), packet.pressed()));
+    }
+
+    private void onUiClosed(Player player, byte[] message) {
+        UiClosedPacket packet = UiClosedPacket.decode(message);
+        plugin.uiSessions().onClosed(player, packet.uiId());
     }
 
     private void onHelloAck(Player player, byte[] message) {
@@ -294,6 +303,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
             case HUD_ATLAS -> plugin.hudAtlases().assetBytes(id).orElse(null);
             case SHADER_PACK -> plugin.shaderPacks().rawBytes(id).orElse(null);
             case FONT -> plugin.fonts().rawBytes(id).orElse(null);
+            case CUSTOM_UI -> plugin.uis().assetBytes(id).orElse(null);
         });
     }
 

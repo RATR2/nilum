@@ -1,6 +1,7 @@
 package io.github.r4t2.nilum.common.asset;
 
 import io.github.r4t2.nilum.common.model.BbBakedQuad;
+import io.github.r4t2.nilum.common.model.BbElement;
 import io.github.r4t2.nilum.common.model.BbModel;
 import io.github.r4t2.nilum.common.model.BbModelBaker;
 import io.github.r4t2.nilum.common.model.BbModelParser;
@@ -31,7 +32,11 @@ public final class ClientModelStore {
 
     public void load(String modelId, byte[] rawBytes) {
         BbModel model = BbModelParser.parse(new String(rawBytes, StandardCharsets.UTF_8));
-        List<BbBakedQuad> quads = BbModelBaker.bake(model, List.copyOf(model.elementsByUuid().values()));
+        Set<String> handMarkerUuids = model.handMarkerElementUuids();
+        List<BbElement> renderableElements = model.elementsByUuid().values().stream()
+                .filter(element -> !handMarkerUuids.contains(element.uuid()))
+                .toList();
+        List<BbBakedQuad> quads = BbModelBaker.bake(model, renderableElements);
 
         Map<Integer, List<BbBakedQuad>> byTexture = new HashMap<>();
         for (BbBakedQuad quad : quads) {

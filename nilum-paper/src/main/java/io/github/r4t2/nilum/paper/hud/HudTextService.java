@@ -11,6 +11,7 @@ import io.github.r4t2.nilum.common.hud.HudAtlasDescriptor;
 import io.github.r4t2.nilum.common.hud.HudAtlasElement;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.paper.NilumPlugin;
+import io.github.r4t2.nilum.paper.skript.NilumSkriptVariables;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
@@ -81,7 +82,7 @@ public final class HudTextService {
             return;
         }
         if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            logger.info("PlaceholderAPI isn't installed - placeholderapi(...) server_connector calls will resolve to nothing, java(...) still works.");
+            logger.info("PlaceholderAPI isn't installed; placeholderapi(...) server_connector calls will resolve to nothing, java(...) still works.");
         }
         task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, intervalTicks, intervalTicks);
     }
@@ -100,6 +101,7 @@ public final class HudTextService {
         }
 
         boolean placeholderApiAvailable = Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
+        boolean skriptAvailable = NilumSkriptVariables.isAvailable();
         double timeSeconds = System.nanoTime() / 1_000_000_000.0;
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             UUID playerId = player.getUniqueId();
@@ -113,6 +115,17 @@ public final class HudTextService {
                     ? new PlaceholderApiValueSource(player) : new NilumJavaValueSource(player);
             TextValueSource textSource = placeholderApiAvailable
                     ? new PlaceholderApiTextValueSource(player) : new NilumJavaTextValueSource(player);
+
+            // Same NoClassDefFoundError caution as PlaceholderAPI above: only wrap in a
+            // skriptvar(...) branch once Skript is confirmed installed.
+            if (skriptAvailable) {
+                ValueSource base = valueSource;
+                valueSource = (function, key) -> function.equals("skriptvar")
+                        ? SkriptVariableValueSource.resolveNumeric(key) : base.resolve(function, key);
+                TextValueSource baseText = textSource;
+                textSource = (function, key) -> function.equals("skriptvar")
+                        ? SkriptVariableValueSource.resolveText(key) : baseText.resolve(function, key);
+            }
 
             for (Map.Entry<String, List<ServerTextElement>> entry : elementsByAtlas.entrySet()) {
                 String atlasId = entry.getKey();

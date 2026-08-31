@@ -123,7 +123,7 @@ public final class BlockDefinitionRegistry {
                 }
                 if (wireBlockName == null) {
                     logger.warn("Block definition '" + id + "' has proxy.mode: custom with no 'wire_block' set, "
-                            + "defaulting to glass - pick a non-occluding material whose real hardness roughly "
+                            + "defaulting to glass; pick a non-occluding material whose real hardness roughly "
                             + "matches break_time_seconds, or an opaque one only if your model fills the full block.");
                 }
                 yield new BlockProxy.Custom(wireBlock,

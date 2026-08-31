@@ -7,12 +7,14 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Owns every currently-loaded HudAtlas, keyed by server-assigned atlas id. */
 public final class ClientHudAtlasStore {
 
     private final Map<String, HudAtlas> atlasesById = new ConcurrentHashMap<>();
+    private final Set<String> hiddenAtlasIds = ConcurrentHashMap.newKeySet();
 
     public void add(String atlasId, byte[] assetBytes) {
         Minecraft.getInstance().execute(() -> {
@@ -50,5 +52,21 @@ public final class ClientHudAtlasStore {
 
     public void onHudText(String atlasId, String elementId, String text) {
         get(atlasId).ifPresent(atlas -> atlas.setServerText(elementId, text));
+    }
+
+    public void setAtlasVisible(String atlasId, boolean visible) {
+        if (visible) {
+            hiddenAtlasIds.remove(atlasId);
+        } else {
+            hiddenAtlasIds.add(atlasId);
+        }
+    }
+
+    public boolean isAtlasVisible(String atlasId) {
+        return !hiddenAtlasIds.contains(atlasId);
+    }
+
+    public void setElementVisible(String atlasId, String elementId, boolean visible) {
+        get(atlasId).ifPresent(atlas -> atlas.setElementVisible(elementId, visible));
     }
 }

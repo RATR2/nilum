@@ -17,6 +17,7 @@ public final class AssetSyncSession {
     private final BiConsumer<String, byte[]> hudAtlasSink;
     private final BiConsumer<String, byte[]> shaderPackSink;
     private final BiConsumer<String, byte[]> fontSink;
+    private final BiConsumer<String, byte[]> customUiSink;
     private final NilumLogger logger;
 
     private volatile Socket tcpSocket;
@@ -25,13 +26,15 @@ public final class AssetSyncSession {
 
     public AssetSyncSession(AssetCache cache, ClientModelStore modelStore, BiConsumer<String, byte[]> iconSink,
                              BiConsumer<String, byte[]> hudAtlasSink, BiConsumer<String, byte[]> shaderPackSink,
-                             BiConsumer<String, byte[]> fontSink, NilumLogger logger) {
+                             BiConsumer<String, byte[]> fontSink, BiConsumer<String, byte[]> customUiSink,
+                             NilumLogger logger) {
         this.cache = cache;
         this.modelStore = modelStore;
         this.iconSink = iconSink;
         this.hudAtlasSink = hudAtlasSink;
         this.shaderPackSink = shaderPackSink;
         this.fontSink = fontSink;
+        this.customUiSink = customUiSink;
         this.logger = logger;
     }
 
@@ -89,6 +92,7 @@ public final class AssetSyncSession {
                     case HUD_ATLAS -> hudAtlasSink.accept(entry.assetId(), data);
                     case SHADER_PACK -> shaderPackSink.accept(entry.assetId(), data);
                     case FONT -> fontSink.accept(entry.assetId(), data);
+                    case CUSTOM_UI -> customUiSink.accept(entry.assetId(), data);
                 }
             } catch (IOException e) {
                 logger.warn("Failed to fetch asset '" + entry.assetId() + "'", e);
