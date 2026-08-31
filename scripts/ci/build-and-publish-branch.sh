@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
+NILUM_ROOT="$(pwd)"
 source scripts/ci/lib.sh
 
 OUT_DIR="$(mktemp -d)"
@@ -21,3 +22,6 @@ update_readme "${CHECKOUT_DIR}" "${COMMIT_SHA}" "release: nilum ${VERSION} (${CO
 git add builds README.md
 git commit -m "release: nilum ${VERSION} (${COMMIT_SHA})"
 git push -u origin "release/${VERSION}"
+
+cd "${NILUM_ROOT}"
+publish_api_release "${VERSION}" "${COMMIT_SHA}"

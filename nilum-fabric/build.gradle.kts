@@ -61,12 +61,29 @@ val clientOnlyModJson by tasks.registering {
     }
 }
 
+// A plain Jar task writes its own bare manifest by default; without copying remapJar's,
+// Fabric-Loom-Mixin-Remap-Type/Fabric-Mapping-Namespace go missing and mixins stop remapping
+// correctly on this jar. Manifest.from() needs a real manifest-format file, not a zip to pull
+// one entry out of, so extract it first.
+val clientOnlyManifest by tasks.registering {
+    val remapJarTask = tasks.named<AbstractArchiveTask>("remapJar")
+    dependsOn(remapJarTask)
+    val outputFile = layout.buildDirectory.file("generated/clientOnly/MANIFEST.MF")
+    outputs.file(outputFile)
+    doLast {
+        val jarFile = remapJarTask.get().archiveFile.get().asFile
+        val manifestFile = zipTree(jarFile).matching { include("META-INF/MANIFEST.MF") }.singleFile
+        manifestFile.copyTo(outputFile.get().asFile, overwrite = true)
+    }
+}
+
 val clientOnlyJar by tasks.registering(Jar::class) {
     group = "build"
     description = "Client-only jar with dedicated-server hosting code and nilum-common-server stripped out."
     val remapJarTask = tasks.named<AbstractArchiveTask>("remapJar")
-    dependsOn(remapJarTask, clientOnlyModJson)
+    dependsOn(remapJarTask, clientOnlyModJson, clientOnlyManifest)
     archiveClassifier.set("client-only")
+    manifest.from(clientOnlyManifest.map { it.outputs.files.singleFile })
     from({ zipTree(remapJarTask.get().archiveFile.get().asFile) }) {
         exclude("io/github/r4t2/nilum/fabric/NilumFabricDedicatedServer*.class")
         exclude("io/github/r4t2/nilum/fabric/handshake/FabricServerHandshake*.class")

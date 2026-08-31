@@ -97,4 +97,5 @@ jobs:
         env:
           NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
           COMMIT_SHA: ${{ steps.classify.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/ci/build-and-publish-branch.sh
