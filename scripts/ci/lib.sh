@@ -58,31 +58,31 @@ build_and_collect_jars() {
   ./gradlew build mergeUniversalJar mergeMultiloaderJar --console=plain
 
   mkdir -p \
-    "${out_dir}/nilum-server/nilum-server-fabric" \
-    "${out_dir}/nilum-server/nilum-server-neoforge" \
-    "${out_dir}/nilum-server/nilum-server-paper" \
+    "${out_dir}/nilum-server" \
     "${out_dir}/nilum-universal" \
-    "${out_dir}/nilum-client/nilum-multiloader" \
-    "${out_dir}/nilum-source/nilum-common" \
-    "${out_dir}/nilum-source/nilum-common-server" \
-    "${out_dir}/nilum-source/nilum-common-client"
+    "${out_dir}/nilum-client" \
+    "${out_dir}/nilum-source"
 
   cp "nilum-fabric/build/libs/nilum-fabric-${version}.jar" \
-    "${out_dir}/nilum-server/nilum-server-fabric/nilum-${version}-${sha}-SERVER-FABRIC.jar"
+    "${out_dir}/nilum-server/nilum-${version}-${sha}-SERVER-FABRIC.jar"
   cp "nilum-neoforge/build/libs/nilum-neoforge-${version}.jar" \
-    "${out_dir}/nilum-server/nilum-server-neoforge/nilum-${version}-${sha}-SERVER-NEOFORGE.jar"
+    "${out_dir}/nilum-server/nilum-${version}-${sha}-SERVER-NEOFORGE.jar"
   cp "nilum-paper/build/libs/nilum-paper-${version}.jar" \
-    "${out_dir}/nilum-server/nilum-server-paper/nilum-${version}-${sha}-SERVER-PAPER.jar"
+    "${out_dir}/nilum-server/nilum-${version}-${sha}-SERVER-PAPER.jar"
   cp "build/libs/nilum-universal-${version}.jar" \
     "${out_dir}/nilum-universal/nilum-${version}-${sha}-UNIVERSAL.jar"
+  cp "nilum-fabric/build/libs/nilum-fabric-${version}-client-only.jar" \
+    "${out_dir}/nilum-client/nilum-${version}-${sha}-CLIENT-FABRIC.jar"
+  cp "nilum-neoforge/build/libs/nilum-neoforge-${version}-client-only.jar" \
+    "${out_dir}/nilum-client/nilum-${version}-${sha}-CLIENT-NEOFORGE.jar"
   cp "build/libs/nilum-multiloader-${version}.jar" \
-    "${out_dir}/nilum-client/nilum-multiloader/nilum-${version}-${sha}-MULTILOADER.jar"
+    "${out_dir}/nilum-client/nilum-${version}-${sha}-MULTILOADER.jar"
   cp "nilum-common/build/libs/nilum-common-${version}.jar" \
-    "${out_dir}/nilum-source/nilum-common/nilum-${version}-${sha}-COMMON.jar"
+    "${out_dir}/nilum-source/nilum-${version}-${sha}-COMMON.jar"
   cp "nilum-common-server/build/libs/nilum-common-server-${version}.jar" \
-    "${out_dir}/nilum-source/nilum-common-server/nilum-${version}-${sha}-COMMON-SERVER.jar"
+    "${out_dir}/nilum-source/nilum-${version}-${sha}-COMMON-SERVER.jar"
   cp "nilum-common-client/build/libs/nilum-common-client-${version}.jar" \
-    "${out_dir}/nilum-source/nilum-common-client/nilum-${version}-${sha}-COMMON-CLIENT.jar"
+    "${out_dir}/nilum-source/nilum-${version}-${sha}-COMMON-CLIENT.jar"
 }
 
 # Publishes nilum-api as a GitHub Release on the source repo (not nilum-builds), since it's a
