@@ -1,11 +1,13 @@
 package io.github.r4t2.nilum.common.tcp;
 
+import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.common.protocol.AssetDataPacket;
 import io.github.r4t2.nilum.common.protocol.AssetKind;
 import io.github.r4t2.nilum.common.protocol.AssetRequestPacket;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.function.BiFunction;
 
 public final class NilumTcpAssetServer {
@@ -13,13 +15,13 @@ public final class NilumTcpAssetServer {
     private NilumTcpAssetServer() {
     }
 
-    public static void serve(Socket socket, BiFunction<AssetKind, String, byte[]> assetLookup) {
-        Thread thread = new Thread(() -> loop(socket, assetLookup), "nilum-tcp-asset-server");
+    public static void serve(Socket socket, NilumLogger logger, BiFunction<AssetKind, String, byte[]> assetLookup) {
+        Thread thread = new Thread(() -> loop(socket, logger, assetLookup), "nilum-tcp-asset-server");
         thread.setDaemon(true);
         thread.start();
     }
 
-    private static void loop(Socket socket, BiFunction<AssetKind, String, byte[]> assetLookup) {
+    private static void loop(Socket socket, NilumLogger logger, BiFunction<AssetKind, String, byte[]> assetLookup) {
         try {
             while (!socket.isClosed()) {
                 AssetRequestPacket request = AssetRequestPacket.decode(
@@ -32,8 +34,12 @@ public final class NilumTcpAssetServer {
 
                 NilumTcpFrames.writeFrame(socket.getOutputStream(), response.encode());
             }
-        } catch (IOException ignored) {
-            // Socket closed or the connection dropped
+        } catch (IOException e) {
+            // A closed/reset socket is the normal shape of a player disconnecting mid-session,
+            // not a failure worth a warning; anything else (malformed frame, I/O error) is.
+            if (!(e instanceof SocketException) && !socket.isClosed()) {
+                logger.warn("TCP side-channel asset loop for " + socket.getRemoteSocketAddress() + " ended unexpectedly", e);
+            }
         }
     }
 }

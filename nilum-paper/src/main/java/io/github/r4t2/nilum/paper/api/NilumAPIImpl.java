@@ -78,6 +78,16 @@ public final class NilumAPIImpl implements NilumAPI {
     }
 
     @Override
+    public void playHeldItemAnimation(Player player, boolean mainHand, String animationName) {
+        plugin.animations().playHeldItemAnimation(player, mainHand, animationName);
+    }
+
+    @Override
+    public void stopHeldItemAnimation(Player player, boolean mainHand) {
+        plugin.animations().stopHeldItemAnimation(player, mainHand);
+    }
+
+    @Override
     public void setHudFrame(Player player, String atlasId, String elementId, int frame) {
         plugin.hud().setHudFrame(player, atlasId, elementId, frame);
     }

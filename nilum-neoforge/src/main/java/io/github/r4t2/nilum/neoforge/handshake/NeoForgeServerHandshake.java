@@ -105,7 +105,7 @@ public final class NeoForgeServerHandshake {
         String bindAddress = configManager.get(TcpConfig.BIND_ADDRESS);
         int configuredPort = configManager.get(TcpConfig.PORT);
 
-        NilumTcpServer server = new NilumTcpServer(this::onTcpConnected);
+        NilumTcpServer server = new NilumTcpServer(logger, this::onTcpConnected);
         try {
             int boundPort = server.start(bindAddress, configuredPort);
             tcpServer = server;
@@ -161,7 +161,7 @@ public final class NeoForgeServerHandshake {
     private void onTcpConnected(UUID playerId, Socket socket) {
         tcpConnections.put(playerId, socket);
         logger.info("TCP side-channel connected for " + playerId + ", serving asset requests.");
-        NilumTcpAssetServer.serve(socket, assetHost::assetBytes);
+        NilumTcpAssetServer.serve(socket, logger, assetHost::assetBytes);
     }
 
     private void onJoin(ServerPlayer player) {
@@ -169,6 +169,7 @@ public final class NeoForgeServerHandshake {
         if (server != null) {
             UUID playerId = player.getUUID();
             String token = server.offerConnection(playerId);
+            logger.info("Offering TCP side-channel " + tcpAdvertisedHost + ":" + tcpPort + " to " + player.getName().getString() + ".");
             PacketDistributor.sendToPlayer(player, new NilumTcpOfferPayload(
                     new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode()));
         }

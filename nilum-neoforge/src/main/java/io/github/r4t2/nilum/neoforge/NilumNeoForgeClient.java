@@ -5,9 +5,12 @@ import io.github.r4t2.nilum.common.asset.AssetSyncSession;
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.common.model.BbModel;
+import io.github.r4t2.nilum.common.model.ClientHeldItemAnimationStates;
 import io.github.r4t2.nilum.common.model.ClientModelPlacements;
 import io.github.r4t2.nilum.common.protocol.ActivateShaderPackPacket;
+import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
 import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
+import io.github.r4t2.nilum.common.protocol.ItemDefinedAssetsPacket;
 import io.github.r4t2.nilum.common.protocol.AtlasPatchPacket;
 import io.github.r4t2.nilum.common.protocol.BlockAnimationPlayPacket;
 import io.github.r4t2.nilum.common.protocol.BlockAnimationStopPacket;
@@ -20,6 +23,8 @@ import io.github.r4t2.nilum.common.protocol.HelloPacket;
 import io.github.r4t2.nilum.common.protocol.HudFrameOverridePacket;
 import io.github.r4t2.nilum.common.protocol.HudFramePacket;
 import io.github.r4t2.nilum.common.protocol.HudFrameReleasePacket;
+import io.github.r4t2.nilum.common.protocol.ItemAnimationPlayPacket;
+import io.github.r4t2.nilum.common.protocol.ItemAnimationStopPacket;
 import io.github.r4t2.nilum.common.protocol.ModEntry;
 import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
@@ -33,6 +38,7 @@ import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
+import io.github.r4t2.nilum.common.util.ServerCacheId;
 import io.github.r4t2.nilum.neoforge.block.ClientBlockRegistry;
 import io.github.r4t2.nilum.neoforge.block.NilumBlockEntity;
 import io.github.r4t2.nilum.neoforge.block.NilumBlockEntityRenderer;
@@ -53,6 +59,7 @@ import io.github.r4t2.nilum.neoforge.hud.HudAtlasRenderer;
 import io.github.r4t2.nilum.neoforge.keybind.NilumKeybinds;
 import io.github.r4t2.nilum.neoforge.network.NilumActivateShaderPackPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumItemDefinedAssetsPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumAtlasPatchPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationPlayPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationStopPayload;
@@ -65,6 +72,8 @@ import io.github.r4t2.nilum.neoforge.network.NilumHelloPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHudFrameOverridePayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHudFramePayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHudFrameReleasePayload;
+import io.github.r4t2.nilum.neoforge.network.NilumItemAnimationPlayPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumItemAnimationStopPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModListPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
@@ -119,9 +128,11 @@ final class NilumNeoForgeClient {
     }
 
     static void register(IEventBus modEventBus, NilumLogger logger, String modVersion) {
-        AssetCache assetCache = new AssetCache(FMLPaths.CONFIGDIR.get().resolve("nilum-cache"));
+        Path assetCacheRoot = FMLPaths.CONFIGDIR.get().resolve("nilum-cache");
+        AssetCache assetCache = new AssetCache(assetCacheRoot);
         ClientModelStore modelStore = new ClientModelStore();
         ClientModelPlacements placements = new ClientModelPlacements();
+        ClientHeldItemAnimationStates heldItemAnimations = new ClientHeldItemAnimationStates();
         IconAtlas iconAtlas = new IconAtlas(
                 FMLPaths.CONFIGDIR.get().resolve("nilum-cache").resolve("icon_atlas_debug.png"), logger);
         ClientHudAtlasStore hudAtlases = new ClientHudAtlasStore(logger);
@@ -164,7 +175,8 @@ final class NilumNeoForgeClient {
         };
 
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
-                shaderPackSink, fontSink, customUiStore::add, logger);
+                shaderPackSink, fontSink, customUiStore::add, logger,
+                runnable -> Minecraft.getInstance().execute(runnable));
         TextureUploader textureUploader = new TextureUploader();
         // A model reloading with new bytes under the same id (e.g. a default-retexture block
         // after a blocktextures/ edit) must drop any already-uploaded GPU textures for it, or
@@ -195,7 +207,7 @@ final class NilumNeoForgeClient {
             Map<Identifier, ItemModel> models = event.getBakingResult().itemStackModels();
             models.replaceAll((id, original) -> new NilumModelItemModel(
                     new NilumIconItemModel(original, iconAtlas, iconRenderer, glintRenderer),
-                    modelStore, modelRenderer, glintRenderer));
+                    modelStore, modelRenderer, glintRenderer, heldItemAnimations));
 
             event.getBakingResult().blockStateModels().replaceAll((state, original) ->
                     new NilumBlockStateModel(original, blockRegistry));
@@ -214,10 +226,18 @@ final class NilumNeoForgeClient {
         NeoForge.EVENT_BUS.addListener((RenderLevelStageEvent.AfterEntities event) -> blockRenderer.render(event));
 
         modEventBus.addListener((RegisterClientPayloadHandlersEvent event) -> {
-            event.register(NilumHelloPayload.TYPE, (payload, context) -> handleHello(payload, context, logger, modVersion));
+            event.register(NilumHelloPayload.TYPE, (payload, context) ->
+                    handleHello(payload, context, logger, modVersion, assetCache, assetCacheRoot));
             event.register(NilumTcpOfferPayload.TYPE, (payload, context) -> handleTcpOffer(payload, logger, assetSync));
-            event.register(NilumAssetManifestPayload.TYPE, (payload, context) ->
-                    assetSync.onManifest(AssetManifestPacket.decode(payload.data()).entries()));
+            event.register(NilumAssetManifestPayload.TYPE, (payload, context) -> {
+                List<AssetManifestEntry> entries = AssetManifestPacket.decode(payload.data()).entries();
+                logger.info("Received asset manifest from the server: " + entries.size() + " entries.");
+                assetSync.onManifest(entries);
+            });
+            event.register(NilumItemDefinedAssetsPayload.TYPE, (payload, context) -> {
+                ItemDefinedAssetsPacket packet = ItemDefinedAssetsPacket.decode(payload.data());
+                NilumCreativeTabs.setItemDefinedAssets(packet.models(), packet.icons());
+            });
             event.register(NilumModelSpawnPayload.TYPE, (payload, context) -> {
                 ModelSpawnPacket spawn = ModelSpawnPacket.decode(payload.data());
                 placements.put(spawn.entityId(), spawn.modelId());
@@ -259,7 +279,7 @@ final class NilumNeoForgeClient {
             event.register(NilumOpenUiPayload.TYPE, (payload, context) -> {
                 OpenUiPacket packet = OpenUiPacket.decode(payload.data());
                 customUiStore.get(packet.uiId()).ifPresentOrElse(
-                        ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui)),
+                        ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui, logger, fontStore)),
                         () -> logger.warn("Server opened custom UI '" + packet.uiId()
                                 + "' but it isn't cached on this client yet."));
             });
@@ -302,6 +322,23 @@ final class NilumNeoForgeClient {
                     blockRegistry.animationState(pos).stop(model, System.currentTimeMillis());
                 }
             });
+            event.register(NilumItemAnimationPlayPayload.TYPE, (payload, context) -> {
+                ItemAnimationPlayPacket packet = ItemAnimationPlayPacket.decode(payload.data());
+                String modelId = heldItemAnimations.currentModelId(packet.holderId(), packet.rightHand());
+                BbModel model = modelId == null ? null : modelStore.model(modelId).orElse(null);
+                if (model != null) {
+                    heldItemAnimations.get(packet.holderId(), packet.rightHand(), model)
+                            .play(model, packet.animationName(), packet.startTimeMillis(), System.currentTimeMillis());
+                }
+            });
+            event.register(NilumItemAnimationStopPayload.TYPE, (payload, context) -> {
+                ItemAnimationStopPacket packet = ItemAnimationStopPacket.decode(payload.data());
+                String modelId = heldItemAnimations.currentModelId(packet.holderId(), packet.rightHand());
+                BbModel model = modelId == null ? null : modelStore.model(modelId).orElse(null);
+                if (model != null) {
+                    heldItemAnimations.get(packet.holderId(), packet.rightHand(), model).stop(model, System.currentTimeMillis());
+                }
+            });
             event.register(NilumChunkBlocksPayload.TYPE, (payload, context) -> {
                 ChunkBlocksPacket packet = ChunkBlocksPacket.decode(payload.data());
                 blockRegistry.apply(packet.entries());
@@ -329,8 +366,13 @@ final class NilumNeoForgeClient {
         return null;
     }
 
-    private static void handleHello(NilumHelloPayload payload, IPayloadContext context, NilumLogger logger, String modVersion) {
+    private static void handleHello(NilumHelloPayload payload, IPayloadContext context, NilumLogger logger, String modVersion,
+                                     AssetCache assetCache, Path assetCacheRoot) {
         HelloPacket hello = HelloPacket.decode(payload.data());
+
+        String serverId = ServerCacheId.sanitize(Minecraft.getInstance().getCurrentServer() == null
+                ? null : Minecraft.getInstance().getCurrentServer().ip);
+        assetCache.rebase(assetCacheRoot.resolve(serverId));
 
         if (SemanticVersions.isNewer(modVersion, hello.serverModVersion())) {
             logger.warn("This Nilum client (" + modVersion + ") is newer than the server ("
@@ -350,23 +392,25 @@ final class NilumNeoForgeClient {
         // context.reply() works regardless of phase; ClientPacketDistributor doesn't, it
         // requires Minecraft.getInstance().getConnection(), which is null during configuration.
         context.reply(new NilumHelloAckPayload(ack.encode()));
+        logger.info("Nilum server detected (server " + hello.serverModVersion()
+                + ", client " + modVersion + "), handshake acknowledged.");
     }
 
     private static void handleTcpOffer(NilumTcpOfferPayload payload, NilumLogger logger, AssetSyncSession assetSync) {
         TcpOfferPacket offer = TcpOfferPacket.decode(payload.data());
+        logger.info("Received TCP side-channel offer from the server: " + offer.host() + ":" + offer.port() + ".");
 
         // NilumTcpClient.connect blocks until success/timeout; never call it on the
         // network callback thread, that would stall all other packet handling.
         Thread.ofVirtual().start(() -> {
             Socket socket = NilumTcpClient.connect(offer.host(), offer.port(), offer.token(),
-                    TCP_CONNECT_TIMEOUT_MILLIS);
+                    TCP_CONNECT_TIMEOUT_MILLIS, logger);
 
             if (socket != null) {
                 logger.info("TCP side-channel connected to " + offer.host() + ":" + offer.port() + ".");
                 assetSync.onTcpConnected(socket);
             } else {
-                logger.warn("Couldn't reach the TCP side-channel at " + offer.host() + ":" + offer.port()
-                        + ", falling back to plugin-channel transfer for this session.");
+                logger.warn("Falling back to plugin-channel transfer for this session.");
                 ClientPacketDistributor.sendToServer(
                         new NilumTcpUnavailablePayload(new TcpUnavailablePacket().encode()));
             }

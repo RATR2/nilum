@@ -1,0 +1,3204 @@
+diff --git a/ROADMAP.md b/ROADMAP.md
+index 29b8a84..8293bb3 100644
+--- a/ROADMAP.md
++++ b/ROADMAP.md
+@@ -7,6 +7,7 @@ Status tracker
+ - [x] Handshake + capability negotiation
+ - [x] TCP side-channel with plugin-channel fallback
+ - [x] Hash-based asset cache
++- [x] Per-server cache scoping, manifest-pruned
+ - [x] Paper plugin (handshake, rejection)
+ - [x] Fabric client mod
+ - [x] NeoForge client mod, full rendering parity with Fabric (see Modded Server Hosting)
+@@ -21,6 +22,8 @@ Status tracker
+ - [x] Custom item NBT rendering
+ - [x] Icon atlas (icon-only items)
+ - [x] Fake creative tabs
++- [x] `/nilum giveitem`/`givemodel` split (item-definition lookup vs raw model id)
++- [x] Server reports item-defined models/icons (`ItemDefinedAssetsPacket`)
+ 
+ ## HUD System
+ 
+@@ -32,6 +35,7 @@ Status tracker
+ - [x] All built-in functions + value sources
+ - [x] Server client-variable push
+ - [x] Custom font streaming (`.ttf` -> `nilum/font/` on the client)
++- [ ] Font provider icons (image -> Private Use Area codepoint, inline in text)
+ - [x] Dynamic text HUD elements (`type: render_text`)
+ - [x] Actually use a streamed custom font when rendering text
+ - [x] `server_connector` + PlaceholderAPI integration for server-resolved text values
+@@ -66,11 +70,12 @@ Status tracker
+ ## Keybinds
+ 
+ - [x] 4 client keybinds, server-side event
++- [x] Skript event (`on nilum keybind <1-4> <press|release|both>:`)
+ 
+ ## Integrations
+ 
+ - [x] Skript addon
+-- [x] `skriptvar(name)` reads a real Skript global variable from the HUD expression language (`ch.njol.skript.variables.Variables`, read-only for now; get/set/delete groundwork exists on `NilumSkriptVariables` for the future Custom UI action language to use once that's built)
++- [x] `skriptvar(name)` reads a real Skript global variable from the HUD expression language (read-only for now, write support planned for the Custom UI action language)
+ - [ ] Denizen extension
+ - [x] Public API + permission gating
+ - [ ] Connect/disconnect events for other plugins
+@@ -81,11 +86,14 @@ Status tracker
+ - [x] Keyframe interpolation (linear/step/catmullrom)
+ - [x] Bone transform hierarchy
+ - [x] Playback on placed/in-world models
+-- [x] Playback on held/dropped items
++- [x] Playback on held/dropped items (real play/stop trigger state)
+ - [x] Custom player skeleton rendering
+ - [x] Real player skin support
+-- [x] Server-driven animation triggering protocol (play/stop/blend)
+-- [x] Player hand IK animation for held items (Fabric; orientation tuned to match vanilla's own first-person hand via NilumHandTuneScreen, a live in-game correction tool for future re-tuning)
++- [x] Server-driven animation triggering protocol (play/stop/blend), placed models and held items
++- [ ] Per-trigger loop-mode override for held items
++- [x] Player hand IK animation for held items (Fabric only; live-tunable via `NilumHandTuneScreen`)
++- [x] Empty-hand marker borrowing (driven by the other hand's item/animation)
++- [x] Blockbench authoring: standalone "Nilum Animation" format (`nilum-blockbench-plugin`)
+ 
+ ## Custom Biomes
+ 
+@@ -95,19 +103,14 @@ Status tracker
+ 
+ ## Modded Server Hosting
+ 
+-Intended support matrix: Paper is the one server type both client loaders must fully support
+-(including custom blocks), since it's the only tier where the client loader doesn't have to
+-match the server loader. A Fabric-hosted server only ever needs to support a Fabric client; a
+-NeoForge-hosted server only ever needs to support a NeoForge client.
+-
+ - [x] Handshake + capability negotiation on both loaders, hosted server side
+ - [x] Asset streaming (models, HUD atlases, shader packs, fonts) on both loaders, hosted server side
+ - [x] Icon streaming on both loaders, hosted server side
+ - [x] Placing standalone models on both loaders, hosted server side
+-- [x] Custom blocks on both loaders, hosted server side (real registered `NilumBlock`/`NilumBlockEntity` per loader, not a proxy; `explosion_resistance` is parsed but not yet enforced per-block; now renders on NeoForge too, see below)
+-- [x] Collision on both loaders, hosted server side (real per-position `VoxelShape` from the placed model's `collision` group; PARTIAL boxes dampen movement via `entityInside`, matching the existing Paper behavior)
++- [x] Custom blocks on both loaders, hosted server side (real block/blockentity, not a proxy)
++- [x] Collision on both loaders, hosted server side (real per-position VoxelShape)
+ - [ ] Custom items, animation triggering, PlaceholderAPI-equivalent HUD text on both loaders, hosted server side
+-- [x] NeoForge client rendering parity with Fabric: real `NilumBlock` models/entity display/held-dropped-inventory items/icon-atlas rendering plus glints (`EntityRenderersEvent.RegisterRenderers`, `ModelEvent.ModifyBakingResult` wrapping every baked `ItemModel`), HUD atlas rendering (`RegisterGuiLayersEvent`, `GuiLayer.render` has the exact same signature as Fabric's `HudElement.render` so `HudAtlasRenderer` needed no logic changes), custom font streaming, fake creative tabs (`DeferredRegister<CreativeModeTab>` + `BuildCreativeModeTabContentsEvent`), and real Iris integration (`iris-neoforge-1.10.7+mc1.21.11.jar` vendored the same way `iris-fabric` is; same `net.irisshaders.iris` API on both loaders, ports verbatim; a one-time log recommends Iris if Oculus is installed without it). Plus the Paper-compatibility path both client loaders need regardless of hosted-server work: `ClientBlockRegistry`/`NilumBlockRenderer`/`NilumBlockStateModel`, ported using NeoForge's own `BlockStateModelExtension` position-aware `collectParts` in place of Fabric's FRAPI, and `RenderLevelStageEvent.AfterEntities` with immediate-mode `MultiBufferSource` rendering in place of Fabric's `SubmitNodeCollector`-based one (NeoForge's render-stage event doesn't hand one out). `NilumChunkBlocksPayload` came back after being deleted during the custom-blocks rework; that deletion was correct for NeoForge-hosted servers (real blocks, vanilla sync) but wrongly also removed a NeoForge client's ability to render Paper's wire-block overlay blocks. Almost the rest of the port was near-verbatim since nilum-fabric's `render/`/`hud/`/`font/`/`creativetab/` packages turned out to be vanilla-API only; only files touching a static `NilumFabricMod.LOGGER`/`NilumFabricClient.FONT_STORE` field needed real changes (NeoForge's mod class uses instance fields, so those became constructor parameters instead). The held-item hand-IK mixin is still unported, but that's not a parity gap since it's still unfinished on Fabric itself (see Animation)
++- [x] NeoForge client rendering parity with Fabric (hand-IK mixin still unported, see Animation)
+ 
+ ## Dimensions
+ 
+@@ -116,23 +119,22 @@ NeoForge-hosted server only ever needs to support a NeoForge client.
+ 
+ ## Custom UIs
+ 
+-- [ ] `type: custom`: config-defined layered UI, each layer an image or button with a screen
+-      position and a layer/z-order index
+-- [ ] Button layers: default and pressed images, an `action` expression that runs on click
+-- [ ] Per-player variable state (skript-var-flavored get/set, e.g. `skriptvar(...).list(playeruuid(...))`)
+-      readable from `action`/`requirement` expressions, writable from `action`
+-- [ ] Per-layer `requirement`: conditional visibility (and swapped image) driven by that variable state,
+-      so one button's click can reveal/hide another layer
+-- [ ] `type: chest`: a real chest inventory whose GUI texture is fully replaced by a custom one,
+-      with specific slots highlightable/selectable
+-- [ ] Custom buttons/interactive elements inside a chest UI (feasibility unconfirmed, chest GUIs are
+-      still real inventory slots under the hood, not a free-form canvas like `type: custom`)
++- [x] `type: custom` layered UI (image/button/text/head layers, `anchor: center`)
++- [x] Button layers (default/pressed images, click action, drag-off-cancel)
++- [x] `type: text` (literal or one-time expression, inline head tags)
++- [x] `type: head` (standalone player head glyph)
++- [ ] Per-player variable state (skript-var-flavored get/set)
++- [ ] Per-layer `requirement` (conditional visibility)
++- [ ] Live-updating text (server-pushed, like HUD's `server_connector`)
++- [ ] `type: chest` (custom GUI texture on a real chest inventory)
++- [ ] Custom buttons inside chest UI (feasibility unconfirmed)
+ 
+ ## Distribution
+ 
+-- [x] Client-only jar for playtesting (`clientOnlyJar` Gradle task on both loaders): `nilum-common`/`nilum-common-client`/`nilum-common-server` module split, `NilumNeoForgeMod`'s dedicated-server setup extracted into `NilumNeoForgeDedicatedServer` (matching Fabric's existing `NilumFabricMod`/`NilumFabricDedicatedServer` split) so neither common entrypoint class has any hard dependency on server-only types, and a post-processing task that strips the dedicated-server-only classes and the embedded `nilum-common-server` nested jar from the already-built jar (removing `fabric.mod.json`'s `server` entrypoint / NeoForge's `jarjar` metadata entry to match). Regular `build` output is unchanged; run `clientOnlyJar` specifically to get the stripped variant
+-- [x] Move `NilumAPI` out of nilum-paper into its own module (`nilum-api`), so other plugins can compile against it without depending on the whole plugin jar
+-- [x] Reorganized nilum-builds output by role instead of by Gradle module name, each a flat folder of jars (the filename's own SERVER-FABRIC/CLIENT-NEOFORGE/etc. suffix says what it is, no need to nest that same distinction into a subfolder too): `nilum-server/` (the full per-loader jars), `nilum-universal/` (Fabric + NeoForge + Paper merged into one jar that works no matter which loader it's dropped into, root `mergeUniversalJar` task), `nilum-client/` (the per-loader `clientOnlyJar` outputs plus those same two merged into one `MULTILOADER` jar, root `mergeMultiloaderJar` task), `nilum-source/` (nilum-common/-server/-client). The three-loader merge works because Fabric mods, NeoForge mods, and Paper plugins each look for a differently-named manifest at a fixed path (`fabric.mod.json`, `META-INF/neoforge.mods.toml`, `plugin.yml`) inside the same jar and otherwise ignore files they don't recognize; Fabric's own contribution has to merge in first, since its `META-INF/MANIFEST.MF` carries Loom/Mixin attributes the other two don't need and `DuplicatesStrategy.EXCLUDE` keeps whichever came first. `nilum-api` is no longer copied into nilum-builds at all; it publishes as a GitHub Release (`v<version>`, `gh release create` in `build-and-publish-branch.sh`) on the nilum repo itself instead, since it's a public compile-time dependency for third-party developers, not a runnable artifact
++- [x] Client-only jar for playtesting (strips dedicated-server code)
++- [x] `nilum-api` split into its own module
++- [x] nilum-builds output reorganized by role
++- [x] Bundled starter content on first enable (`DefaultAssetInstaller`)
+ 
+ ## Web Tools
+ 
+diff --git a/docs/skript.md b/docs/skript.md
+index 36486aa..4a2a753 100644
+--- a/docs/skript.md
++++ b/docs/skript.md
+@@ -7,41 +7,57 @@ Nilum's internals directly.
+ ## Effects
+ 
+ Give Nilum Item
++
+ - Pattern: `give %player% [the] nilum item %string%`
+ - Gives a player an item defined in Nilum's `items/<id>.yml`.
+ - Example: `give player the nilum item "ray_gun"`
+ 
+ Place Nilum Model
++
+ - Pattern: `place nilum model %string% at %location%`
+ - Places a loaded Nilum model as a standalone in-world display.
+ - Example: `place nilum model "scanner" at player's location`
+ 
+ Place/Remove Nilum Block
++
+ - Patterns: `place nilum block %string% at %location%`, `remove nilum block at %location%`
+ - Places or removes a real, rendered Nilum custom block.
+ - Examples: `place nilum block "crate" at target block's location`, `remove nilum block at target block's location`
+ 
+ Play/Stop Nilum Entity Animation
++
+ - Patterns: `play nilum animation %string% on %entity%`, `stop nilum animation on %entity%`
+ - Plays or stops a named animation on a player skeleton or placed model entity.
+ - Examples: `play nilum animation "reload" on player`, `stop nilum animation on player`
+ 
+ Play/Stop Nilum Block Animation
++
+ - Patterns: `play nilum animation %string% on [the] block at %location%`, `stop nilum animation on [the] block at %location%`
+ - Plays or stops a named animation on a Nilum block.
+ - Examples: `play nilum animation "open" on block at target block's location`, `stop nilum animation on block at target block's location`
+ 
++Play/Stop Nilum Held Item Animation
++
++- Patterns: `play nilum animation %string% on %player%'[s] (main|off) hand`, `stop nilum animation on %player%'[s] (main|off) hand`
++- Plays or stops a named animation on the Nilum item a player is holding in that hand. Unlike
++  entity/block animations, a held item starts at rest (not auto-looping) until triggered; any
++  groups listed in that item's `hide_groups` stay hidden until an animation is actually playing.
++- Examples: `play nilum animation "scan" on player's main hand`, `stop nilum animation on player's main hand`
++
+ Switch/Reset Nilum Shaderpack
++
+ - Patterns: `switch nilum shaderpack of %player% to %string%`, `reset nilum shaderpack of %player%`
+ - Switches a player's client to a Nilum shaderpack, or back to their previous state. Needs Iris on their client.
+ - Examples: `switch nilum shaderpack of player to "cave"`, `reset nilum shaderpack of player`
+ 
+ Open Nilum UI
++
+ - Pattern: `open [nilum] ui %string% for %player%`
+ - Opens a Nilum custom UI for a player.
+ - Example: `open nilum ui "main_menu" for player`
+ 
+ Set Nilum HUD Visibility
++
+ - Pattern: `set [nilum] hud %string% for %player% to %boolean%`
+ - Shows or hides an entire HUD atlas (`"hud_demo"`), or one element within it
+   (`"hud_demo:health_bar"`), for a player. New per-player visibility toggle, before this every
+@@ -49,6 +65,7 @@ Set Nilum HUD Visibility
+ - Examples: `set nilum hud "hud_demo" for player to false`, `set nilum hud "hud_demo:health_bar" for player to true`
+ 
+ Set Nilum HUD Frame
++
+ - Pattern: `set [nilum] hud frame %string% for %player% to %integer%`
+ - Sets a HUD atlas element's frame (`"hud_demo:health_bar"`) for a player. Wraps the existing
+   `NilumAPI.setHudFrame`.
+@@ -57,14 +74,16 @@ Set Nilum HUD Frame
+ ## Expressions
+ 
+ Nilum UI Of Player
++
+ - Patterns: `[nilum] ui of %players%`, `%players%'[s] [nilum] ui`
+ - The id of the Nilum custom UI a player currently has open, or nothing if they don't have one open.
+ - Example: `broadcast "%nilum ui of player%"`
+ 
+ Closed Nilum UI
++
+ - Pattern: `[the] closed [nilum] ui`
+ - The id of the Nilum custom UI that was just closed. Only meaningful inside `on ui close:`.
+-- Example: `on ui close:` / `	broadcast "%player% closed %closed nilum ui%"`
++- Example: `on ui close:` / `    broadcast "%player% closed %closed nilum ui%"`
+ 
+ ## Conditions
+ 
+@@ -73,26 +92,16 @@ None registered.
+ ## Events
+ 
+ Nilum UI Close
++
+ - Pattern: `[nilum] ui close`
+-- Fires when a player closes a Nilum custom UI, backed by a real Bukkit event
+-  (`NilumUiCloseEvent`, `nilum-paper/.../event/NilumUiCloseEvent.java`) that's actually fired
+-  through Bukkit's event bus, unlike `NilumUiActionEvent` below. `player` resolves to who closed
+-  it (registered as a real event value); `the closed nilum ui` resolves to which UI.
+-- Example: `on ui close:` / `	broadcast "%player% closed %closed nilum ui%"`
+-
+-`NilumUiActionEvent` (`nilum-paper/.../skript/NilumUiActionEvent.java`) is not a Skript event and
+-never will be a `on ...:` trigger, despite the name. It's an internal, synthetic Bukkit event
+-Nilum constructs itself to run a Custom UI's `action:` line through Skript's real effect parser
+-(`Effect.parse` + `TriggerItem.walk`), never fired through Bukkit's own event bus. Its only
+-visible effect from a script author's side is that Skript's own `player` expression, and
+-`%player%` interpolation inside variable names (e.g. `{button1_clicked::%player%}`), resolve
+-correctly when used inside a Custom UI action string.
+-
+-## Skript variables (not addon syntax)
+-
+-`NilumSkriptVariables` (`nilum-paper/.../skript/NilumSkriptVariables.java`) reads and writes
+-Skript's real global variables (`ch.njol.skript.variables.Variables`) from Nilum's own Java code.
+-It isn't exposed as new Skript syntax; it's how `skriptvar(name)` in Nilum's HUD/Custom-UI
+-expression language reads a Skript variable's value, and how Custom UI actions running through
+-`NilumSkriptEffectRunner` end up modifying real `{...}` variables via ordinary Skript effects
+-like `set`/`delete`.
++- fires when a player closes a Nilum custom UI
++
++Nilum Keybind
++
++- Pattern: `[nilum] keybind %integer% (press|release|both)`
++- fires when a player presses or releases one of Nilum's 4 general-purpose client keybinds
++- the number is 1-4, matching "Nilum Keybind 1"-"Nilum Keybind 4" in the client's Controls menu
++- use `player` for who pressed it
++- Examples:
++  - `on nilum keybind 1 press:` / `    send "you pressed keybind 1" to player`
++  - `on nilum keybind 2 both:` / `    send "keybind 2 changed" to player`
+diff --git a/nilum-api/src/main/java/io/github/r4t2/nilum/api/NilumAPI.java b/nilum-api/src/main/java/io/github/r4t2/nilum/api/NilumAPI.java
+index 1760940..c3f7f51 100644
+--- a/nilum-api/src/main/java/io/github/r4t2/nilum/api/NilumAPI.java
++++ b/nilum-api/src/main/java/io/github/r4t2/nilum/api/NilumAPI.java
+@@ -42,6 +42,12 @@ public interface NilumAPI {
+     /** Stops a triggered block animation, back to its rest pose. */
+     void stopBlockAnimation(Location location);
+ 
++    /** Plays a named animation on whatever Nilum item player is holding in mainHand (or their off hand). */
++    void playHeldItemAnimation(Player player, boolean mainHand, String animationName);
++
++    /** Stops a triggered held-item animation, back to its rest pose. */
++    void stopHeldItemAnimation(Player player, boolean mainHand);
++
+     /** Pushes a HUD atlas frame update to player. */
+     void setHudFrame(Player player, String atlasId, String elementId, int frame);
+ 
+diff --git a/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/asset/AssetCache.java b/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/asset/AssetCache.java
+index 898d5a6..95284ed 100644
+--- a/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/asset/AssetCache.java
++++ b/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/asset/AssetCache.java
+@@ -1,20 +1,50 @@
+ package io.github.r4t2.nilum.common.asset;
+ 
+ import io.github.r4t2.nilum.common.protocol.AssetKind;
++import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
+ import io.github.r4t2.nilum.common.util.SHA256;
+ 
+ import java.io.IOException;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Set;
+ 
++/** Content-hash cache scoped to whichever server rebase() last pointed it at. */
+ public final class AssetCache {
+ 
+-    private final Path root;
++    private volatile Path root;
+ 
+     public AssetCache(Path root) {
+         this.root = root;
+     }
+ 
++    /** Repoints the cache at a different server's own directory, e.g. on a new connection. */
++    public void rebase(Path root) {
++        this.root = root;
++    }
++
++    /** Deletes any cached file the given manifest no longer references, since the server no longer has it. */
++    public synchronized void pruneExcept(List<AssetManifestEntry> keep) {
++        if (!Files.isDirectory(root)) {
++            return;
++        }
++        Set<String> keepNames = new HashSet<>();
++        for (AssetManifestEntry entry : keep) {
++            keepNames.add(fileFor(entry.assetId(), entry.kind()).getFileName().toString());
++        }
++        try (var files = Files.list(root)) {
++            for (Path file : (Iterable<Path>) files::iterator) {
++                if (Files.isRegularFile(file) && !keepNames.contains(file.getFileName().toString())) {
++                    Files.delete(file);
++                }
++            }
++        } catch (IOException ignored) {
++            // Best-effort: a stale file left behind just gets pruned next manifest instead.
++        }
++    }
++
+     public boolean isCached(String assetId, AssetKind kind, String expectedSha256) {
+         Path file = fileFor(assetId, kind);
+         if (!Files.isRegularFile(file)) {
+diff --git a/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/asset/AssetSyncSession.java b/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/asset/AssetSyncSession.java
+index 189f7d8..0849fa7 100644
+--- a/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/asset/AssetSyncSession.java
++++ b/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/asset/AssetSyncSession.java
+@@ -6,6 +6,7 @@ import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
+ import java.io.IOException;
+ import java.net.Socket;
+ import java.util.List;
++import java.util.concurrent.Executor;
+ import java.util.function.BiConsumer;
+ 
+ 
+@@ -19,15 +20,22 @@ public final class AssetSyncSession {
+     private final BiConsumer<String, byte[]> fontSink;
+     private final BiConsumer<String, byte[]> customUiSink;
+     private final NilumLogger logger;
++    private final Executor mainThreadExecutor;
+ 
+     private volatile Socket tcpSocket;
+     private volatile List<AssetManifestEntry> pendingManifest;
+     private boolean fetching;
+ 
++    /**
++     * @param mainThreadExecutor runs a sink's actual apply-to-client-state step; several sinks
++     *                           (texture upload/invalidate, glyph atlas stitching) touch the GPU,
++     *                           which only the render thread is allowed to do, so that step can't
++     *                           run inline on fetchAll's own background thread.
++     */
+     public AssetSyncSession(AssetCache cache, ClientModelStore modelStore, BiConsumer<String, byte[]> iconSink,
+                              BiConsumer<String, byte[]> hudAtlasSink, BiConsumer<String, byte[]> shaderPackSink,
+                              BiConsumer<String, byte[]> fontSink, BiConsumer<String, byte[]> customUiSink,
+-                             NilumLogger logger) {
++                             NilumLogger logger, Executor mainThreadExecutor) {
+         this.cache = cache;
+         this.modelStore = modelStore;
+         this.iconSink = iconSink;
+@@ -36,9 +44,11 @@ public final class AssetSyncSession {
+         this.fontSink = fontSink;
+         this.customUiSink = customUiSink;
+         this.logger = logger;
++        this.mainThreadExecutor = mainThreadExecutor;
+     }
+ 
+     public synchronized void onManifest(List<AssetManifestEntry> entries) {
++        cache.pruneExcept(entries);
+         this.pendingManifest = entries;
+         tryFetch();
+     }
+@@ -76,8 +86,9 @@ public final class AssetSyncSession {
+             if (socket.isClosed()) {
+                 return;
+             }
++
++            byte[] data;
+             try {
+-                byte[] data;
+                 if (cache.isCached(entry.assetId(), entry.kind(), entry.sha256())) {
+                     data = cache.read(entry.assetId(), entry.kind());
+                 } else {
+@@ -85,20 +96,27 @@ public final class AssetSyncSession {
+                     cache.write(entry.assetId(), entry.kind(), data);
+                     logger.info("Cached asset '" + entry.assetId() + "' (" + data.length + " bytes).");
+                 }
+-
+-                switch (entry.kind()) {
+-                    case MODEL -> modelStore.load(entry.assetId(), data);
+-                    case ICON -> iconSink.accept(entry.assetId(), data);
+-                    case HUD_ATLAS -> hudAtlasSink.accept(entry.assetId(), data);
+-                    case SHADER_PACK -> shaderPackSink.accept(entry.assetId(), data);
+-                    case FONT -> fontSink.accept(entry.assetId(), data);
+-                    case CUSTOM_UI -> customUiSink.accept(entry.assetId(), data);
+-                }
+             } catch (IOException e) {
+                 logger.warn("Failed to fetch asset '" + entry.assetId() + "'", e);
+-            } catch (RuntimeException e) {
+-                logger.warn("Failed to parse asset '" + entry.assetId() + "'", e);
++                continue;
++            }
++
++            mainThreadExecutor.execute(() -> applyToSink(entry, data));
++        }
++    }
++
++    private void applyToSink(AssetManifestEntry entry, byte[] data) {
++        try {
++            switch (entry.kind()) {
++                case MODEL -> modelStore.load(entry.assetId(), data);
++                case ICON -> iconSink.accept(entry.assetId(), data);
++                case HUD_ATLAS -> hudAtlasSink.accept(entry.assetId(), data);
++                case SHADER_PACK -> shaderPackSink.accept(entry.assetId(), data);
++                case FONT -> fontSink.accept(entry.assetId(), data);
++                case CUSTOM_UI -> customUiSink.accept(entry.assetId(), data);
+             }
++        } catch (RuntimeException e) {
++            logger.warn("Failed to parse asset '" + entry.assetId() + "'", e);
+         }
+     }
+ }
+diff --git a/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/model/AnimationPlaybackState.java b/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/model/AnimationPlaybackState.java
+index 17fed2e..80c3a7e 100644
+--- a/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/model/AnimationPlaybackState.java
++++ b/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/model/AnimationPlaybackState.java
+@@ -34,6 +34,26 @@ public final class AnimationPlaybackState {
+         this.triggered = true;
+     }
+ 
++    /**
++     * True at rest: never triggered, explicitly stopped, or a "once" animation that has finished
++     * playing (which keeps rendering the rest pose but, unlike "loop"/"hold", isn't meant to stay
++     * "active" forever after). False while a blend is still in flight.
++     */
++    public synchronized boolean isIdle(BbModel model, long nowMillis) {
++        if (blendFromPose != null) {
++            return false;
++        }
++        if (!triggered || animationName == null) {
++            return true;
++        }
++        BbAnimation animation = model.findAnimation(animationName).orElse(null);
++        if (animation == null || animation.length() <= 0) {
++            return true;
++        }
++        double elapsed = Math.max(0, (nowMillis - startTimeMillis) / 1000.0);
++        return "once".equals(animation.loop()) && elapsed >= animation.length();
++    }
++
+     public synchronized Map<String, BbMatrix4> pose(BbModel model, long nowMillis) {
+         Map<String, BbMatrix4> target = triggered ? resolveTriggeredPose(model, nowMillis) : BbBonePose.computeAutoLoop(model);
+ 
+diff --git a/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpClient.java b/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpClient.java
+index 13a29b1..57b1cfd 100644
+--- a/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpClient.java
++++ b/nilum-common-client/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpClient.java
+@@ -1,5 +1,7 @@
+ package io.github.r4t2.nilum.common.tcp;
+ 
++import io.github.r4t2.nilum.common.logging.NilumLogger;
++
+ import java.io.DataOutputStream;
+ import java.io.IOException;
+ import java.net.InetSocketAddress;
+@@ -10,13 +12,14 @@ public final class NilumTcpClient {
+     private NilumTcpClient() {
+     }
+ 
+-    public static Socket connect(String host, int port, String token, int connectTimeoutMillis) {
++    public static Socket connect(String host, int port, String token, int connectTimeoutMillis, NilumLogger logger) {
+         Socket socket = new Socket();
+         try {
+             socket.connect(new InetSocketAddress(host, port), connectTimeoutMillis);
+             new DataOutputStream(socket.getOutputStream()).writeUTF(token);
+             return socket;
+         } catch (IOException e) {
++            logger.warn("TCP side-channel connect to " + host + ":" + port + " failed", e);
+             closeQuietly(socket);
+             return null;
+         }
+diff --git a/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpAssetServer.java b/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpAssetServer.java
+index 4f49a36..840c4d0 100644
+--- a/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpAssetServer.java
++++ b/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpAssetServer.java
+@@ -1,11 +1,13 @@
+ package io.github.r4t2.nilum.common.tcp;
+ 
++import io.github.r4t2.nilum.common.logging.NilumLogger;
+ import io.github.r4t2.nilum.common.protocol.AssetDataPacket;
+ import io.github.r4t2.nilum.common.protocol.AssetKind;
+ import io.github.r4t2.nilum.common.protocol.AssetRequestPacket;
+ 
+ import java.io.IOException;
+ import java.net.Socket;
++import java.net.SocketException;
+ import java.util.function.BiFunction;
+ 
+ public final class NilumTcpAssetServer {
+@@ -13,13 +15,13 @@ public final class NilumTcpAssetServer {
+     private NilumTcpAssetServer() {
+     }
+ 
+-    public static void serve(Socket socket, BiFunction<AssetKind, String, byte[]> assetLookup) {
+-        Thread thread = new Thread(() -> loop(socket, assetLookup), "nilum-tcp-asset-server");
++    public static void serve(Socket socket, NilumLogger logger, BiFunction<AssetKind, String, byte[]> assetLookup) {
++        Thread thread = new Thread(() -> loop(socket, logger, assetLookup), "nilum-tcp-asset-server");
+         thread.setDaemon(true);
+         thread.start();
+     }
+ 
+-    private static void loop(Socket socket, BiFunction<AssetKind, String, byte[]> assetLookup) {
++    private static void loop(Socket socket, NilumLogger logger, BiFunction<AssetKind, String, byte[]> assetLookup) {
+         try {
+             while (!socket.isClosed()) {
+                 AssetRequestPacket request = AssetRequestPacket.decode(
+@@ -32,8 +34,12 @@ public final class NilumTcpAssetServer {
+ 
+                 NilumTcpFrames.writeFrame(socket.getOutputStream(), response.encode());
+             }
+-        } catch (IOException ignored) {
+-            // Socket closed or the connection dropped
++        } catch (IOException e) {
++            // A closed/reset socket is the normal shape of a player disconnecting mid-session,
++            // not a failure worth a warning; anything else (malformed frame, I/O error) is.
++            if (!(e instanceof SocketException) && !socket.isClosed()) {
++                logger.warn("TCP side-channel asset loop for " + socket.getRemoteSocketAddress() + " ended unexpectedly", e);
++            }
+         }
+     }
+ }
+diff --git a/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpServer.java b/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpServer.java
+index 01a37b8..d29837a 100644
+--- a/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpServer.java
++++ b/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/tcp/NilumTcpServer.java
+@@ -1,5 +1,7 @@
+ package io.github.r4t2.nilum.common.tcp;
+ 
++import io.github.r4t2.nilum.common.logging.NilumLogger;
++
+ import java.io.DataInputStream;
+ import java.io.IOException;
+ import java.net.InetSocketAddress;
+@@ -11,15 +13,13 @@ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.concurrent.ExecutorService;
+ import java.util.concurrent.Executors;
+ import java.util.function.BiConsumer;
+-import java.util.logging.Level;
+-import java.util.logging.Logger;
+ 
+ /** Server side of the TCP side-channel: */
+ public final class NilumTcpServer {
+ 
+     private static final int HANDSHAKE_READ_TIMEOUT_MILLIS = 5000;
+-    private static final Logger LOGGER = Logger.getLogger("nilum");
+ 
++    private final NilumLogger logger;
+     private final Map<String, UUID> pendingTokens = new ConcurrentHashMap<>();
+     private final BiConsumer<UUID, Socket> onConnected;
+     private final ExecutorService connectionHandlers = Executors.newCachedThreadPool(r -> {
+@@ -31,7 +31,8 @@ public final class NilumTcpServer {
+     private ServerSocket serverSocket;
+     private Thread acceptThread;
+ 
+-    public NilumTcpServer(BiConsumer<UUID, Socket> onConnected) {
++    public NilumTcpServer(NilumLogger logger, BiConsumer<UUID, Socket> onConnected) {
++        this.logger = logger;
+         this.onConnected = onConnected;
+     }
+ 
+@@ -76,7 +77,7 @@ public final class NilumTcpServer {
+                 connectionHandlers.submit(() -> handleConnection(socket));
+             } catch (IOException e) {
+                 if (!serverSocket.isClosed()) {
+-                    LOGGER.log(Level.WARNING, "Nilum TCP accept loop error", e);
++                    logger.warn("TCP side-channel accept loop error", e);
+                 }
+             }
+         }
+@@ -88,12 +89,15 @@ public final class NilumTcpServer {
+             String token = new DataInputStream(socket.getInputStream()).readUTF();
+             UUID playerId = pendingTokens.remove(token);
+             if (playerId == null) {
++                logger.warn("TCP side-channel connection from " + socket.getRemoteSocketAddress()
++                        + " presented an unknown or already-used token, dropping it.");
+                 closeQuietly(socket);
+                 return;
+             }
+             socket.setSoTimeout(0);
+             onConnected.accept(playerId, socket);
+         } catch (IOException e) {
++            logger.warn("TCP side-channel handshake with " + socket.getRemoteSocketAddress() + " failed", e);
+             closeQuietly(socket);
+         }
+     }
+diff --git a/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/ui/UiRegistry.java b/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/ui/UiRegistry.java
+index e960502..253170b 100644
+--- a/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/ui/UiRegistry.java
++++ b/nilum-common-server/src/main/java/io/github/r4t2/nilum/common/ui/UiRegistry.java
+@@ -24,10 +24,12 @@ public final class UiRegistry {
+ 
+     private final Map<String, byte[]> assetBytesById = new ConcurrentHashMap<>();
+     private final Map<String, String> hashById = new ConcurrentHashMap<>();
++    private final Map<String, UiDescriptor> descriptorById = new ConcurrentHashMap<>();
+ 
+     public void loadDirectory(Path uiDirectory, Path texturesDirectory, Consumer<String> onWarning) throws IOException {
+         assetBytesById.clear();
+         hashById.clear();
++        descriptorById.clear();
+ 
+         Files.createDirectories(uiDirectory);
+ 
+@@ -71,12 +73,17 @@ public final class UiRegistry {
+         byte[] assetBytes = new UiAssetPayload(images, descriptorBytes).encode();
+         assetBytesById.put(uiId, assetBytes);
+         hashById.put(uiId, SHA256.of(assetBytes));
++        descriptorById.put(uiId, descriptor);
+     }
+ 
+     public Optional<byte[]> assetBytes(String uiId) {
+         return Optional.ofNullable(assetBytesById.get(uiId));
+     }
+ 
++    public Optional<UiDescriptor> descriptor(String uiId) {
++        return Optional.ofNullable(descriptorById.get(uiId));
++    }
++
+     public Set<String> uiIds() {
+         return Set.copyOf(assetBytesById.keySet());
+     }
+diff --git a/nilum-common/src/main/java/io/github/r4t2/nilum/common/logging/NilumConsoleFormat.java b/nilum-common/src/main/java/io/github/r4t2/nilum/common/logging/NilumConsoleFormat.java
+index 5207dbe..41bf5a6 100644
+--- a/nilum-common/src/main/java/io/github/r4t2/nilum/common/logging/NilumConsoleFormat.java
++++ b/nilum-common/src/main/java/io/github/r4t2/nilum/common/logging/NilumConsoleFormat.java
+@@ -3,7 +3,7 @@ package io.github.r4t2.nilum.common.logging;
+ 
+ public final class NilumConsoleFormat {
+ 
+-    public static final String PREFIX_COLOR_HEX = "5E3191";
++    public static final String PREFIX_COLOR_HEX = "3B36FF";
+     public static final String PREFIX_TEXT = "「Nilum 」";
+ 
+     private static final String ANSI_ESCAPE = "";
+diff --git a/nilum-common/src/main/java/io/github/r4t2/nilum/common/protocol/NilumChannels.java b/nilum-common/src/main/java/io/github/r4t2/nilum/common/protocol/NilumChannels.java
+index 3dba127..9f0bf08 100644
+--- a/nilum-common/src/main/java/io/github/r4t2/nilum/common/protocol/NilumChannels.java
++++ b/nilum-common/src/main/java/io/github/r4t2/nilum/common/protocol/NilumChannels.java
+@@ -79,12 +79,24 @@ public final class NilumChannels {
+     public static final String UI_CLOSED = "ui_closed";
+     public static final String UI_CLOSED_QUALIFIED = NAMESPACE + ":" + UI_CLOSED;
+ 
++    public static final String UI_BUTTON_CLICKED = "ui_button_clicked";
++    public static final String UI_BUTTON_CLICKED_QUALIFIED = NAMESPACE + ":" + UI_BUTTON_CLICKED;
++
++    public static final String ITEM_DEFINED_ASSETS = "item_defined_assets";
++    public static final String ITEM_DEFINED_ASSETS_QUALIFIED = NAMESPACE + ":" + ITEM_DEFINED_ASSETS;
++
+     public static final String SET_HUD_ATLAS_VISIBILITY = "set_hud_atlas_visibility";
+     public static final String SET_HUD_ATLAS_VISIBILITY_QUALIFIED = NAMESPACE + ":" + SET_HUD_ATLAS_VISIBILITY;
+ 
+     public static final String SET_HUD_ELEMENT_VISIBILITY = "set_hud_element_visibility";
+     public static final String SET_HUD_ELEMENT_VISIBILITY_QUALIFIED = NAMESPACE + ":" + SET_HUD_ELEMENT_VISIBILITY;
+ 
++    public static final String ITEM_ANIMATION_PLAY = "item_animation_play";
++    public static final String ITEM_ANIMATION_PLAY_QUALIFIED = NAMESPACE + ":" + ITEM_ANIMATION_PLAY;
++
++    public static final String ITEM_ANIMATION_STOP = "item_animation_stop";
++    public static final String ITEM_ANIMATION_STOP_QUALIFIED = NAMESPACE + ":" + ITEM_ANIMATION_STOP;
++
+     private NilumChannels() {
+     }
+ }
+diff --git a/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiDescriptor.java b/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiDescriptor.java
+index 22862b4..27fe7a3 100644
+--- a/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiDescriptor.java
++++ b/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiDescriptor.java
+@@ -2,5 +2,5 @@ package io.github.r4t2.nilum.common.ui;
+ 
+ import java.util.Map;
+ 
+-public record UiDescriptor(Map<String, UiElement> elements) {
++public record UiDescriptor(UiAnchor anchor, Map<String, UiElement> elements) {
+ }
+diff --git a/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiElement.java b/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiElement.java
+index e2d0ce0..3a629a9 100644
+--- a/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiElement.java
++++ b/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiElement.java
+@@ -2,7 +2,7 @@ package io.github.r4t2.nilum.common.ui;
+ 
+ import java.util.Optional;
+ 
+-/** One named layer of a custom UI: a static image, or a clickable button. */
++/** One named layer of a custom UI: a static image, a clickable button, or a text label. */
+ public sealed interface UiElement {
+ 
+     int x();
+@@ -21,4 +21,19 @@ public sealed interface UiElement {
+     record Button(String imageFile, String pressedImageFile, int x, int y, int layer,
+                   Optional<String> requirement, Optional<String> action) implements UiElement {
+     }
++
++    /**
++     * Either text or clientConnector is present, never both; a literal string or a Nilum
++     * expression evaluated once when the UI opens, not live-updated afterward.
++     */
++    record Text(String font, Optional<String> text, Optional<String> clientConnector, int color,
++                int x, int y, int layer, Optional<String> requirement) implements UiElement {
++    }
++
++    /**
++     * player is a literal UUID or username, not an expression; renders at the same size as a text
++     * glyph, via the same <head:...> mechanism inline text heads use.
++     */
++    record Head(String player, int x, int y, int layer, Optional<String> requirement) implements UiElement {
++    }
+ }
+diff --git a/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiParser.java b/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiParser.java
+index 7039ea9..be55c8d 100644
+--- a/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiParser.java
++++ b/nilum-common/src/main/java/io/github/r4t2/nilum/common/ui/UiParser.java
+@@ -59,32 +59,70 @@ public final class UiParser {
+             throw new UiParseException("Unsupported UI type '" + type + "', only 'custom' is supported so far");
+         }
+ 
++        UiAnchor anchor = parseAnchor(topLevel.getOrDefault("anchor", "top-left"));
++
+         Map<String, UiElement> elements = new LinkedHashMap<>();
+         for (Map.Entry<String, Map<String, String>> entry : elementFields.entrySet()) {
+             elements.put(entry.getKey(), parseElement(entry.getKey(), entry.getValue()));
+         }
+ 
+-        return new UiDescriptor(elements);
++        return new UiDescriptor(anchor, elements);
++    }
++
++    private static UiAnchor parseAnchor(String raw) {
++        return switch (raw.toLowerCase(java.util.Locale.ROOT)) {
++            case "top-left" -> UiAnchor.TOP_LEFT;
++            case "center" -> UiAnchor.CENTER;
++            default -> throw new UiParseException("Unknown anchor '" + raw + "', expected 'top-left' or 'center'");
++        };
+     }
+ 
+     private static UiElement parseElement(String id, Map<String, String> fields) {
+         String typeStr = require(fields, id, "type");
+-        String imageFile = require(fields, id, "image");
+         int[] position = requireIntArray(fields, "position", "Element '" + id + "'");
+         int layer = fields.containsKey("layer") ? Integer.parseInt(fields.get("layer")) : 0;
+         Optional<String> requirement = Optional.ofNullable(fields.get("requirement"));
+ 
+         if (typeStr.equalsIgnoreCase("button")) {
++            String imageFile = require(fields, id, "image");
+             String pressedImageFile = require(fields, id, "pressed");
+             Optional<String> action = Optional.ofNullable(fields.get("action"));
+             return new UiElement.Button(imageFile, pressedImageFile, position[0], position[1], layer, requirement, action);
+         }
+         if (typeStr.equalsIgnoreCase("image")) {
++            String imageFile = require(fields, id, "image");
+             return new UiElement.Image(imageFile, position[0], position[1], layer, requirement);
+         }
++        if (typeStr.equalsIgnoreCase("text")) {
++            return parseTextElement(id, fields, position, layer, requirement);
++        }
++        if (typeStr.equalsIgnoreCase("head")) {
++            String player = require(fields, id, "player");
++            return new UiElement.Head(player, position[0], position[1], layer, requirement);
++        }
+         throw new UiParseException("Element '" + id + "' has unknown type '" + typeStr + "'");
+     }
+ 
++    private static UiElement.Text parseTextElement(String id, Map<String, String> fields, int[] position, int layer,
++                                                     Optional<String> requirement) {
++        String font = fields.getOrDefault("font", "default");
++        Optional<String> text = Optional.ofNullable(fields.get("text"));
++        Optional<String> clientConnector = Optional.ofNullable(fields.get("client_connector"));
++        if (text.isEmpty() && clientConnector.isEmpty()) {
++            throw new UiParseException("Element '" + id + "' is type 'text' but has neither 'text' nor 'client_connector'");
++        }
++        if (text.isPresent() && clientConnector.isPresent()) {
++            throw new UiParseException("Element '" + id + "' has both 'text' and 'client_connector', only one is allowed");
++        }
++        int color = fields.containsKey("color") ? parseColor(fields.get("color")) : 0xFFFFFFFF;
++        return new UiElement.Text(font, text, clientConnector, color, position[0], position[1], layer, requirement);
++    }
++
++    private static int parseColor(String raw) {
++        String hex = raw.startsWith("#") ? raw.substring(1) : raw;
++        return 0xFF000000 | Integer.parseInt(hex, 16);
++    }
++
+     private static String require(Map<String, String> fields, String id, String field) {
+         String value = fields.get(field);
+         if (value == null) {
+diff --git a/nilum-fabric/build.gradle.kts b/nilum-fabric/build.gradle.kts
+index b5de60f..ee7b104 100644
+--- a/nilum-fabric/build.gradle.kts
++++ b/nilum-fabric/build.gradle.kts
+@@ -42,6 +42,7 @@ tasks.processResources {
+ val clientOnlyModJson by tasks.registering {
+     val remapJarTask = tasks.named<AbstractArchiveTask>("remapJar")
+     dependsOn(remapJarTask)
++    inputs.file(remapJarTask.flatMap { it.archiveFile })
+     val outputFile = layout.buildDirectory.file("generated/clientOnly/fabric.mod.json")
+     outputs.file(outputFile)
+     doLast {
+@@ -68,6 +69,7 @@ val clientOnlyModJson by tasks.registering {
+ val clientOnlyManifest by tasks.registering {
+     val remapJarTask = tasks.named<AbstractArchiveTask>("remapJar")
+     dependsOn(remapJarTask)
++    inputs.file(remapJarTask.flatMap { it.archiveFile })
+     val outputFile = layout.buildDirectory.file("generated/clientOnly/MANIFEST.MF")
+     outputs.file(outputFile)
+     doLast {
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/NilumFabricClient.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/NilumFabricClient.java
+index 9d61bf9..eabe94e 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/NilumFabricClient.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/NilumFabricClient.java
+@@ -4,9 +4,12 @@ import io.github.r4t2.nilum.common.asset.AssetCache;
+ import io.github.r4t2.nilum.common.asset.AssetSyncSession;
+ import io.github.r4t2.nilum.common.asset.ClientModelStore;
+ import io.github.r4t2.nilum.common.model.BbModel;
++import io.github.r4t2.nilum.common.model.ClientHeldItemAnimationStates;
+ import io.github.r4t2.nilum.common.model.ClientModelPlacements;
+ import io.github.r4t2.nilum.common.protocol.ActivateShaderPackPacket;
++import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
+ import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
++import io.github.r4t2.nilum.common.protocol.ItemDefinedAssetsPacket;
+ import io.github.r4t2.nilum.common.protocol.AtlasPatchPacket;
+ import io.github.r4t2.nilum.common.protocol.BlockAnimationPlayPacket;
+ import io.github.r4t2.nilum.common.protocol.BlockAnimationStopPacket;
+@@ -19,6 +22,8 @@ import io.github.r4t2.nilum.common.protocol.HelloPacket;
+ import io.github.r4t2.nilum.common.protocol.HudFrameOverridePacket;
+ import io.github.r4t2.nilum.common.protocol.HudFramePacket;
+ import io.github.r4t2.nilum.common.protocol.HudFrameReleasePacket;
++import io.github.r4t2.nilum.common.protocol.ItemAnimationPlayPacket;
++import io.github.r4t2.nilum.common.protocol.ItemAnimationStopPacket;
+ import io.github.r4t2.nilum.common.protocol.ModEntry;
+ import io.github.r4t2.nilum.common.protocol.ModListPacket;
+ import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
+@@ -32,6 +37,7 @@ import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
+ import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
+ import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
+ import io.github.r4t2.nilum.common.util.SemanticVersions;
++import io.github.r4t2.nilum.common.util.ServerCacheId;
+ import io.github.r4t2.nilum.fabric.block.ClientBlockRegistry;
+ import io.github.r4t2.nilum.fabric.font.ClientFontStore;
+ import io.github.r4t2.nilum.fabric.font.FontInstaller;
+@@ -53,6 +59,7 @@ import io.github.r4t2.nilum.fabric.hud.HudAtlasRenderer;
+ import io.github.r4t2.nilum.fabric.keybind.NilumKeybinds;
+ import io.github.r4t2.nilum.fabric.network.NilumActivateShaderPackPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
++import io.github.r4t2.nilum.fabric.network.NilumItemDefinedAssetsPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumAtlasPatchPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumBlockAnimationPlayPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumBlockAnimationStopPayload;
+@@ -65,6 +72,8 @@ import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumHudFrameOverridePayload;
+ import io.github.r4t2.nilum.fabric.network.NilumHudFramePayload;
+ import io.github.r4t2.nilum.fabric.network.NilumHudFrameReleasePayload;
++import io.github.r4t2.nilum.fabric.network.NilumItemAnimationPlayPayload;
++import io.github.r4t2.nilum.fabric.network.NilumItemAnimationStopPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumModListPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
+@@ -115,17 +124,20 @@ public final class NilumFabricClient implements ClientModInitializer {
+     // same pattern NilumFabricMod already uses for CONFIG/LOGGER.
+     public static ClientModelStore MODEL_STORE;
+     public static ClientModelPlacements PLACEMENTS;
++    public static ClientHeldItemAnimationStates HELD_ITEM_ANIMATIONS;
+     public static TextureUploader TEXTURE_UPLOADER;
+     public static ClientFontStore FONT_STORE;
+     public static ClientCustomUiStore CUSTOM_UI_STORE;
+ 
+     @Override
+     public void onInitializeClient() {
+-        AssetCache assetCache = new AssetCache(FabricLoader.getInstance().getConfigDir().resolve("nilum-cache"));
++        Path assetCacheRoot = FabricLoader.getInstance().getConfigDir().resolve("nilum-cache");
++        AssetCache assetCache = new AssetCache(assetCacheRoot);
+         ClientModelStore modelStore = new ClientModelStore();
+         ClientModelPlacements placements = new ClientModelPlacements();
+         MODEL_STORE = modelStore;
+         PLACEMENTS = placements;
++        HELD_ITEM_ANIMATIONS = new ClientHeldItemAnimationStates();
+         IconAtlas iconAtlas = new IconAtlas(
+                 FabricLoader.getInstance().getConfigDir().resolve("nilum-cache").resolve("icon_atlas_debug.png"));
+         ClientHudAtlasStore hudAtlases = new ClientHudAtlasStore();
+@@ -163,7 +175,8 @@ public final class NilumFabricClient implements ClientModInitializer {
+         };
+ 
+         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
+-                shaderPackSink, fontSink, customUiStore::add, NilumFabricMod.LOGGER);
++                shaderPackSink, fontSink, customUiStore::add, NilumFabricMod.LOGGER,
++                runnable -> Minecraft.getInstance().execute(runnable));
+         TextureUploader textureUploader = new TextureUploader();
+         TEXTURE_UPLOADER = textureUploader;
+         // A model reloading with new bytes under the same id (e.g. a default-retexture block
+@@ -208,32 +221,40 @@ public final class NilumFabricClient implements ClientModInitializer {
+         // Registered on both phases: a Paper server sends hello in PLAY, a Fabric-hosted
+         // server sends it during configuration (see FabricServerHandshake).
+         ClientConfigurationNetworking.registerGlobalReceiver(NilumHelloPayload.TYPE, (payload, context) ->
+-                handleHello(payload, ClientConfigurationNetworking::send));
++                handleHello(payload, ClientConfigurationNetworking::send, assetCache, assetCacheRoot));
+         ClientPlayNetworking.registerGlobalReceiver(NilumHelloPayload.TYPE, (payload, context) ->
+-                handleHello(payload, ClientPlayNetworking::send));
++                handleHello(payload, ClientPlayNetworking::send, assetCache, assetCacheRoot));
+ 
+         ClientPlayNetworking.registerGlobalReceiver(NilumTcpOfferPayload.TYPE, (payload, context) -> {
+             TcpOfferPacket offer = TcpOfferPacket.decode(payload.data());
++            NilumFabricMod.LOGGER.info("Received TCP side-channel offer from the server: " + offer.host() + ":" + offer.port() + ".");
+ 
+             // NilumTcpClient.connect blocks until success/timeout; never call it on the
+             // network callback thread, that would stall all other packet handling.
+             Thread.ofVirtual().start(() -> {
+                 Socket socket = NilumTcpClient.connect(offer.host(), offer.port(), offer.token(),
+-                        TCP_CONNECT_TIMEOUT_MILLIS);
++                        TCP_CONNECT_TIMEOUT_MILLIS, NilumFabricMod.LOGGER);
+ 
+                 if (socket != null) {
+                     NilumFabricMod.LOGGER.info("TCP side-channel connected to " + offer.host() + ":" + offer.port() + ".");
+                     assetSync.onTcpConnected(socket);
+                 } else {
+-                    NilumFabricMod.LOGGER.warn("Couldn't reach the TCP side-channel at " + offer.host() + ":"
+-                            + offer.port() + ", falling back to plugin-channel transfer for this session.");
++                    NilumFabricMod.LOGGER.warn("Falling back to plugin-channel transfer for this session.");
+                     ClientPlayNetworking.send(new NilumTcpUnavailablePayload(new TcpUnavailablePacket().encode()));
+                 }
+             });
+         });
+ 
+-        ClientPlayNetworking.registerGlobalReceiver(NilumAssetManifestPayload.TYPE, (payload, context) ->
+-                assetSync.onManifest(AssetManifestPacket.decode(payload.data()).entries()));
++        ClientPlayNetworking.registerGlobalReceiver(NilumAssetManifestPayload.TYPE, (payload, context) -> {
++            List<AssetManifestEntry> entries = AssetManifestPacket.decode(payload.data()).entries();
++            NilumFabricMod.LOGGER.info("Received asset manifest from the server: " + entries.size() + " entries.");
++            assetSync.onManifest(entries);
++        });
++
++        ClientPlayNetworking.registerGlobalReceiver(NilumItemDefinedAssetsPayload.TYPE, (payload, context) -> {
++            ItemDefinedAssetsPacket packet = ItemDefinedAssetsPacket.decode(payload.data());
++            NilumCreativeTabs.setItemDefinedAssets(packet.models(), packet.icons());
++        });
+ 
+         ClientPlayNetworking.registerGlobalReceiver(NilumModelSpawnPayload.TYPE, (payload, context) -> {
+             ModelSpawnPacket spawn = ModelSpawnPacket.decode(payload.data());
+@@ -339,6 +360,25 @@ public final class NilumFabricClient implements ClientModInitializer {
+                 blockRegistry.animationState(pos).stop(model, System.currentTimeMillis());
+             }
+         });
++
++        ClientPlayNetworking.registerGlobalReceiver(NilumItemAnimationPlayPayload.TYPE, (payload, context) -> {
++            ItemAnimationPlayPacket packet = ItemAnimationPlayPacket.decode(payload.data());
++            String modelId = HELD_ITEM_ANIMATIONS.currentModelId(packet.holderId(), packet.rightHand());
++            BbModel model = modelId == null ? null : modelStore.model(modelId).orElse(null);
++            if (model != null) {
++                HELD_ITEM_ANIMATIONS.get(packet.holderId(), packet.rightHand(), model)
++                        .play(model, packet.animationName(), packet.startTimeMillis(), System.currentTimeMillis());
++            }
++        });
++
++        ClientPlayNetworking.registerGlobalReceiver(NilumItemAnimationStopPayload.TYPE, (payload, context) -> {
++            ItemAnimationStopPacket packet = ItemAnimationStopPacket.decode(payload.data());
++            String modelId = HELD_ITEM_ANIMATIONS.currentModelId(packet.holderId(), packet.rightHand());
++            BbModel model = modelId == null ? null : modelStore.model(modelId).orElse(null);
++            if (model != null) {
++                HELD_ITEM_ANIMATIONS.get(packet.holderId(), packet.rightHand(), model).stop(model, System.currentTimeMillis());
++            }
++        });
+     }
+ 
+     private static BbModel modelForEntity(ClientModelStore modelStore, ClientModelPlacements placements, UUID entityId) {
+@@ -361,9 +401,14 @@ public final class NilumFabricClient implements ClientModInitializer {
+         return null;
+     }
+ 
+-    private static void handleHello(NilumHelloPayload payload, Consumer<CustomPacketPayload> sender) {
++    private static void handleHello(NilumHelloPayload payload, Consumer<CustomPacketPayload> sender,
++                                     AssetCache assetCache, Path assetCacheRoot) {
+         HelloPacket hello = HelloPacket.decode(payload.data());
+ 
++        String serverId = ServerCacheId.sanitize(Minecraft.getInstance().getCurrentServer() == null
++                ? null : Minecraft.getInstance().getCurrentServer().ip);
++        assetCache.rebase(assetCacheRoot.resolve(serverId));
++
+         String modVersion = FabricLoader.getInstance()
+                 .getModContainer("nilum")
+                 .map(container -> container.getMetadata().getVersion().getFriendlyString())
+@@ -385,5 +430,7 @@ public final class NilumFabricClient implements ClientModInitializer {
+         );
+ 
+         sender.accept(new NilumHelloAckPayload(ack.encode()));
++        NilumFabricMod.LOGGER.info("Nilum server detected (server " + hello.serverModVersion()
++                + ", client " + modVersion + "), handshake acknowledged.");
+     }
+ }
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/NilumFabricMod.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/NilumFabricMod.java
+index d22160a..5c6c683 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/NilumFabricMod.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/NilumFabricMod.java
+@@ -9,6 +9,7 @@ import io.github.r4t2.nilum.fabric.block.NilumBlocks;
+ import io.github.r4t2.nilum.fabric.logging.FabricLogSink;
+ import io.github.r4t2.nilum.fabric.network.NilumActivateShaderPackPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
++import io.github.r4t2.nilum.fabric.network.NilumItemDefinedAssetsPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumAtlasPatchPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumBlockAnimationPlayPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumBlockAnimationStopPayload;
+@@ -16,6 +17,8 @@ import io.github.r4t2.nilum.fabric.network.NilumDeactivateShaderPackPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumChunkBlocksPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumEntityAnimationPlayPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumEntityAnimationStopPayload;
++import io.github.r4t2.nilum.fabric.network.NilumItemAnimationPlayPayload;
++import io.github.r4t2.nilum.fabric.network.NilumItemAnimationStopPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumHelloPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumHudFrameOverridePayload;
+@@ -33,6 +36,7 @@ import io.github.r4t2.nilum.fabric.network.NilumSetClientVarPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumSetHudTextPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
++import io.github.r4t2.nilum.fabric.network.NilumUiButtonClickedPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumUiClosedPayload;
+ import net.fabricmc.api.ModInitializer;
+ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+@@ -83,6 +87,7 @@ public final class NilumFabricMod implements ModInitializer {
+         PayloadTypeRegistry.playS2C().register(NilumTcpOfferPayload.TYPE, NilumTcpOfferPayload.CODEC);
+         PayloadTypeRegistry.playC2S().register(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC);
+         PayloadTypeRegistry.playS2C().register(NilumAssetManifestPayload.TYPE, NilumAssetManifestPayload.CODEC);
++        PayloadTypeRegistry.playS2C().register(NilumItemDefinedAssetsPayload.TYPE, NilumItemDefinedAssetsPayload.CODEC);
+         PayloadTypeRegistry.playS2C().register(NilumModelSpawnPayload.TYPE, NilumModelSpawnPayload.CODEC);
+         PayloadTypeRegistry.playS2C().register(NilumModListRequestPayload.TYPE, NilumModListRequestPayload.CODEC);
+         PayloadTypeRegistry.playC2S().register(NilumModListPayload.TYPE, NilumModListPayload.CODEC);
+@@ -101,8 +106,11 @@ public final class NilumFabricMod implements ModInitializer {
+         PayloadTypeRegistry.playS2C().register(NilumEntityAnimationStopPayload.TYPE, NilumEntityAnimationStopPayload.CODEC);
+         PayloadTypeRegistry.playS2C().register(NilumBlockAnimationPlayPayload.TYPE, NilumBlockAnimationPlayPayload.CODEC);
+         PayloadTypeRegistry.playS2C().register(NilumBlockAnimationStopPayload.TYPE, NilumBlockAnimationStopPayload.CODEC);
++        PayloadTypeRegistry.playS2C().register(NilumItemAnimationPlayPayload.TYPE, NilumItemAnimationPlayPayload.CODEC);
++        PayloadTypeRegistry.playS2C().register(NilumItemAnimationStopPayload.TYPE, NilumItemAnimationStopPayload.CODEC);
+         PayloadTypeRegistry.playS2C().register(NilumOpenUiPayload.TYPE, NilumOpenUiPayload.CODEC);
+         PayloadTypeRegistry.playC2S().register(NilumUiClosedPayload.TYPE, NilumUiClosedPayload.CODEC);
++        PayloadTypeRegistry.playC2S().register(NilumUiButtonClickedPayload.TYPE, NilumUiButtonClickedPayload.CODEC);
+         PayloadTypeRegistry.playS2C().register(NilumSetHudAtlasVisibilityPayload.TYPE, NilumSetHudAtlasVisibilityPayload.CODEC);
+         PayloadTypeRegistry.playS2C().register(NilumSetHudElementVisibilityPayload.TYPE, NilumSetHudElementVisibilityPayload.CODEC);
+ 
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/creativetab/NilumCreativeTabs.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/creativetab/NilumCreativeTabs.java
+index 632fea5..2a58db6 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/creativetab/NilumCreativeTabs.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/creativetab/NilumCreativeTabs.java
+@@ -1,6 +1,7 @@
+ package io.github.r4t2.nilum.fabric.creativetab;
+ 
+ import io.github.r4t2.nilum.common.asset.ClientModelStore;
++import io.github.r4t2.nilum.common.protocol.ItemPreviewEntry;
+ import io.github.r4t2.nilum.fabric.render.IconAtlas;
+ import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
+ import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+@@ -17,10 +18,12 @@ import net.minecraft.world.item.ItemStack;
+ import java.util.List;
+ import java.util.concurrent.CopyOnWriteArrayList;
+ 
+-/** Four fixed Nilum creative tabs. Custom Items stays empty until something calls addCustomItem. */
++/** Four fixed Nilum creative tabs. Custom Items lists addCustomItem() entries plus every model/icon the server says has a real item definition. */
+ public final class NilumCreativeTabs {
+ 
+     private static final List<ItemStack> CUSTOM_ITEMS = new CopyOnWriteArrayList<>();
++    private static volatile List<ItemPreviewEntry> itemDefinedModels = List.of();
++    private static volatile List<ItemPreviewEntry> itemDefinedIcons = List.of();
+ 
+     private static final ResourceKey<CreativeModeTab> ITEMS = key("items");
+     private static final ResourceKey<CreativeModeTab> BLOCKS = key("blocks");
+@@ -61,15 +64,20 @@ public final class NilumCreativeTabs {
+                 entries.accept(NilumTaggedItems.iconItem(Items.PAPER, iconId));
+             }
+         });
+-        ItemGroupEvents.modifyEntriesEvent(MODELS).register(entries -> {
+-            for (String modelId : modelStore.modelIds()) {
+-                entries.accept(NilumTaggedItems.modelItem(Items.PAPER, modelId));
+-            }
+-        });
++        // Deliberately not auto-populated from modelStore.modelIds()/iconAtlas.iconIds(): a loaded
++        // model or icon isn't necessarily meant to be a standalone item (block-only models,
++        // skeleton overrides, hand-IK calibration rigs). Only ids the server confirms have a real
++        // items/*.yml definition (see setItemDefinedAssets) show up here.
+         ItemGroupEvents.modifyEntriesEvent(CUSTOM_ITEMS_TAB).register(entries -> {
+             for (ItemStack stack : CUSTOM_ITEMS) {
+                 entries.accept(stack);
+             }
++            for (ItemPreviewEntry preview : itemDefinedModels) {
++                entries.accept(NilumTaggedItems.modelItem(Items.PAPER, preview));
++            }
++            for (ItemPreviewEntry preview : itemDefinedIcons) {
++                entries.accept(NilumTaggedItems.iconItem(Items.PAPER, preview));
++            }
+         });
+     }
+ 
+@@ -78,6 +86,12 @@ public final class NilumCreativeTabs {
+         CUSTOM_ITEMS.add(stack);
+     }
+ 
++    /** Which loaded models/icons the server says have a real item definition, with their name/lore/hide_groups; drives the "Nilum Custom Items" tab. */
++    public static void setItemDefinedAssets(List<ItemPreviewEntry> models, List<ItemPreviewEntry> icons) {
++        itemDefinedModels = List.copyOf(models);
++        itemDefinedIcons = List.copyOf(icons);
++    }
++
+     private static ResourceKey<CreativeModeTab> key(String path) {
+         return ResourceKey.create(Registries.CREATIVE_MODE_TAB, Identifier.fromNamespaceAndPath("nilum", path));
+     }
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/creativetab/NilumTaggedItems.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/creativetab/NilumTaggedItems.java
+index 0dc3d0c..dee1b9b 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/creativetab/NilumTaggedItems.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/creativetab/NilumTaggedItems.java
+@@ -1,10 +1,13 @@
+ package io.github.r4t2.nilum.fabric.creativetab;
+ 
++import io.github.r4t2.nilum.common.protocol.ItemPreviewEntry;
+ import net.minecraft.core.component.DataComponents;
+ import net.minecraft.nbt.CompoundTag;
++import net.minecraft.network.chat.Component;
+ import net.minecraft.world.item.Item;
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.component.CustomData;
++import net.minecraft.world.item.component.ItemLore;
+ 
+ /** Builds representative ItemStacks for Nilum's creative tabs, tagged the same way Paper serializes a PersistentDataContainer. */
+ final class NilumTaggedItems {
+@@ -14,21 +17,42 @@ final class NilumTaggedItems {
+     private NilumTaggedItems() {
+     }
+ 
++    /** Bare tag only, no name/lore/hide_groups; used for the generic "Items" icon-atlas tab, which isn't backed by a real item definition. */
+     static ItemStack iconItem(Item baseMaterial, String iconId) {
+-        return tagged(baseMaterial, "nilum:icon_id", iconId);
++        return tagged(baseMaterial, "nilum:icon_id", iconId, null);
+     }
+ 
+-    static ItemStack modelItem(Item baseMaterial, String modelId) {
+-        return tagged(baseMaterial, "nilum:model_id", modelId);
++    /** Full preview (name, lore, hide_groups) from a real item definition; used for the "Nilum Custom Items" tab. */
++    static ItemStack modelItem(Item baseMaterial, ItemPreviewEntry preview) {
++        return tagged(baseMaterial, "nilum:model_id", preview.assetId(), preview);
+     }
+ 
+-    private static ItemStack tagged(Item baseMaterial, String key, String value) {
++    static ItemStack iconItem(Item baseMaterial, ItemPreviewEntry preview) {
++        return tagged(baseMaterial, "nilum:icon_id", preview.assetId(), preview);
++    }
++
++    private static ItemStack tagged(Item baseMaterial, String key, String value, ItemPreviewEntry preview) {
+         ItemStack stack = new ItemStack(baseMaterial);
+         CompoundTag publicValues = new CompoundTag();
+         publicValues.putString(key, value);
++        if (preview != null && !preview.hideGroups().isEmpty()) {
++            publicValues.putString("nilum:hide_groups", String.join(",", preview.hideGroups()));
++        }
+         CompoundTag customData = new CompoundTag();
+         customData.put(PUBLIC_BUKKIT_VALUES, publicValues);
+         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(customData));
++
++        if (preview != null && !preview.displayName().isBlank()) {
++            stack.set(DataComponents.CUSTOM_NAME, legacy(preview.displayName()));
++        }
++        if (preview != null && !preview.lore().isEmpty()) {
++            stack.set(DataComponents.LORE, new ItemLore(preview.lore().stream().map(NilumTaggedItems::legacy).toList()));
++        }
+         return stack;
+     }
++
++    /** item.yml text uses '&' legacy color codes (matching the server's LegacyComponentSerializer); vanilla's own text layout already re-parses embedded section-sign codes. */
++    private static Component legacy(String text) {
++        return Component.literal(text.replace('&', '§'));
++    }
+ }
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/handshake/FabricServerHandshake.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/handshake/FabricServerHandshake.java
+index d5b23e7..4e124f9 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/handshake/FabricServerHandshake.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/handshake/FabricServerHandshake.java
+@@ -103,7 +103,7 @@ public final class FabricServerHandshake {
+         String bindAddress = configManager.get(TcpConfig.BIND_ADDRESS);
+         int configuredPort = configManager.get(TcpConfig.PORT);
+ 
+-        NilumTcpServer server = new NilumTcpServer(this::onTcpConnected);
++        NilumTcpServer server = new NilumTcpServer(logger, this::onTcpConnected);
+         try {
+             int boundPort = server.start(bindAddress, configuredPort);
+             tcpServer = server;
+@@ -161,6 +161,7 @@ public final class FabricServerHandshake {
+         if (server != null) {
+             UUID playerId = player.getUUID();
+             String token = server.offerConnection(playerId);
++            logger.info("Offering TCP side-channel " + tcpAdvertisedHost + ":" + tcpPort + " to " + player.getName().getString() + ".");
+             ServerPlayNetworking.send(player, new NilumTcpOfferPayload(
+                     new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode()));
+         }
+@@ -204,7 +205,7 @@ public final class FabricServerHandshake {
+     private void onTcpConnected(UUID playerId, Socket socket) {
+         tcpConnections.put(playerId, socket);
+         logger.info("TCP side-channel connected for " + playerId + ", serving asset requests.");
+-        NilumTcpAssetServer.serve(socket, assetHost::assetBytes);
++        NilumTcpAssetServer.serve(socket, logger, assetHost::assetBytes);
+     }
+ 
+     private static void closeQuietly(Socket socket) {
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/mixin/ItemInHandRendererMixin.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/mixin/ItemInHandRendererMixin.java
+index 0676a80..2b12609 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/mixin/ItemInHandRendererMixin.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/mixin/ItemInHandRendererMixin.java
+@@ -2,7 +2,6 @@ package io.github.r4t2.nilum.fabric.mixin;
+ 
+ import com.mojang.blaze3d.vertex.PoseStack;
+ import com.mojang.math.Axis;
+-import io.github.r4t2.nilum.common.model.BbBonePose;
+ import io.github.r4t2.nilum.common.model.BbElement;
+ import io.github.r4t2.nilum.common.model.BbMatrix4;
+ import io.github.r4t2.nilum.common.model.BbModel;
+@@ -26,6 +25,7 @@ import net.minecraft.world.entity.player.PlayerModelPart;
+ import net.minecraft.world.item.ItemDisplayContext;
+ import net.minecraft.world.item.ItemStack;
+ import org.joml.Matrix4f;
++import org.jspecify.annotations.Nullable;
+ import org.spongepowered.asm.mixin.Mixin;
+ import org.spongepowered.asm.mixin.injection.At;
+ import org.spongepowered.asm.mixin.injection.Inject;
+@@ -59,35 +59,76 @@ public abstract class ItemInHandRendererMixin {
+     private static final float VANILLA_PIVOT_FRACTION_HEIGHT = 2.0F / 12.0F;
+     private static final float VANILLA_PIVOT_FRACTION_DEPTH = 0.5F;
+ 
++    // Each arm box's own geometric center relative to its pivot at local (0,0,0) (right_arm box
++    // (-3,-2,-2) to (1,10,2); left_arm mirrored across width to (-1,-2,-2)-(3,10,2)): used to
++    // re-center the "Left arm" role's 180-degree Z correction below on whichever mesh is actually
++    // being drawn, rather than on the pivot, which sits at a box corner.
++    private static final float VANILLA_ARM_CENTER_X_RIGHT = -1.0F;
++    private static final float VANILLA_ARM_CENTER_X_LEFT = 1.0F;
++    private static final float VANILLA_ARM_CENTER_Y = 4.0F;
++
++    // Conjugating a rotation by this (Sx * R * Sx) mirrors its apparent direction while staying a
++    // proper rotation (determinant +1), so it reorients rather than flips the chirality of
++    // whatever fixed mesh gets drawn through it afterward.
++    private static final BbMatrix4 MIRROR_X = BbMatrix4.scale(-1, 1, 1);
++
+     @Inject(method = "renderArmWithItem(Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;"
+             + "FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;"
+             + "Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V", at = @At("HEAD"), cancellable = true)
+     private void nilum$onRenderArmWithItem(AbstractClientPlayer player, float partialTick, float pitch, InteractionHand hand,
+                                             float attackAnim, ItemStack itemStack, float swapHeightOffset,
+                                             PoseStack poseStack, SubmitNodeCollector collector, int light, CallbackInfo ci) {
+-        if (player.isScoping() || itemStack.isEmpty()) {
++        if (player.isScoping()) {
+             return;
+         }
+ 
+-        String modelId = NilumItemTags.get(itemStack, "nilum:model_id");
+-        if (modelId == null) {
+-            return;
+-        }
+-        BbModel model = NilumFabricClient.MODEL_STORE.model(modelId).orElse(null);
+-        if (model == null) {
+-            return;
+-        }
++        // A marker like "Left arm" can represent the player's own arm (or whatever it's holding)
++        // moving into frame as part of an animation playing on the OTHER hand's item (e.g. a
++        // scanner in the right hand "scanning" the left arm), not just a substitute grip for an
++        // item actually held in this hand. Try this hand's own item first; if it isn't a Nilum
++        // item, or its model has no marker for this hand's role, fall back to borrowing the other
++        // hand's item/animation for the model+pose, but still render only the arm here, never a
++        // second copy of that item.
++        ItemStack drivingStack = itemStack;
++        InteractionHand drivingHand = hand;
++        boolean rendersItem = !itemStack.isEmpty();
++
++        BbModel model = resolveModel(drivingStack);
++        // Marker choice is a fixed ROLE relative to this item ("Right arm" = the hand actually
++        // gripping it, "Left arm" = the other one), not tied to handedness/visual side. A
++        // left-handed player's main hand still grips with "Right arm"; it just renders on the
++        // visual left.
++        String markerGroupName = "Right arm";
++        Optional<BbOutlinerGroup> armBone = model == null ? Optional.empty() : model.findGroup(markerGroupName);
+ 
+-        boolean rightArm = (hand == InteractionHand.MAIN_HAND ? player.getMainArm() : player.getMainArm().getOpposite()) == HumanoidArm.RIGHT;
+-        Optional<BbOutlinerGroup> armBone = model.findGroup(rightArm ? "Right arm" : "Left arm");
+         if (armBone.isEmpty()) {
+-            return;
++            drivingHand = hand == InteractionHand.MAIN_HAND ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
++            drivingStack = player.getItemInHand(drivingHand);
++            model = resolveModel(drivingStack);
++            markerGroupName = "Left arm";
++            armBone = model == null ? Optional.empty() : model.findGroup(markerGroupName);
++            if (armBone.isEmpty()) {
++                return;
++            }
+         }
+ 
++        // Visual side (which physical screen-side this hand renders on) drives the vanilla-mesh
++        // mirroring math below (anchor, pivot fraction, which ModelPart to draw); it must follow
++        // handedness so the correct arm mesh lands on the correct side.
++        boolean rightArm = (hand == InteractionHand.MAIN_HAND ? player.getMainArm() : player.getMainArm().getOpposite()) == HumanoidArm.RIGHT;
++
+         List<BbElement> armElements = model.resolveElements(armBone.get());
+         if (armElements.isEmpty()) {
+             return;
+         }
++
++        boolean drivingRightHand = (drivingHand == InteractionHand.MAIN_HAND
++                ? player.getMainArm() : player.getMainArm().getOpposite()) == HumanoidArm.RIGHT;
++        var animationState = NilumFabricClient.HELD_ITEM_ANIMATIONS.get(player.getUUID(), drivingRightHand, model);
++        if (animationState.isIdle(model, System.currentTimeMillis()) && isHiddenGroup(drivingStack, markerGroupName)) {
++            return;
++        }
++
+         BbElement marker = armElements.get(0);
+         BbVector3 markerOrigin = marker.origin();
+         BbVector3 markerRotation = marker.rotation();
+@@ -98,7 +139,7 @@ public abstract class ItemInHandRendererMixin {
+                 marker.from().y() + VANILLA_PIVOT_FRACTION_HEIGHT * markerSize.y(),
+                 marker.from().z() + VANILLA_PIVOT_FRACTION_DEPTH * markerSize.z());
+ 
+-        Map<String, BbMatrix4> bonePose = BbBonePose.computeAutoLoop(model);
++        Map<String, BbMatrix4> bonePose = animationState.pose(model, System.currentTimeMillis());
+         BbMatrix4 boneWorld = bonePose.get(armBone.get().uuid());
+         if (boneWorld == null) {
+             return;
+@@ -119,26 +160,42 @@ public abstract class ItemInHandRendererMixin {
+                 (float) (markerPivotEquivalent.x() / 16.0), (float) (markerPivotEquivalent.y() / 16.0), (float) (markerPivotEquivalent.z() / 16.0));
+ 
+         float[] attachPoint = boneWorld.transformPoint(localAttach[0], localAttach[1], localAttach[2]);
+-        Matrix4f attachRotation = toJoml(boneWorld);
++        BbMatrix4 rotationSource = boneWorld;
++        if (!drivingRightHand) {
++            // A world-space position from an unmirrored transform mirrors correctly by simply
++            // negating X afterward. Orientation needs the opposite treatment: negating X here too
++            // would double-mirror it back to the original direction, since rotation direction
++            // already flips correctly when the transform itself is conjugated (Sx * M * Sx) below.
++            attachPoint[0] = -attachPoint[0];
++            rotationSource = MIRROR_X.multiply(boneWorld).multiply(MIRROR_X);
++        }
++        Matrix4f attachRotation = toJoml(rotationSource);
+         attachRotation.setTranslation(0, 0, 0);
+         Matrix4f markerRotationJoml = toJoml(BbMatrix4.rotationXYZDegrees(
+                 (float) markerRotation.x(), (float) markerRotation.y(), (float) markerRotation.z()));
+ 
+         ci.cancel();
+ 
+-        ItemDisplayContext displayContext = rightArm ? ItemDisplayContext.FIRST_PERSON_RIGHT_HAND : ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
+-        float anchorX = rightArm ? ITEM_POS_X : -ITEM_POS_X;
+-        float sign = rightArm ? 1.0F : -1.0F;
++        // Anchored on the driving hand's screen side, not this render call's own hand: the arm
++        // marker is a bone within the driving item's own model, animated in that model's local
++        // space, so it must share the driving item's on-screen anchor. For a hand actually
++        // holding its own item, drivingRightHand == rightArm, so this doesn't change that path.
++        ItemDisplayContext displayContext = drivingRightHand ? ItemDisplayContext.FIRST_PERSON_RIGHT_HAND : ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
++        float anchorX = drivingRightHand ? ITEM_POS_X : -ITEM_POS_X;
++        float sign = drivingRightHand ? 1.0F : -1.0F;
+ 
+         // Item: same resting anchor vanilla's own applyItemArmTransform uses, plus the same swing
+         // vanilla's own swingArm applies on attack. Its own first-person display transform is
+         // applied again automatically inside renderItem's normal per-item pipeline, so it must not
+-        // be applied here too, or the item would be double-transformed.
+-        poseStack.pushPose();
+-        poseStack.translate(anchorX, ITEM_POS_Y, ITEM_POS_Z);
+-        applySwing(poseStack, attackAnim, sign);
+-        ((ItemInHandRenderer) (Object) this).renderItem(player, itemStack, displayContext, poseStack, collector, light);
+-        poseStack.popPose();
++        // be applied here too, or the item would be double-transformed. Skipped entirely when this
++        // hand is empty and only borrowing the other hand's item for the arm marker below.
++        if (rendersItem) {
++            poseStack.pushPose();
++            poseStack.translate(anchorX, ITEM_POS_Y, ITEM_POS_Z);
++            applySwing(poseStack, attackAnim, sign);
++            ((ItemInHandRenderer) (Object) this).renderItem(player, itemStack, displayContext, poseStack, collector, light);
++            poseStack.popPose();
++        }
+ 
+         // Arm: same anchor and swing, then the item's display transform, then seated at the
+         // marker's animated world position, oriented by the bone's rotation composed with the
+@@ -146,10 +203,24 @@ public abstract class ItemInHandRendererMixin {
+         poseStack.pushPose();
+         poseStack.translate(anchorX, ITEM_POS_Y, ITEM_POS_Z);
+         applySwing(poseStack, attackAnim, sign);
+-        NilumDisplayTransforms.resolve(model, displayContext.getSerializedName()).apply(!rightArm, poseStack.last());
++        // resolve() already pre-compensates for vanilla's own left-hand auto-mirror, so this is
++        // never mirrored again here regardless of which arm is rendering.
++        NilumDisplayTransforms.resolve(model, displayContext.getSerializedName()).apply(false, poseStack.last());
+         poseStack.translate(attachPoint[0], attachPoint[1], attachPoint[2]);
+         poseStack.mulPose(attachRotation);
+         poseStack.mulPose(markerRotationJoml);
++        if (markerGroupName.equals("Left arm")) {
++            // The "Left arm" role's rotation data reads 180 degrees off on Z unless corrected -
++            // this is tied to the ROLE, not which visual side/mesh it ends up rendering through:
++            // for a left-handed player, "Right arm" (the driving hand) can end up on the left
++            // mesh and "Left arm" on the right mesh, but the correction still only ever applies
++            // to "Left arm". The pivot point for it does depend on the actual mesh being drawn
++            // (each arm box has a different center), so that part still follows rightArm.
++            float centerX = rightArm ? VANILLA_ARM_CENTER_X_RIGHT : VANILLA_ARM_CENTER_X_LEFT;
++            poseStack.translate(centerX / 16.0F, VANILLA_ARM_CENTER_Y / 16.0F, 0.0F);
++            poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
++            poseStack.translate(-centerX / 16.0F, -VANILLA_ARM_CENTER_Y / 16.0F, 0.0F);
++        }
+ 
+         // Scales the vanilla hand mesh to match the marker's own bounding size instead of
+         // always rendering at vanilla's fixed proportions, so a marker drawn bigger or smaller
+@@ -189,6 +260,24 @@ public abstract class ItemInHandRendererMixin {
+         poseStack.popPose();
+     }
+ 
++    private static @Nullable BbModel resolveModel(ItemStack stack) {
++        String modelId = NilumItemTags.get(stack, "nilum:model_id");
++        return modelId == null ? null : NilumFabricClient.MODEL_STORE.model(modelId).orElse(null);
++    }
++
++    private static boolean isHiddenGroup(ItemStack itemStack, String groupName) {
++        String raw = NilumItemTags.get(itemStack, "nilum:hide_groups");
++        if (raw == null) {
++            return false;
++        }
++        for (String name : raw.split(",")) {
++            if (name.trim().equalsIgnoreCase(groupName)) {
++                return true;
++            }
++        }
++        return false;
++    }
++
+     /** Vanilla's own swingArm plus applyItemArmAttackTransform (the WHACK-type attack swing every plain item uses). */
+     private static void applySwing(PoseStack poseStack, float attackAnim, float sign) {
+         float f = -0.4F * Mth.sin(Mth.sqrt(attackAnim) * (float) Math.PI);
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumDisplayTransforms.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumDisplayTransforms.java
+index 9fd7d12..af8d3af 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumDisplayTransforms.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumDisplayTransforms.java
+@@ -23,9 +23,23 @@ public final class NilumDisplayTransforms {
+         BbVector3 translation = fieldOrElse(authored == null ? null : authored.translation(), BbVector3.ZERO);
+         BbVector3 scale = fieldOrElse(authored == null ? null : authored.scale(), new BbVector3(1, 1, 1));
+ 
++        if (isLeftHand(context)) {
++            // Vanilla's own ItemStackRenderState.LayerRenderState.submit() always calls
++            // ItemTransform.apply(displayContext.leftHand(), pose) on whatever we return here,
++            // negating translation.x/rotation.y/rotation.z again for left-hand contexts. Since we
++            // already resolved this context's own authored data, pre-negate the same fields so
++            // that second mirror cancels out and the authored values render unchanged.
++            translation = new BbVector3(-translation.x(), translation.y(), translation.z());
++            rotation = new BbVector3(rotation.x(), -rotation.y(), -rotation.z());
++        }
++
+         return toItemTransform(rotation, translation, scale);
+     }
+ 
++    private static boolean isLeftHand(String context) {
++        return "thirdperson_lefthand".equals(context) || "firstperson_lefthand".equals(context);
++    }
++
+     private static BbVector3 fieldOrElse(Optional<BbVector3> authored, BbVector3 identity) {
+         if (authored != null && authored.isPresent()) {
+             return authored.get();
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumModelItemModel.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumModelItemModel.java
+index fb96e7e..b8bb4dd 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumModelItemModel.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumModelItemModel.java
+@@ -3,21 +3,34 @@ package io.github.r4t2.nilum.fabric.render;
+ import io.github.r4t2.nilum.common.asset.ClientModelStore;
+ import io.github.r4t2.nilum.common.model.BbBakedQuad;
+ import io.github.r4t2.nilum.common.model.BbBakedVertex;
++import io.github.r4t2.nilum.common.model.BbMatrix4;
++import io.github.r4t2.nilum.common.model.BbModel;
++import io.github.r4t2.nilum.common.model.BbOutlinerGroup;
++import io.github.r4t2.nilum.fabric.NilumFabricClient;
+ import net.minecraft.client.multiplayer.ClientLevel;
+ import net.minecraft.client.renderer.item.ItemModel;
+ import net.minecraft.client.renderer.item.ItemModelResolver;
+ import net.minecraft.client.renderer.item.ItemStackRenderState;
+ import net.minecraft.world.entity.ItemOwner;
++import net.minecraft.world.entity.LivingEntity;
+ import net.minecraft.world.item.ItemDisplayContext;
+ import net.minecraft.world.item.ItemStack;
+ import org.jspecify.annotations.Nullable;
+ 
+ import java.util.ArrayList;
++import java.util.EnumSet;
++import java.util.HashSet;
+ import java.util.List;
++import java.util.Map;
++import java.util.Set;
+ 
+ /** Wraps an ItemModel. Draws the model's baked geometry if the stack carries a Nilum full-model tag, otherwise delegates to the wrapped model. */
+ public final class NilumModelItemModel implements ItemModel {
+ 
++    private static final Set<ItemDisplayContext> HELD_CONTEXTS = EnumSet.of(
++            ItemDisplayContext.THIRD_PERSON_LEFT_HAND, ItemDisplayContext.THIRD_PERSON_RIGHT_HAND,
++            ItemDisplayContext.FIRST_PERSON_LEFT_HAND, ItemDisplayContext.FIRST_PERSON_RIGHT_HAND);
++
+     private final ItemModel original;
+     private final ClientModelStore modelStore;
+     private final NilumModelItemSpecialRenderer modelRenderer;
+@@ -52,7 +65,8 @@ public final class NilumModelItemModel implements ItemModel {
+                 // ItemEntityRenderer translates dropped items by -Infinity, making them invisible.
+                 // See vanilla's own SpecialModelWrapper.update(), which does the same setExtents(...) call.
+                 layer.setExtents(() -> modelRenderer.extentsOf(modelId));
+-                layer.setupSpecialModel(modelRenderer, modelId);
++                layer.setupSpecialModel(modelRenderer,
++                        buildRenderArgument(modelId, model, itemStack, displayContext, owner));
+ 
+                 GlintRenderData glint = GlintTagReader.read(itemStack, glintQuadsOf(modelId));
+                 if (glint != null) {
+@@ -71,6 +85,42 @@ public final class NilumModelItemModel implements ItemModel {
+         original.update(state, itemStack, resolver, displayContext, level, owner, seed);
+     }
+ 
++    /** Held-hand contexts get a real per-(holder,hand) trigger state (rest by default); every other context (gui/ground/etc.) has no animation to be mid-trigger on, so it's always at rest and gets hide_groups applied directly. */
++    private NilumModelItemSpecialRenderer.RenderArgument buildRenderArgument(String modelId, BbModel model, ItemStack itemStack,
++                                                                              ItemDisplayContext displayContext, @Nullable ItemOwner owner) {
++        LivingEntity holder = !HELD_CONTEXTS.contains(displayContext) || owner == null ? null : owner.asLivingEntity();
++        if (holder == null) {
++            return new NilumModelItemSpecialRenderer.RenderArgument(modelId, null, hiddenBoneUuidsFor(model, itemStack));
++        }
++
++        boolean rightHand = !displayContext.leftHand();
++        NilumFabricClient.HELD_ITEM_ANIMATIONS.noteCurrentModel(holder.getUUID(), rightHand, modelId);
++        var animationState = NilumFabricClient.HELD_ITEM_ANIMATIONS.get(holder.getUUID(), rightHand, model);
++        Map<String, BbMatrix4> bonePose = animationState.pose(model, System.currentTimeMillis());
++
++        Set<String> hiddenBoneUuids = animationState.isIdle(model, System.currentTimeMillis())
++                ? hiddenBoneUuidsFor(model, itemStack)
++                : Set.of();
++
++        return new NilumModelItemSpecialRenderer.RenderArgument(modelId, bonePose, hiddenBoneUuids);
++    }
++
++    private static Set<String> hiddenBoneUuidsFor(BbModel model, ItemStack itemStack) {
++        String raw = NilumItemTags.get(itemStack, "nilum:hide_groups");
++        if (raw == null || raw.isBlank()) {
++            return Set.of();
++        }
++        Set<String> uuids = new HashSet<>();
++        for (String name : raw.split(",")) {
++            String trimmed = name.trim();
++            if (trimmed.isEmpty()) {
++                continue;
++            }
++            model.findGroup(trimmed).map(BbOutlinerGroup::uuid).ifPresent(uuids::add);
++        }
++        return uuids;
++    }
++
+     private List<GlintQuad> glintQuadsOf(String modelId) {
+         var quadsByTexture = modelStore.bakedQuadsByTexture(modelId).orElse(null);
+         if (quadsByTexture == null) {
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumModelItemSpecialRenderer.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumModelItemSpecialRenderer.java
+index 158387b..edf90ac 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumModelItemSpecialRenderer.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/render/NilumModelItemSpecialRenderer.java
+@@ -18,13 +18,22 @@ import net.minecraft.world.item.ItemStack;
+ import org.joml.Vector3f;
+ import org.joml.Vector3fc;
+ 
++import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
++import java.util.Set;
+ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.function.Consumer;
+ 
+ /** Draws a Nilum full-.bbmodel item as its actual baked geometry, the same quads the in-world entity renderer draws. */
+-public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer<String> {
++public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer<NilumModelItemSpecialRenderer.RenderArgument> {
++
++    /**
++     * @param bonePose        null falls back to auto-looping the model's first animation (non-held contexts: gui/ground/etc.)
++     * @param hiddenBoneUuids bones to exclude entirely, e.g. a held item at rest with configured hide_groups
++     */
++    public record RenderArgument(String modelId, Map<String, BbMatrix4> bonePose, Set<String> hiddenBoneUuids) {
++    }
+ 
+     private final ClientModelStore modelStore;
+     private final TextureUploader textureUploader;
+@@ -36,19 +45,25 @@ public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer
+     }
+ 
+     @Override
+-    public void submit(String modelId, ItemDisplayContext itemDisplayContext, PoseStack poseStack,
++    public void submit(RenderArgument argument, ItemDisplayContext itemDisplayContext, PoseStack poseStack,
+                         SubmitNodeCollector collector, int light, int overlay, boolean hasFoil, int seed) {
+-        if (modelId == null) {
++        if (argument == null) {
+             return;
+         }
++        String modelId = argument.modelId();
+ 
+         BbModel model = modelStore.model(modelId).orElse(null);
+         Map<String, List<BbBakedQuad>> quadsByBone = modelStore.bakedQuadsByBone(modelId).orElse(null);
+         if (model == null || quadsByBone == null) {
+             return;
+         }
++        if (!argument.hiddenBoneUuids().isEmpty()) {
++            Map<String, List<BbBakedQuad>> filtered = new HashMap<>(quadsByBone);
++            argument.hiddenBoneUuids().forEach(filtered::remove);
++            quadsByBone = filtered;
++        }
+ 
+-        Map<String, BbMatrix4> bonePose = BbBonePose.computeAutoLoop(model);
++        Map<String, BbMatrix4> bonePose = argument.bonePose() != null ? argument.bonePose() : BbBonePose.computeAutoLoop(model);
+         List<BbBakedQuad> posed = BbPosedModel.apply(quadsByBone, bonePose);
+         Map<Integer, List<BbBakedQuad>> quadsByTexture = NilumModelGeometry.groupByTexture(posed);
+ 
+@@ -117,7 +132,7 @@ public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer
+     }
+ 
+     @Override
+-    public String extractArgument(ItemStack itemStack) {
++    public RenderArgument extractArgument(ItemStack itemStack) {
+         return null;
+     }
+ }
+diff --git a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/ui/NilumCustomUiScreen.java b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/ui/NilumCustomUiScreen.java
+index 74a09c1..7f76991 100644
+--- a/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/ui/NilumCustomUiScreen.java
++++ b/nilum-fabric/src/main/java/io/github/r4t2/nilum/fabric/ui/NilumCustomUiScreen.java
+@@ -1,12 +1,30 @@
+ package io.github.r4t2.nilum.fabric.ui;
+ 
++import io.github.r4t2.nilum.common.expr.ExprEvaluator;
++import io.github.r4t2.nilum.common.expr.ExprNode;
++import io.github.r4t2.nilum.common.expr.ExprParser;
++import io.github.r4t2.nilum.common.expr.TextValueSource;
++import io.github.r4t2.nilum.common.expr.ValueSource;
++import io.github.r4t2.nilum.common.protocol.UiButtonClickedPacket;
+ import io.github.r4t2.nilum.common.protocol.UiClosedPacket;
++import io.github.r4t2.nilum.common.ui.UiAnchor;
+ import io.github.r4t2.nilum.common.ui.UiDescriptor;
+ import io.github.r4t2.nilum.common.ui.UiElement;
++import io.github.r4t2.nilum.fabric.NilumFabricClient;
++import io.github.r4t2.nilum.fabric.NilumFabricMod;
++import io.github.r4t2.nilum.fabric.hud.ClientVarStore;
++import io.github.r4t2.nilum.fabric.hud.HudHeadText;
++import io.github.r4t2.nilum.fabric.hud.NilumHudTextValueSource;
++import io.github.r4t2.nilum.fabric.hud.NilumHudValueSource;
++import io.github.r4t2.nilum.fabric.network.NilumUiButtonClickedPayload;
+ import io.github.r4t2.nilum.fabric.network.NilumUiClosedPayload;
+ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.Font;
+ import net.minecraft.client.gui.GuiGraphics;
+ import net.minecraft.client.gui.screens.Screen;
++import net.minecraft.client.input.MouseButtonEvent;
++import net.minecraft.client.player.LocalPlayer;
+ import net.minecraft.client.renderer.RenderPipelines;
+ import net.minecraft.network.chat.Component;
+ 
+@@ -15,15 +33,42 @@ import java.util.Comparator;
+ import java.util.List;
+ import java.util.Map;
+ 
+-/** Renders a Custom UI's layers by z-order. Buttons don't respond to clicks or requirement conditions yet, layout only. */
++/** Renders a Custom UI's layers by z-order and handles button clicks. Requirement-based visibility isn't wired up yet. */
+ public final class NilumCustomUiScreen extends Screen {
+ 
+-    private record RenderableLayer(int x, int y, int layer, CustomUi.TextureRef texture) {
++    private sealed interface RenderableLayer {
++        String elementId();
++
++        int x();
++
++        int y();
++
++        int layer();
++
++        int width();
++
++        int height();
++
++        record Sprite(String elementId, int x, int y, int layer, int width, int height,
++                      CustomUi.TextureRef texture, CustomUi.TextureRef pressedTexture) implements RenderableLayer {
++            boolean isButton() {
++                return pressedTexture != null;
++            }
++        }
++
++        record TextLayer(String elementId, int x, int y, int layer, int width, int height,
++                          Font font, Component value, int color) implements RenderableLayer {
++        }
++
++        default boolean contains(double mouseX, double mouseY) {
++            return mouseX >= x() && mouseX < x() + width() && mouseY >= y() && mouseY < y() + height();
++        }
+     }
+ 
+     private final String uiId;
+     private final CustomUi customUi;
+     private final List<RenderableLayer> layers = new ArrayList<>();
++    private String pressedElementId;
+ 
+     public NilumCustomUiScreen(String uiId, CustomUi customUi) {
+         super(Component.literal("Nilum UI: " + uiId));
+@@ -35,26 +80,163 @@ public final class NilumCustomUiScreen extends Screen {
+     protected void init() {
+         layers.clear();
+         UiDescriptor descriptor = customUi.descriptor();
++        LocalPlayer player = Minecraft.getInstance().player;
++        ValueSource valueSource = player == null ? null : new NilumHudValueSource(player, new ClientVarStore());
++        TextValueSource textSource = player == null ? null : new NilumHudTextValueSource(player);
++
+         for (Map.Entry<String, UiElement> entry : descriptor.elements().entrySet()) {
+             UiElement element = entry.getValue();
++            if (element instanceof UiElement.Text text) {
++                addTextLayer(entry.getKey(), text, valueSource, textSource);
++                continue;
++            }
++            if (element instanceof UiElement.Head head) {
++                addHeadLayer(entry.getKey(), head);
++                continue;
++            }
+             String imageFile = switch (element) {
+                 case UiElement.Image image -> image.imageFile();
+                 case UiElement.Button button -> button.imageFile();
++                case UiElement.Text ignored -> throw new IllegalStateException("handled above");
++                case UiElement.Head ignored -> throw new IllegalStateException("handled above");
+             };
+-            customUi.textureFor(imageFile).ifPresent(texture ->
+-                    layers.add(new RenderableLayer(element.x(), element.y(), element.layer(), texture)));
++            CustomUi.TextureRef pressedTexture = element instanceof UiElement.Button button
++                    ? customUi.textureFor(button.pressedImageFile()).orElse(null)
++                    : null;
++            customUi.textureFor(imageFile).ifPresentOrElse(
++                    texture -> layers.add(new RenderableLayer.Sprite(entry.getKey(), element.x(), element.y(),
++                            element.layer(), texture.width(), texture.height(), texture, pressedTexture)),
++                    () -> NilumFabricMod.LOGGER.warn("Custom UI '" + uiId + "' element '" + entry.getKey()
++                            + "' references image '" + imageFile + "', which the server never sent; "
++                            + "check the server console for a missing-texture warning when it loaded this UI."));
+         }
++
++        if (descriptor.anchor() == UiAnchor.CENTER) {
++            recenter();
++        }
++
+         layers.sort(Comparator.comparingInt(RenderableLayer::layer));
++        if (layers.isEmpty()) {
++            NilumFabricMod.LOGGER.warn("Custom UI '" + uiId + "' opened with zero renderable layers.");
++        }
++    }
++
++    private void addTextLayer(String elementId, UiElement.Text text, ValueSource valueSource, TextValueSource textSource) {
++        String raw;
++        if (text.text().isPresent()) {
++            raw = text.text().get();
++        } else if (valueSource == null || textSource == null) {
++            raw = "";
++        } else {
++            ExprNode node = ExprParser.parse(text.clientConnector().orElseThrow());
++            raw = ExprEvaluator.evaluateText(node, valueSource, textSource, 0);
++        }
++        Component value = HudHeadText.containsHeadTag(raw) ? HudHeadText.parse(raw) : Component.literal(raw);
++
++        Font font = resolveFont(text.font());
++        layers.add(new RenderableLayer.TextLayer(elementId, text.x(), text.y(), text.layer(),
++                font.width(value), font.lineHeight, font, value, text.color()));
++    }
++
++    private void addHeadLayer(String elementId, UiElement.Head head) {
++        Component value = HudHeadText.parse("<head:" + head.player() + ">");
++        Font font = resolveFont("default");
++        layers.add(new RenderableLayer.TextLayer(elementId, head.x(), head.y(), head.layer(),
++                font.width(value), font.lineHeight, font, value, 0xFFFFFFFF));
++    }
++
++    private static Font resolveFont(String fontId) {
++        if ("default".equals(fontId)) {
++            return Minecraft.getInstance().font;
++        }
++        return NilumFabricClient.FONT_STORE.get(fontId).orElseGet(() -> Minecraft.getInstance().font);
++    }
++
++    /** Shifts every layer by the same offset so the bounding box of all of them, keeping their authored
++     *  positions relative to each other, lands centered on the current screen size. */
++    private void recenter() {
++        if (layers.isEmpty()) {
++            return;
++        }
++        int minX = Integer.MAX_VALUE;
++        int minY = Integer.MAX_VALUE;
++        int maxX = Integer.MIN_VALUE;
++        int maxY = Integer.MIN_VALUE;
++        for (RenderableLayer layer : layers) {
++            minX = Math.min(minX, layer.x());
++            minY = Math.min(minY, layer.y());
++            maxX = Math.max(maxX, layer.x() + layer.width());
++            maxY = Math.max(maxY, layer.y() + layer.height());
++        }
++
++        int offsetX = (width - (maxX - minX)) / 2 - minX;
++        int offsetY = (height - (maxY - minY)) / 2 - minY;
++
++        List<RenderableLayer> recentered = new ArrayList<>(layers.size());
++        for (RenderableLayer layer : layers) {
++            recentered.add(switch (layer) {
++                case RenderableLayer.Sprite sprite -> new RenderableLayer.Sprite(sprite.elementId(),
++                        sprite.x() + offsetX, sprite.y() + offsetY, sprite.layer(), sprite.width(), sprite.height(),
++                        sprite.texture(), sprite.pressedTexture());
++                case RenderableLayer.TextLayer text -> new RenderableLayer.TextLayer(text.elementId(),
++                        text.x() + offsetX, text.y() + offsetY, text.layer(), text.width(), text.height(),
++                        text.font(), text.value(), text.color());
++            });
++        }
++        layers.clear();
++        layers.addAll(recentered);
+     }
+ 
+     @Override
+     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+         super.render(graphics, mouseX, mouseY, partialTick);
+         for (RenderableLayer layer : layers) {
+-            CustomUi.TextureRef texture = layer.texture();
+-            graphics.blit(RenderPipelines.GUI_TEXTURED, texture.id(), layer.x(), layer.y(),
+-                    0, 0, texture.width(), texture.height(), texture.width(), texture.height());
++            switch (layer) {
++                case RenderableLayer.Sprite sprite -> {
++                    CustomUi.TextureRef texture = sprite.isButton() && sprite.elementId().equals(pressedElementId)
++                            ? sprite.pressedTexture() : sprite.texture();
++                    graphics.blit(RenderPipelines.GUI_TEXTURED, texture.id(), sprite.x(), sprite.y(),
++                            0, 0, texture.width(), texture.height(), texture.width(), texture.height());
++                }
++                case RenderableLayer.TextLayer text ->
++                        graphics.drawString(text.font(), text.value(), text.x(), text.y(), text.color());
++            }
++        }
++    }
++
++    private RenderableLayer.Sprite topButtonAt(double mouseX, double mouseY) {
++        for (int i = layers.size() - 1; i >= 0; i--) {
++            if (layers.get(i) instanceof RenderableLayer.Sprite sprite && sprite.isButton() && sprite.contains(mouseX, mouseY)) {
++                return sprite;
++            }
++        }
++        return null;
++    }
++
++    @Override
++    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
++        if (event.button() == 0) {
++            RenderableLayer.Sprite hit = topButtonAt(event.x(), event.y());
++            if (hit != null) {
++                pressedElementId = hit.elementId();
++                return true;
++            }
++        }
++        return super.mouseClicked(event, doubleClick);
++    }
++
++    @Override
++    public boolean mouseReleased(MouseButtonEvent event) {
++        if (event.button() == 0 && pressedElementId != null) {
++            RenderableLayer.Sprite released = topButtonAt(event.x(), event.y());
++            if (released != null && released.elementId().equals(pressedElementId)) {
++                ClientPlayNetworking.send(new NilumUiButtonClickedPayload(
++                        new UiButtonClickedPacket(uiId, pressedElementId).encode()));
++            }
++            pressedElementId = null;
++            return true;
+         }
++        return super.mouseReleased(event);
+     }
+ 
+     @Override
+diff --git a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/NilumNeoForgeClient.java b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/NilumNeoForgeClient.java
+index 1c0c0c3..3a5559b 100644
+--- a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/NilumNeoForgeClient.java
++++ b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/NilumNeoForgeClient.java
+@@ -5,9 +5,12 @@ import io.github.r4t2.nilum.common.asset.AssetSyncSession;
+ import io.github.r4t2.nilum.common.asset.ClientModelStore;
+ import io.github.r4t2.nilum.common.logging.NilumLogger;
+ import io.github.r4t2.nilum.common.model.BbModel;
++import io.github.r4t2.nilum.common.model.ClientHeldItemAnimationStates;
+ import io.github.r4t2.nilum.common.model.ClientModelPlacements;
+ import io.github.r4t2.nilum.common.protocol.ActivateShaderPackPacket;
++import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
+ import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
++import io.github.r4t2.nilum.common.protocol.ItemDefinedAssetsPacket;
+ import io.github.r4t2.nilum.common.protocol.AtlasPatchPacket;
+ import io.github.r4t2.nilum.common.protocol.BlockAnimationPlayPacket;
+ import io.github.r4t2.nilum.common.protocol.BlockAnimationStopPacket;
+@@ -20,6 +23,8 @@ import io.github.r4t2.nilum.common.protocol.HelloPacket;
+ import io.github.r4t2.nilum.common.protocol.HudFrameOverridePacket;
+ import io.github.r4t2.nilum.common.protocol.HudFramePacket;
+ import io.github.r4t2.nilum.common.protocol.HudFrameReleasePacket;
++import io.github.r4t2.nilum.common.protocol.ItemAnimationPlayPacket;
++import io.github.r4t2.nilum.common.protocol.ItemAnimationStopPacket;
+ import io.github.r4t2.nilum.common.protocol.ModEntry;
+ import io.github.r4t2.nilum.common.protocol.ModListPacket;
+ import io.github.r4t2.nilum.common.protocol.ModelSpawnPacket;
+@@ -33,6 +38,7 @@ import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
+ import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
+ import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
+ import io.github.r4t2.nilum.common.util.SemanticVersions;
++import io.github.r4t2.nilum.common.util.ServerCacheId;
+ import io.github.r4t2.nilum.neoforge.block.ClientBlockRegistry;
+ import io.github.r4t2.nilum.neoforge.block.NilumBlockEntity;
+ import io.github.r4t2.nilum.neoforge.block.NilumBlockEntityRenderer;
+@@ -53,6 +59,7 @@ import io.github.r4t2.nilum.neoforge.hud.HudAtlasRenderer;
+ import io.github.r4t2.nilum.neoforge.keybind.NilumKeybinds;
+ import io.github.r4t2.nilum.neoforge.network.NilumActivateShaderPackPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
++import io.github.r4t2.nilum.neoforge.network.NilumItemDefinedAssetsPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumAtlasPatchPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationPlayPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationStopPayload;
+@@ -65,6 +72,8 @@ import io.github.r4t2.nilum.neoforge.network.NilumHelloPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumHudFrameOverridePayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumHudFramePayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumHudFrameReleasePayload;
++import io.github.r4t2.nilum.neoforge.network.NilumItemAnimationPlayPayload;
++import io.github.r4t2.nilum.neoforge.network.NilumItemAnimationStopPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumModListPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumModListRequestPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
+@@ -119,9 +128,11 @@ final class NilumNeoForgeClient {
+     }
+ 
+     static void register(IEventBus modEventBus, NilumLogger logger, String modVersion) {
+-        AssetCache assetCache = new AssetCache(FMLPaths.CONFIGDIR.get().resolve("nilum-cache"));
++        Path assetCacheRoot = FMLPaths.CONFIGDIR.get().resolve("nilum-cache");
++        AssetCache assetCache = new AssetCache(assetCacheRoot);
+         ClientModelStore modelStore = new ClientModelStore();
+         ClientModelPlacements placements = new ClientModelPlacements();
++        ClientHeldItemAnimationStates heldItemAnimations = new ClientHeldItemAnimationStates();
+         IconAtlas iconAtlas = new IconAtlas(
+                 FMLPaths.CONFIGDIR.get().resolve("nilum-cache").resolve("icon_atlas_debug.png"), logger);
+         ClientHudAtlasStore hudAtlases = new ClientHudAtlasStore(logger);
+@@ -164,7 +175,8 @@ final class NilumNeoForgeClient {
+         };
+ 
+         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
+-                shaderPackSink, fontSink, customUiStore::add, logger);
++                shaderPackSink, fontSink, customUiStore::add, logger,
++                runnable -> Minecraft.getInstance().execute(runnable));
+         TextureUploader textureUploader = new TextureUploader();
+         // A model reloading with new bytes under the same id (e.g. a default-retexture block
+         // after a blocktextures/ edit) must drop any already-uploaded GPU textures for it, or
+@@ -195,7 +207,7 @@ final class NilumNeoForgeClient {
+             Map<Identifier, ItemModel> models = event.getBakingResult().itemStackModels();
+             models.replaceAll((id, original) -> new NilumModelItemModel(
+                     new NilumIconItemModel(original, iconAtlas, iconRenderer, glintRenderer),
+-                    modelStore, modelRenderer, glintRenderer));
++                    modelStore, modelRenderer, glintRenderer, heldItemAnimations));
+ 
+             event.getBakingResult().blockStateModels().replaceAll((state, original) ->
+                     new NilumBlockStateModel(original, blockRegistry));
+@@ -214,10 +226,18 @@ final class NilumNeoForgeClient {
+         NeoForge.EVENT_BUS.addListener((RenderLevelStageEvent.AfterEntities event) -> blockRenderer.render(event));
+ 
+         modEventBus.addListener((RegisterClientPayloadHandlersEvent event) -> {
+-            event.register(NilumHelloPayload.TYPE, (payload, context) -> handleHello(payload, context, logger, modVersion));
++            event.register(NilumHelloPayload.TYPE, (payload, context) ->
++                    handleHello(payload, context, logger, modVersion, assetCache, assetCacheRoot));
+             event.register(NilumTcpOfferPayload.TYPE, (payload, context) -> handleTcpOffer(payload, logger, assetSync));
+-            event.register(NilumAssetManifestPayload.TYPE, (payload, context) ->
+-                    assetSync.onManifest(AssetManifestPacket.decode(payload.data()).entries()));
++            event.register(NilumAssetManifestPayload.TYPE, (payload, context) -> {
++                List<AssetManifestEntry> entries = AssetManifestPacket.decode(payload.data()).entries();
++                logger.info("Received asset manifest from the server: " + entries.size() + " entries.");
++                assetSync.onManifest(entries);
++            });
++            event.register(NilumItemDefinedAssetsPayload.TYPE, (payload, context) -> {
++                ItemDefinedAssetsPacket packet = ItemDefinedAssetsPacket.decode(payload.data());
++                NilumCreativeTabs.setItemDefinedAssets(packet.models(), packet.icons());
++            });
+             event.register(NilumModelSpawnPayload.TYPE, (payload, context) -> {
+                 ModelSpawnPacket spawn = ModelSpawnPacket.decode(payload.data());
+                 placements.put(spawn.entityId(), spawn.modelId());
+@@ -259,7 +279,7 @@ final class NilumNeoForgeClient {
+             event.register(NilumOpenUiPayload.TYPE, (payload, context) -> {
+                 OpenUiPacket packet = OpenUiPacket.decode(payload.data());
+                 customUiStore.get(packet.uiId()).ifPresentOrElse(
+-                        ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui)),
++                        ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui, logger, fontStore)),
+                         () -> logger.warn("Server opened custom UI '" + packet.uiId()
+                                 + "' but it isn't cached on this client yet."));
+             });
+@@ -302,6 +322,23 @@ final class NilumNeoForgeClient {
+                     blockRegistry.animationState(pos).stop(model, System.currentTimeMillis());
+                 }
+             });
++            event.register(NilumItemAnimationPlayPayload.TYPE, (payload, context) -> {
++                ItemAnimationPlayPacket packet = ItemAnimationPlayPacket.decode(payload.data());
++                String modelId = heldItemAnimations.currentModelId(packet.holderId(), packet.rightHand());
++                BbModel model = modelId == null ? null : modelStore.model(modelId).orElse(null);
++                if (model != null) {
++                    heldItemAnimations.get(packet.holderId(), packet.rightHand(), model)
++                            .play(model, packet.animationName(), packet.startTimeMillis(), System.currentTimeMillis());
++                }
++            });
++            event.register(NilumItemAnimationStopPayload.TYPE, (payload, context) -> {
++                ItemAnimationStopPacket packet = ItemAnimationStopPacket.decode(payload.data());
++                String modelId = heldItemAnimations.currentModelId(packet.holderId(), packet.rightHand());
++                BbModel model = modelId == null ? null : modelStore.model(modelId).orElse(null);
++                if (model != null) {
++                    heldItemAnimations.get(packet.holderId(), packet.rightHand(), model).stop(model, System.currentTimeMillis());
++                }
++            });
+             event.register(NilumChunkBlocksPayload.TYPE, (payload, context) -> {
+                 ChunkBlocksPacket packet = ChunkBlocksPacket.decode(payload.data());
+                 blockRegistry.apply(packet.entries());
+@@ -329,9 +366,14 @@ final class NilumNeoForgeClient {
+         return null;
+     }
+ 
+-    private static void handleHello(NilumHelloPayload payload, IPayloadContext context, NilumLogger logger, String modVersion) {
++    private static void handleHello(NilumHelloPayload payload, IPayloadContext context, NilumLogger logger, String modVersion,
++                                     AssetCache assetCache, Path assetCacheRoot) {
+         HelloPacket hello = HelloPacket.decode(payload.data());
+ 
++        String serverId = ServerCacheId.sanitize(Minecraft.getInstance().getCurrentServer() == null
++                ? null : Minecraft.getInstance().getCurrentServer().ip);
++        assetCache.rebase(assetCacheRoot.resolve(serverId));
++
+         if (SemanticVersions.isNewer(modVersion, hello.serverModVersion())) {
+             logger.warn("This Nilum client (" + modVersion + ") is newer than the server ("
+                     + hello.serverModVersion() + "), some features may not be available.");
+@@ -350,23 +392,25 @@ final class NilumNeoForgeClient {
+         // context.reply() works regardless of phase; ClientPacketDistributor doesn't, it
+         // requires Minecraft.getInstance().getConnection(), which is null during configuration.
+         context.reply(new NilumHelloAckPayload(ack.encode()));
++        logger.info("Nilum server detected (server " + hello.serverModVersion()
++                + ", client " + modVersion + "), handshake acknowledged.");
+     }
+ 
+     private static void handleTcpOffer(NilumTcpOfferPayload payload, NilumLogger logger, AssetSyncSession assetSync) {
+         TcpOfferPacket offer = TcpOfferPacket.decode(payload.data());
++        logger.info("Received TCP side-channel offer from the server: " + offer.host() + ":" + offer.port() + ".");
+ 
+         // NilumTcpClient.connect blocks until success/timeout; never call it on the
+         // network callback thread, that would stall all other packet handling.
+         Thread.ofVirtual().start(() -> {
+             Socket socket = NilumTcpClient.connect(offer.host(), offer.port(), offer.token(),
+-                    TCP_CONNECT_TIMEOUT_MILLIS);
++                    TCP_CONNECT_TIMEOUT_MILLIS, logger);
+ 
+             if (socket != null) {
+                 logger.info("TCP side-channel connected to " + offer.host() + ":" + offer.port() + ".");
+                 assetSync.onTcpConnected(socket);
+             } else {
+-                logger.warn("Couldn't reach the TCP side-channel at " + offer.host() + ":" + offer.port()
+-                        + ", falling back to plugin-channel transfer for this session.");
++                logger.warn("Falling back to plugin-channel transfer for this session.");
+                 ClientPacketDistributor.sendToServer(
+                         new NilumTcpUnavailablePayload(new TcpUnavailablePacket().encode()));
+             }
+diff --git a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/NilumNeoForgeMod.java b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/NilumNeoForgeMod.java
+index b70679a..bafc8fb 100644
+--- a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/NilumNeoForgeMod.java
++++ b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/NilumNeoForgeMod.java
+@@ -9,12 +9,15 @@ import io.github.r4t2.nilum.neoforge.block.NilumBlocks;
+ import io.github.r4t2.nilum.neoforge.logging.NeoForgeLogSink;
+ import io.github.r4t2.nilum.neoforge.network.NilumActivateShaderPackPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
++import io.github.r4t2.nilum.neoforge.network.NilumItemDefinedAssetsPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumAtlasPatchPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationPlayPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationStopPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumChunkBlocksPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumDeactivateShaderPackPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumEntityAnimationPlayPayload;
++import io.github.r4t2.nilum.neoforge.network.NilumItemAnimationPlayPayload;
++import io.github.r4t2.nilum.neoforge.network.NilumItemAnimationStopPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumEntityAnimationStopPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumHelloAckPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumHelloPayload;
+@@ -33,6 +36,7 @@ import io.github.r4t2.nilum.neoforge.network.NilumSetClientVarPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumSetHudTextPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
++import io.github.r4t2.nilum.neoforge.network.NilumUiButtonClickedPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumUiClosedPayload;
+ import net.minecraft.server.level.ServerPlayer;
+ import net.neoforged.api.distmarker.Dist;
+@@ -119,6 +123,7 @@ public final class NilumNeoForgeMod {
+         registrar.playToServer(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC,
+                 (payload, context) -> tcpUnavailableHandler.accept((ServerPlayer) context.player()));
+         registrar.playToClient(NilumAssetManifestPayload.TYPE, NilumAssetManifestPayload.CODEC);
++        registrar.playToClient(NilumItemDefinedAssetsPayload.TYPE, NilumItemDefinedAssetsPayload.CODEC);
+         registrar.playToClient(NilumModelSpawnPayload.TYPE, NilumModelSpawnPayload.CODEC);
+         registrar.playToClient(NilumModListRequestPayload.TYPE, NilumModListRequestPayload.CODEC);
+         // Only Paper's HandshakeListener currently requests/processes mod lists; a NeoForge-hosted
+@@ -137,6 +142,8 @@ public final class NilumNeoForgeMod {
+         registrar.playToClient(NilumEntityAnimationStopPayload.TYPE, NilumEntityAnimationStopPayload.CODEC);
+         registrar.playToClient(NilumBlockAnimationPlayPayload.TYPE, NilumBlockAnimationPlayPayload.CODEC);
+         registrar.playToClient(NilumBlockAnimationStopPayload.TYPE, NilumBlockAnimationStopPayload.CODEC);
++        registrar.playToClient(NilumItemAnimationPlayPayload.TYPE, NilumItemAnimationPlayPayload.CODEC);
++        registrar.playToClient(NilumItemAnimationStopPayload.TYPE, NilumItemAnimationStopPayload.CODEC);
+         registrar.playToServer(NilumKeybindPayload.TYPE, NilumKeybindPayload.CODEC, (payload, context) -> { });
+         // Paper still needs this: real registry access doesn't exist there, so it always proxies a
+         // vanilla material and streams the overlay position/model over this same wire format.
+@@ -145,6 +152,7 @@ public final class NilumNeoForgeMod {
+         // Custom UI open/close is Skript/Paper-only for now, a NeoForge-hosted server has no
+         // consumer for this, same as keybinds above.
+         registrar.playToServer(NilumUiClosedPayload.TYPE, NilumUiClosedPayload.CODEC, (payload, context) -> { });
++        registrar.playToServer(NilumUiButtonClickedPayload.TYPE, NilumUiButtonClickedPayload.CODEC, (payload, context) -> { });
+         registrar.playToClient(NilumSetHudAtlasVisibilityPayload.TYPE, NilumSetHudAtlasVisibilityPayload.CODEC);
+         registrar.playToClient(NilumSetHudElementVisibilityPayload.TYPE, NilumSetHudElementVisibilityPayload.CODEC);
+     }
+diff --git a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/creativetab/NilumCreativeTabs.java b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/creativetab/NilumCreativeTabs.java
+index 81aedda..612f197 100644
+--- a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/creativetab/NilumCreativeTabs.java
++++ b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/creativetab/NilumCreativeTabs.java
+@@ -1,6 +1,7 @@
+ package io.github.r4t2.nilum.neoforge.creativetab;
+ 
+ import io.github.r4t2.nilum.common.asset.ClientModelStore;
++import io.github.r4t2.nilum.common.protocol.ItemPreviewEntry;
+ import io.github.r4t2.nilum.neoforge.render.IconAtlas;
+ import net.minecraft.core.registries.Registries;
+ import net.minecraft.network.chat.Component;
+@@ -15,10 +16,12 @@ import net.neoforged.neoforge.registries.DeferredRegister;
+ import java.util.List;
+ import java.util.concurrent.CopyOnWriteArrayList;
+ 
+-/** Four fixed Nilum creative tabs. Custom Items stays empty until something calls addCustomItem. */
++/** Four fixed Nilum creative tabs. Custom Items lists addCustomItem() entries plus every model/icon the server says has a real item definition. */
+ public final class NilumCreativeTabs {
+ 
+     private static final List<ItemStack> CUSTOM_ITEMS = new CopyOnWriteArrayList<>();
++    private static volatile List<ItemPreviewEntry> itemDefinedModels = List.of();
++    private static volatile List<ItemPreviewEntry> itemDefinedIcons = List.of();
+ 
+     private static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, "nilum");
+ 
+@@ -62,14 +65,21 @@ public final class NilumCreativeTabs {
+                 for (String iconId : iconAtlas.iconIds()) {
+                     event.accept(NilumTaggedItems.iconItem(Items.PAPER, iconId));
+                 }
+-            } else if (event.getTabKey().equals(MODELS.getKey())) {
+-                for (String modelId : modelStore.modelIds()) {
+-                    event.accept(NilumTaggedItems.modelItem(Items.PAPER, modelId));
+-                }
+             } else if (event.getTabKey().equals(CUSTOM_ITEMS_TAB.getKey())) {
++                // Deliberately not auto-populated from modelStore.modelIds()/iconAtlas.iconIds() for
++                // MODELS/ITEMS: a loaded model or icon isn't necessarily meant to be a standalone item
++                // (block-only models, skeleton overrides, hand-IK calibration rigs). Only ids the
++                // server confirms have a real items/*.yml definition (see setItemDefinedAssets) show
++                // up here.
+                 for (ItemStack stack : CUSTOM_ITEMS) {
+                     event.accept(stack);
+                 }
++                for (ItemPreviewEntry preview : itemDefinedModels) {
++                    event.accept(NilumTaggedItems.modelItem(Items.PAPER, preview));
++                }
++                for (ItemPreviewEntry preview : itemDefinedIcons) {
++                    event.accept(NilumTaggedItems.iconItem(Items.PAPER, preview));
++                }
+             }
+         });
+     }
+@@ -78,4 +88,10 @@ public final class NilumCreativeTabs {
+     public static void addCustomItem(ItemStack stack) {
+         CUSTOM_ITEMS.add(stack);
+     }
++
++    /** Which loaded models/icons the server says have a real item definition, with their name/lore/hide_groups; drives the "Nilum Custom Items" tab. */
++    public static void setItemDefinedAssets(List<ItemPreviewEntry> models, List<ItemPreviewEntry> icons) {
++        itemDefinedModels = List.copyOf(models);
++        itemDefinedIcons = List.copyOf(icons);
++    }
+ }
+diff --git a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/creativetab/NilumTaggedItems.java b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/creativetab/NilumTaggedItems.java
+index ded20a7..58da0cd 100644
+--- a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/creativetab/NilumTaggedItems.java
++++ b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/creativetab/NilumTaggedItems.java
+@@ -1,10 +1,13 @@
+ package io.github.r4t2.nilum.neoforge.creativetab;
+ 
++import io.github.r4t2.nilum.common.protocol.ItemPreviewEntry;
+ import net.minecraft.core.component.DataComponents;
+ import net.minecraft.nbt.CompoundTag;
++import net.minecraft.network.chat.Component;
+ import net.minecraft.world.item.Item;
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.component.CustomData;
++import net.minecraft.world.item.component.ItemLore;
+ 
+ /** Builds representative ItemStacks for Nilum's creative tabs, tagged the same way Paper serializes a PersistentDataContainer. */
+ final class NilumTaggedItems {
+@@ -14,21 +17,42 @@ final class NilumTaggedItems {
+     private NilumTaggedItems() {
+     }
+ 
++    /** Bare tag only, no name/lore/hide_groups; used for the generic "Items" icon-atlas tab, which isn't backed by a real item definition. */
+     static ItemStack iconItem(Item baseMaterial, String iconId) {
+-        return tagged(baseMaterial, "nilum:icon_id", iconId);
++        return tagged(baseMaterial, "nilum:icon_id", iconId, null);
+     }
+ 
+-    static ItemStack modelItem(Item baseMaterial, String modelId) {
+-        return tagged(baseMaterial, "nilum:model_id", modelId);
++    /** Full preview (name, lore, hide_groups) from a real item definition; used for the "Nilum Custom Items" tab. */
++    static ItemStack modelItem(Item baseMaterial, ItemPreviewEntry preview) {
++        return tagged(baseMaterial, "nilum:model_id", preview.assetId(), preview);
+     }
+ 
+-    private static ItemStack tagged(Item baseMaterial, String key, String value) {
++    static ItemStack iconItem(Item baseMaterial, ItemPreviewEntry preview) {
++        return tagged(baseMaterial, "nilum:icon_id", preview.assetId(), preview);
++    }
++
++    private static ItemStack tagged(Item baseMaterial, String key, String value, ItemPreviewEntry preview) {
+         ItemStack stack = new ItemStack(baseMaterial);
+         CompoundTag publicValues = new CompoundTag();
+         publicValues.putString(key, value);
++        if (preview != null && !preview.hideGroups().isEmpty()) {
++            publicValues.putString("nilum:hide_groups", String.join(",", preview.hideGroups()));
++        }
+         CompoundTag customData = new CompoundTag();
+         customData.put(PUBLIC_BUKKIT_VALUES, publicValues);
+         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(customData));
++
++        if (preview != null && !preview.displayName().isBlank()) {
++            stack.set(DataComponents.CUSTOM_NAME, legacy(preview.displayName()));
++        }
++        if (preview != null && !preview.lore().isEmpty()) {
++            stack.set(DataComponents.LORE, new ItemLore(preview.lore().stream().map(NilumTaggedItems::legacy).toList()));
++        }
+         return stack;
+     }
++
++    /** item.yml text uses '&' legacy color codes (matching the server's LegacyComponentSerializer); vanilla's own text layout already re-parses embedded section-sign codes. */
++    private static Component legacy(String text) {
++        return Component.literal(text.replace('&', '§'));
++    }
+ }
+diff --git a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/handshake/NeoForgeServerHandshake.java b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/handshake/NeoForgeServerHandshake.java
+index 3f9d17c..b0820ae 100644
+--- a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/handshake/NeoForgeServerHandshake.java
++++ b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/handshake/NeoForgeServerHandshake.java
+@@ -105,7 +105,7 @@ public final class NeoForgeServerHandshake {
+         String bindAddress = configManager.get(TcpConfig.BIND_ADDRESS);
+         int configuredPort = configManager.get(TcpConfig.PORT);
+ 
+-        NilumTcpServer server = new NilumTcpServer(this::onTcpConnected);
++        NilumTcpServer server = new NilumTcpServer(logger, this::onTcpConnected);
+         try {
+             int boundPort = server.start(bindAddress, configuredPort);
+             tcpServer = server;
+@@ -161,7 +161,7 @@ public final class NeoForgeServerHandshake {
+     private void onTcpConnected(UUID playerId, Socket socket) {
+         tcpConnections.put(playerId, socket);
+         logger.info("TCP side-channel connected for " + playerId + ", serving asset requests.");
+-        NilumTcpAssetServer.serve(socket, assetHost::assetBytes);
++        NilumTcpAssetServer.serve(socket, logger, assetHost::assetBytes);
+     }
+ 
+     private void onJoin(ServerPlayer player) {
+@@ -169,6 +169,7 @@ public final class NeoForgeServerHandshake {
+         if (server != null) {
+             UUID playerId = player.getUUID();
+             String token = server.offerConnection(playerId);
++            logger.info("Offering TCP side-channel " + tcpAdvertisedHost + ":" + tcpPort + " to " + player.getName().getString() + ".");
+             PacketDistributor.sendToPlayer(player, new NilumTcpOfferPayload(
+                     new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode()));
+         }
+diff --git a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumDisplayTransforms.java b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumDisplayTransforms.java
+index 80686da..0790b04 100644
+--- a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumDisplayTransforms.java
++++ b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumDisplayTransforms.java
+@@ -23,9 +23,23 @@ public final class NilumDisplayTransforms {
+         BbVector3 translation = fieldOrElse(authored == null ? null : authored.translation(), BbVector3.ZERO);
+         BbVector3 scale = fieldOrElse(authored == null ? null : authored.scale(), new BbVector3(1, 1, 1));
+ 
++        if (isLeftHand(context)) {
++            // Vanilla's own ItemStackRenderState.LayerRenderState.submit() always calls
++            // ItemTransform.apply(displayContext.leftHand(), pose) on whatever we return here,
++            // negating translation.x/rotation.y/rotation.z again for left-hand contexts. Since we
++            // already resolved this context's own authored data, pre-negate the same fields so
++            // that second mirror cancels out and the authored values render unchanged.
++            translation = new BbVector3(-translation.x(), translation.y(), translation.z());
++            rotation = new BbVector3(rotation.x(), -rotation.y(), -rotation.z());
++        }
++
+         return toItemTransform(rotation, translation, scale);
+     }
+ 
++    private static boolean isLeftHand(String context) {
++        return "thirdperson_lefthand".equals(context) || "firstperson_lefthand".equals(context);
++    }
++
+     private static BbVector3 fieldOrElse(Optional<BbVector3> authored, BbVector3 identity) {
+         if (authored != null && authored.isPresent()) {
+             return authored.get();
+diff --git a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumModelItemModel.java b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumModelItemModel.java
+index 2d6471b..74a6832 100644
+--- a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumModelItemModel.java
++++ b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumModelItemModel.java
+@@ -3,32 +3,47 @@ package io.github.r4t2.nilum.neoforge.render;
+ import io.github.r4t2.nilum.common.asset.ClientModelStore;
+ import io.github.r4t2.nilum.common.model.BbBakedQuad;
+ import io.github.r4t2.nilum.common.model.BbBakedVertex;
++import io.github.r4t2.nilum.common.model.BbMatrix4;
++import io.github.r4t2.nilum.common.model.BbModel;
++import io.github.r4t2.nilum.common.model.BbOutlinerGroup;
++import io.github.r4t2.nilum.common.model.ClientHeldItemAnimationStates;
+ import net.minecraft.client.multiplayer.ClientLevel;
+ import net.minecraft.client.renderer.item.ItemModel;
+ import net.minecraft.client.renderer.item.ItemModelResolver;
+ import net.minecraft.client.renderer.item.ItemStackRenderState;
+ import net.minecraft.world.entity.ItemOwner;
++import net.minecraft.world.entity.LivingEntity;
+ import net.minecraft.world.item.ItemDisplayContext;
+ import net.minecraft.world.item.ItemStack;
+ import org.jspecify.annotations.Nullable;
+ 
+ import java.util.ArrayList;
++import java.util.EnumSet;
++import java.util.HashSet;
+ import java.util.List;
++import java.util.Map;
++import java.util.Set;
+ 
+ /** Wraps an ItemModel. Draws the model's baked geometry if the stack carries a Nilum full-model tag, otherwise delegates to the wrapped model. */
+ public final class NilumModelItemModel implements ItemModel {
+ 
++    private static final Set<ItemDisplayContext> HELD_CONTEXTS = EnumSet.of(
++            ItemDisplayContext.THIRD_PERSON_LEFT_HAND, ItemDisplayContext.THIRD_PERSON_RIGHT_HAND,
++            ItemDisplayContext.FIRST_PERSON_LEFT_HAND, ItemDisplayContext.FIRST_PERSON_RIGHT_HAND);
++
+     private final ItemModel original;
+     private final ClientModelStore modelStore;
+     private final NilumModelItemSpecialRenderer modelRenderer;
+     private final NilumGlintSpecialRenderer glintRenderer;
++    private final ClientHeldItemAnimationStates heldItemAnimations;
+ 
+     public NilumModelItemModel(ItemModel original, ClientModelStore modelStore, NilumModelItemSpecialRenderer modelRenderer,
+-                                NilumGlintSpecialRenderer glintRenderer) {
++                                NilumGlintSpecialRenderer glintRenderer, ClientHeldItemAnimationStates heldItemAnimations) {
+         this.original = original;
+         this.modelStore = modelStore;
+         this.modelRenderer = modelRenderer;
+         this.glintRenderer = glintRenderer;
++        this.heldItemAnimations = heldItemAnimations;
+     }
+ 
+     @Override
+@@ -52,7 +67,8 @@ public final class NilumModelItemModel implements ItemModel {
+                 // ItemEntityRenderer translates dropped items by -Infinity, making them invisible.
+                 // See vanilla's own SpecialModelWrapper.update(), which does the same setExtents(...) call.
+                 layer.setExtents(() -> modelRenderer.extentsOf(modelId));
+-                layer.setupSpecialModel(modelRenderer, modelId);
++                layer.setupSpecialModel(modelRenderer,
++                        buildRenderArgument(modelId, model, itemStack, displayContext, owner));
+ 
+                 GlintRenderData glint = GlintTagReader.read(itemStack, glintQuadsOf(modelId));
+                 if (glint != null) {
+@@ -71,6 +87,42 @@ public final class NilumModelItemModel implements ItemModel {
+         original.update(state, itemStack, resolver, displayContext, level, owner, seed);
+     }
+ 
++    /** Held-hand contexts get a real per-(holder,hand) trigger state (rest by default); every other context (gui/ground/etc.) has no animation to be mid-trigger on, so it's always at rest and gets hide_groups applied directly. */
++    private NilumModelItemSpecialRenderer.RenderArgument buildRenderArgument(String modelId, BbModel model, ItemStack itemStack,
++                                                                              ItemDisplayContext displayContext, @Nullable ItemOwner owner) {
++        LivingEntity holder = !HELD_CONTEXTS.contains(displayContext) || owner == null ? null : owner.asLivingEntity();
++        if (holder == null) {
++            return new NilumModelItemSpecialRenderer.RenderArgument(modelId, null, hiddenBoneUuidsFor(model, itemStack));
++        }
++
++        boolean rightHand = !displayContext.leftHand();
++        heldItemAnimations.noteCurrentModel(holder.getUUID(), rightHand, modelId);
++        var animationState = heldItemAnimations.get(holder.getUUID(), rightHand, model);
++        Map<String, BbMatrix4> bonePose = animationState.pose(model, System.currentTimeMillis());
++
++        Set<String> hiddenBoneUuids = animationState.isIdle(model, System.currentTimeMillis())
++                ? hiddenBoneUuidsFor(model, itemStack)
++                : Set.of();
++
++        return new NilumModelItemSpecialRenderer.RenderArgument(modelId, bonePose, hiddenBoneUuids);
++    }
++
++    private static Set<String> hiddenBoneUuidsFor(BbModel model, ItemStack itemStack) {
++        String raw = NilumItemTags.get(itemStack, "nilum:hide_groups");
++        if (raw == null || raw.isBlank()) {
++            return Set.of();
++        }
++        Set<String> uuids = new HashSet<>();
++        for (String name : raw.split(",")) {
++            String trimmed = name.trim();
++            if (trimmed.isEmpty()) {
++                continue;
++            }
++            model.findGroup(trimmed).map(BbOutlinerGroup::uuid).ifPresent(uuids::add);
++        }
++        return uuids;
++    }
++
+     private List<GlintQuad> glintQuadsOf(String modelId) {
+         var quadsByTexture = modelStore.bakedQuadsByTexture(modelId).orElse(null);
+         if (quadsByTexture == null) {
+diff --git a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumModelItemSpecialRenderer.java b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumModelItemSpecialRenderer.java
+index 62c83f5..bf26379 100644
+--- a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumModelItemSpecialRenderer.java
++++ b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/render/NilumModelItemSpecialRenderer.java
+@@ -18,13 +18,22 @@ import net.minecraft.world.item.ItemStack;
+ import org.joml.Vector3f;
+ import org.joml.Vector3fc;
+ 
++import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
++import java.util.Set;
+ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.function.Consumer;
+ 
+ /** Draws a Nilum full-.bbmodel item as its actual baked geometry, the same quads the in-world entity renderer draws. */
+-public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer<String> {
++public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer<NilumModelItemSpecialRenderer.RenderArgument> {
++
++    /**
++     * @param bonePose        null falls back to auto-looping the model's first animation (non-held contexts: gui/ground/etc.)
++     * @param hiddenBoneUuids bones to exclude entirely, e.g. a held item at rest with configured hide_groups
++     */
++    public record RenderArgument(String modelId, Map<String, BbMatrix4> bonePose, Set<String> hiddenBoneUuids) {
++    }
+ 
+     private final ClientModelStore modelStore;
+     private final TextureUploader textureUploader;
+@@ -36,19 +45,25 @@ public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer
+     }
+ 
+     @Override
+-    public void submit(String modelId, ItemDisplayContext itemDisplayContext, PoseStack poseStack,
++    public void submit(RenderArgument argument, ItemDisplayContext itemDisplayContext, PoseStack poseStack,
+                         SubmitNodeCollector collector, int light, int overlay, boolean hasFoil, int seed) {
+-        if (modelId == null) {
++        if (argument == null) {
+             return;
+         }
++        String modelId = argument.modelId();
+ 
+         BbModel model = modelStore.model(modelId).orElse(null);
+         Map<String, List<BbBakedQuad>> quadsByBone = modelStore.bakedQuadsByBone(modelId).orElse(null);
+         if (model == null || quadsByBone == null) {
+             return;
+         }
++        if (!argument.hiddenBoneUuids().isEmpty()) {
++            Map<String, List<BbBakedQuad>> filtered = new HashMap<>(quadsByBone);
++            argument.hiddenBoneUuids().forEach(filtered::remove);
++            quadsByBone = filtered;
++        }
+ 
+-        Map<String, BbMatrix4> bonePose = BbBonePose.computeAutoLoop(model);
++        Map<String, BbMatrix4> bonePose = argument.bonePose() != null ? argument.bonePose() : BbBonePose.computeAutoLoop(model);
+         List<BbBakedQuad> posed = BbPosedModel.apply(quadsByBone, bonePose);
+         Map<Integer, List<BbBakedQuad>> quadsByTexture = NilumModelGeometry.groupByTexture(posed);
+ 
+@@ -117,7 +132,7 @@ public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer
+     }
+ 
+     @Override
+-    public String extractArgument(ItemStack itemStack) {
++    public RenderArgument extractArgument(ItemStack itemStack) {
+         return null;
+     }
+ }
+diff --git a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/ui/NilumCustomUiScreen.java b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/ui/NilumCustomUiScreen.java
+index f7d861a..6c5fa89 100644
+--- a/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/ui/NilumCustomUiScreen.java
++++ b/nilum-neoforge/src/main/java/io/github/r4t2/nilum/neoforge/ui/NilumCustomUiScreen.java
+@@ -1,11 +1,29 @@
+ package io.github.r4t2.nilum.neoforge.ui;
+ 
++import io.github.r4t2.nilum.common.expr.ExprEvaluator;
++import io.github.r4t2.nilum.common.expr.ExprNode;
++import io.github.r4t2.nilum.common.expr.ExprParser;
++import io.github.r4t2.nilum.common.expr.TextValueSource;
++import io.github.r4t2.nilum.common.expr.ValueSource;
++import io.github.r4t2.nilum.common.logging.NilumLogger;
++import io.github.r4t2.nilum.common.protocol.UiButtonClickedPacket;
+ import io.github.r4t2.nilum.common.protocol.UiClosedPacket;
++import io.github.r4t2.nilum.common.ui.UiAnchor;
+ import io.github.r4t2.nilum.common.ui.UiDescriptor;
+ import io.github.r4t2.nilum.common.ui.UiElement;
++import io.github.r4t2.nilum.neoforge.font.ClientFontStore;
++import io.github.r4t2.nilum.neoforge.hud.ClientVarStore;
++import io.github.r4t2.nilum.neoforge.hud.HudHeadText;
++import io.github.r4t2.nilum.neoforge.hud.NilumHudTextValueSource;
++import io.github.r4t2.nilum.neoforge.hud.NilumHudValueSource;
++import io.github.r4t2.nilum.neoforge.network.NilumUiButtonClickedPayload;
+ import io.github.r4t2.nilum.neoforge.network.NilumUiClosedPayload;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.Font;
+ import net.minecraft.client.gui.GuiGraphics;
+ import net.minecraft.client.gui.screens.Screen;
++import net.minecraft.client.input.MouseButtonEvent;
++import net.minecraft.client.player.LocalPlayer;
+ import net.minecraft.client.renderer.RenderPipelines;
+ import net.minecraft.network.chat.Component;
+ import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+@@ -15,46 +33,214 @@ import java.util.Comparator;
+ import java.util.List;
+ import java.util.Map;
+ 
+-/** Renders a Custom UI's layers by z-order. Buttons don't respond to clicks or requirement conditions yet, layout only. */
++/** Renders a Custom UI's layers by z-order and handles button clicks. Requirement-based visibility isn't wired up yet. */
+ public final class NilumCustomUiScreen extends Screen {
+ 
+-    private record RenderableLayer(int x, int y, int layer, CustomUi.TextureRef texture) {
++    private sealed interface RenderableLayer {
++        String elementId();
++
++        int x();
++
++        int y();
++
++        int layer();
++
++        int width();
++
++        int height();
++
++        record Sprite(String elementId, int x, int y, int layer, int width, int height,
++                      CustomUi.TextureRef texture, CustomUi.TextureRef pressedTexture) implements RenderableLayer {
++            boolean isButton() {
++                return pressedTexture != null;
++            }
++        }
++
++        record TextLayer(String elementId, int x, int y, int layer, int width, int height,
++                          Font font, Component value, int color) implements RenderableLayer {
++        }
++
++        default boolean contains(double mouseX, double mouseY) {
++            return mouseX >= x() && mouseX < x() + width() && mouseY >= y() && mouseY < y() + height();
++        }
+     }
+ 
+     private final String uiId;
+     private final CustomUi customUi;
++    private final NilumLogger logger;
++    private final ClientFontStore fontStore;
+     private final List<RenderableLayer> layers = new ArrayList<>();
++    private String pressedElementId;
+ 
+-    public NilumCustomUiScreen(String uiId, CustomUi customUi) {
++    public NilumCustomUiScreen(String uiId, CustomUi customUi, NilumLogger logger, ClientFontStore fontStore) {
+         super(Component.literal("Nilum UI: " + uiId));
+         this.uiId = uiId;
+         this.customUi = customUi;
++        this.logger = logger;
++        this.fontStore = fontStore;
+     }
+ 
+     @Override
+     protected void init() {
+         layers.clear();
+         UiDescriptor descriptor = customUi.descriptor();
++        LocalPlayer player = Minecraft.getInstance().player;
++        ValueSource valueSource = player == null ? null : new NilumHudValueSource(player, new ClientVarStore(), logger);
++        TextValueSource textSource = player == null ? null : new NilumHudTextValueSource(player, logger);
++
+         for (Map.Entry<String, UiElement> entry : descriptor.elements().entrySet()) {
+             UiElement element = entry.getValue();
++            if (element instanceof UiElement.Text text) {
++                addTextLayer(entry.getKey(), text, valueSource, textSource);
++                continue;
++            }
++            if (element instanceof UiElement.Head head) {
++                addHeadLayer(entry.getKey(), head);
++                continue;
++            }
+             String imageFile = switch (element) {
+                 case UiElement.Image image -> image.imageFile();
+                 case UiElement.Button button -> button.imageFile();
++                case UiElement.Text ignored -> throw new IllegalStateException("handled above");
++                case UiElement.Head ignored -> throw new IllegalStateException("handled above");
+             };
+-            customUi.textureFor(imageFile).ifPresent(texture ->
+-                    layers.add(new RenderableLayer(element.x(), element.y(), element.layer(), texture)));
++            CustomUi.TextureRef pressedTexture = element instanceof UiElement.Button button
++                    ? customUi.textureFor(button.pressedImageFile()).orElse(null)
++                    : null;
++            customUi.textureFor(imageFile).ifPresentOrElse(
++                    texture -> layers.add(new RenderableLayer.Sprite(entry.getKey(), element.x(), element.y(),
++                            element.layer(), texture.width(), texture.height(), texture, pressedTexture)),
++                    () -> logger.warn("Custom UI '" + uiId + "' element '" + entry.getKey()
++                            + "' references image '" + imageFile + "', which the server never sent; "
++                            + "check the server console for a missing-texture warning when it loaded this UI."));
+         }
++
++        if (descriptor.anchor() == UiAnchor.CENTER) {
++            recenter();
++        }
++
+         layers.sort(Comparator.comparingInt(RenderableLayer::layer));
++        if (layers.isEmpty()) {
++            logger.warn("Custom UI '" + uiId + "' opened with zero renderable layers.");
++        }
++    }
++
++    private void addTextLayer(String elementId, UiElement.Text text, ValueSource valueSource, TextValueSource textSource) {
++        String raw;
++        if (text.text().isPresent()) {
++            raw = text.text().get();
++        } else if (valueSource == null || textSource == null) {
++            raw = "";
++        } else {
++            ExprNode node = ExprParser.parse(text.clientConnector().orElseThrow());
++            raw = ExprEvaluator.evaluateText(node, valueSource, textSource, 0);
++        }
++        Component value = HudHeadText.containsHeadTag(raw) ? HudHeadText.parse(raw) : Component.literal(raw);
++
++        Font font = resolveFont(text.font());
++        layers.add(new RenderableLayer.TextLayer(elementId, text.x(), text.y(), text.layer(),
++                font.width(value), font.lineHeight, font, value, text.color()));
++    }
++
++    private void addHeadLayer(String elementId, UiElement.Head head) {
++        Component value = HudHeadText.parse("<head:" + head.player() + ">");
++        Font font = resolveFont("default");
++        layers.add(new RenderableLayer.TextLayer(elementId, head.x(), head.y(), head.layer(),
++                font.width(value), font.lineHeight, font, value, 0xFFFFFFFF));
++    }
++
++    private Font resolveFont(String fontId) {
++        if ("default".equals(fontId)) {
++            return Minecraft.getInstance().font;
++        }
++        return fontStore.get(fontId).orElseGet(() -> Minecraft.getInstance().font);
++    }
++
++    /** Shifts every layer by the same offset so the bounding box of all of them, keeping their authored
++     *  positions relative to each other, lands centered on the current screen size. */
++    private void recenter() {
++        if (layers.isEmpty()) {
++            return;
++        }
++        int minX = Integer.MAX_VALUE;
++        int minY = Integer.MAX_VALUE;
++        int maxX = Integer.MIN_VALUE;
++        int maxY = Integer.MIN_VALUE;
++        for (RenderableLayer layer : layers) {
++            minX = Math.min(minX, layer.x());
++            minY = Math.min(minY, layer.y());
++            maxX = Math.max(maxX, layer.x() + layer.width());
++            maxY = Math.max(maxY, layer.y() + layer.height());
++        }
++
++        int offsetX = (width - (maxX - minX)) / 2 - minX;
++        int offsetY = (height - (maxY - minY)) / 2 - minY;
++
++        List<RenderableLayer> recentered = new ArrayList<>(layers.size());
++        for (RenderableLayer layer : layers) {
++            recentered.add(switch (layer) {
++                case RenderableLayer.Sprite sprite -> new RenderableLayer.Sprite(sprite.elementId(),
++                        sprite.x() + offsetX, sprite.y() + offsetY, sprite.layer(), sprite.width(), sprite.height(),
++                        sprite.texture(), sprite.pressedTexture());
++                case RenderableLayer.TextLayer text -> new RenderableLayer.TextLayer(text.elementId(),
++                        text.x() + offsetX, text.y() + offsetY, text.layer(), text.width(), text.height(),
++                        text.font(), text.value(), text.color());
++            });
++        }
++        layers.clear();
++        layers.addAll(recentered);
+     }
+ 
+     @Override
+     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+         super.render(graphics, mouseX, mouseY, partialTick);
+         for (RenderableLayer layer : layers) {
+-            CustomUi.TextureRef texture = layer.texture();
+-            graphics.blit(RenderPipelines.GUI_TEXTURED, texture.id(), layer.x(), layer.y(),
+-                    0, 0, texture.width(), texture.height(), texture.width(), texture.height());
++            switch (layer) {
++                case RenderableLayer.Sprite sprite -> {
++                    CustomUi.TextureRef texture = sprite.isButton() && sprite.elementId().equals(pressedElementId)
++                            ? sprite.pressedTexture() : sprite.texture();
++                    graphics.blit(RenderPipelines.GUI_TEXTURED, texture.id(), sprite.x(), sprite.y(),
++                            0, 0, texture.width(), texture.height(), texture.width(), texture.height());
++                }
++                case RenderableLayer.TextLayer text ->
++                        graphics.drawString(text.font(), text.value(), text.x(), text.y(), text.color());
++            }
++        }
++    }
++
++    private RenderableLayer.Sprite topButtonAt(double mouseX, double mouseY) {
++        for (int i = layers.size() - 1; i >= 0; i--) {
++            if (layers.get(i) instanceof RenderableLayer.Sprite sprite && sprite.isButton() && sprite.contains(mouseX, mouseY)) {
++                return sprite;
++            }
++        }
++        return null;
++    }
++
++    @Override
++    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
++        if (event.button() == 0) {
++            RenderableLayer.Sprite hit = topButtonAt(event.x(), event.y());
++            if (hit != null) {
++                pressedElementId = hit.elementId();
++                return true;
++            }
++        }
++        return super.mouseClicked(event, doubleClick);
++    }
++
++    @Override
++    public boolean mouseReleased(MouseButtonEvent event) {
++        if (event.button() == 0 && pressedElementId != null) {
++            RenderableLayer.Sprite released = topButtonAt(event.x(), event.y());
++            if (released != null && released.elementId().equals(pressedElementId)) {
++                ClientPacketDistributor.sendToServer(new NilumUiButtonClickedPayload(
++                        new UiButtonClickedPacket(uiId, pressedElementId).encode()));
++            }
++            pressedElementId = null;
++            return true;
+         }
++        return super.mouseReleased(event);
+     }
+ 
+     @Override
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumCommand.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumCommand.java
+index fe0859a..1662a4e 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumCommand.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumCommand.java
+@@ -53,7 +53,8 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
+             }
+             case "reload" -> reload(sender, args);
+             case "placemodel" -> placeModel(sender, args);
+-            case "giveitem" -> giveItem(sender, args);
++            case "giveitem" -> giveItemDef(sender, args);
++            case "givemodel" -> giveModel(sender, args);
+             case "giveicon" -> giveIcon(sender, args);
+             case "hudframe" -> hudFrame(sender, args);
+             case "placeblock" -> placeBlock(sender, args);
+@@ -78,7 +79,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
+         return switch (subcommand) {
+             case "reload" -> "nilum.command.reload";
+             case "placemodel", "giveskeleton", "playanim", "stopanim" -> "nilum.command.model";
+-            case "giveitem", "giveicon", "giveitemdef" -> "nilum.command.item";
++            case "giveitem", "givemodel", "giveicon", "giveitemdef" -> "nilum.command.item";
+             case "placeblock", "removeblock", "playblockanim", "stopblockanim" -> "nilum.command.block";
+             case "hudframe" -> "nilum.command.hud";
+             case "shaderpack" -> "nilum.command.shaderpack";
+@@ -102,13 +103,14 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
+         sender.sendMessage(Component.text(
+                 "/nilum placemodel <modelId> [x] [y] [z] [yaw] [pitch] -> Place a model. "
+                         + "Coordinates and rotation default to ~ (your position/facing)."));
+-        sender.sendMessage(Component.text("/nilum giveitem <modelId> [material] -> Give yourself a custom item."));
++        sender.sendMessage(Component.text("/nilum giveitem <id> -> Give yourself a defined item (name/lore/enchants included)."));
++        sender.sendMessage(Component.text(
++                "/nilum givemodel <modelId> [material] -> Give yourself a raw model item, no item definition needed."));
+         sender.sendMessage(Component.text("/nilum giveicon <iconId> [material] -> Give yourself an icon-only custom item."));
+         sender.sendMessage(Component.text("/nilum hudframe <atlasId>:<elementId> <frame> -> Set a HUD frame for yourself."));
+         sender.sendMessage(Component.text(
+                 "/nilum placeblock <blockId> [x] [y] [z] -> Place a real, rendered custom block."));
+         sender.sendMessage(Component.text("/nilum removeblock [x] [y] [z] -> Remove a Nilum block."));
+-        sender.sendMessage(Component.text("/nilum giveitemdef <id> -> Give yourself a defined item (name/lore/enchants included)."));
+         sender.sendMessage(Component.text(
+                 "/nilum shaderpack <id>|off [player] -> Switch yourself (or another online player) to a Nilum "
+                         + "shaderpack, or back to normal. Needs Iris."));
+@@ -419,13 +421,13 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
+         return Double.parseDouble(arg);
+     }
+ 
+-    private boolean giveItem(CommandSender sender, String[] args) {
++    private boolean giveModel(CommandSender sender, String[] args) {
+         if (!(sender instanceof Player player)) {
+             sender.sendMessage(Component.text("Only a player can be given an item."));
+             return true;
+         }
+         if (args.length < 2) {
+-            sender.sendMessage(Component.text("Usage: /nilum giveitem <modelId> [material]"));
++            sender.sendMessage(Component.text("Usage: /nilum givemodel <modelId> [material]"));
+             return true;
+         }
+ 
+@@ -556,7 +558,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
+     @Override
+     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+         if (args.length == 1) {
+-            return filterByPrefix(List.of("ver", "help", "reload", "placemodel", "giveitem", "giveicon",
++            return filterByPrefix(List.of("ver", "help", "reload", "placemodel", "giveitem", "givemodel", "giveicon",
+                     "hudframe", "placeblock", "removeblock", "giveitemdef", "shaderpack", "giveskeleton",
+                     "playanim", "stopanim", "playblockanim", "stopblockanim"), args[0]);
+         }
+@@ -565,11 +567,11 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
+             return switch (args[0].toLowerCase(Locale.ROOT)) {
+                 case "reload" -> filterByPrefix(
+                         List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "tcp", "config", "ui"), args[1]);
+-                case "placemodel", "giveitem", "giveskeleton" -> filterByPrefix(plugin.models().modelIds(), args[1]);
++                case "placemodel", "givemodel", "giveskeleton" -> filterByPrefix(plugin.models().modelIds(), args[1]);
+                 case "placeblock" -> filterByPrefix(plugin.blockDefinitions().blockIds(), args[1]);
+                 case "playanim", "stopanim" -> filterByPrefix(List.of("self"), args[1]);
+                 case "giveicon" -> filterByPrefix(plugin.icons().iconIds(), args[1]);
+-                case "giveitemdef" -> filterByPrefix(plugin.items().itemIds(), args[1]);
++                case "giveitem", "giveitemdef" -> filterByPrefix(plugin.items().itemIds(), args[1]);
+                 case "hudframe" -> filterByPrefix(plugin.hudAtlases().atlasIds().stream()
+                         .map(id -> id + ":").toList(), args[1]);
+                 case "shaderpack" -> {
+@@ -581,7 +583,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
+             };
+         }
+ 
+-        if (args.length == 3 && (args[0].equalsIgnoreCase("giveitem") || args[0].equalsIgnoreCase("giveicon"))) {
++        if (args.length == 3 && (args[0].equalsIgnoreCase("givemodel") || args[0].equalsIgnoreCase("giveicon"))) {
+             return filterByPrefix(Arrays.stream(Material.values()).map(Material::name).toList(), args[2]);
+         }
+ 
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumKeys.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumKeys.java
+index 56fcc4f..3cd14be 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumKeys.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumKeys.java
+@@ -11,6 +11,7 @@ public final class NilumKeys {
+     public static final NamespacedKey GLINT_INTENSITY = new NamespacedKey("nilum", "glint_intensity");
+     public static final NamespacedKey GLINT_SPEED = new NamespacedKey("nilum", "glint_speed");
+     public static final NamespacedKey GLINT_TEXTURE = new NamespacedKey("nilum", "glint_texture");
++    public static final NamespacedKey HIDE_GROUPS = new NamespacedKey("nilum", "hide_groups");
+ 
+     private NilumKeys() {
+     }
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumPlugin.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumPlugin.java
+index 3da1ab1..0a48baa 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumPlugin.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/NilumPlugin.java
+@@ -115,6 +115,8 @@ public final class NilumPlugin extends JavaPlugin {
+         logger = new NilumLogger(new PaperConsoleSink(), getDataFolder().toPath().resolve("logs").resolve("nilum.log"),
+                 LoggingConfig.destinationLookup(configManager), configManager.get(LoggingConfig.MAX_LOG_FILES));
+ 
++        DefaultAssetInstaller.install(this, logger);
++
+         handshakeListener = new HandshakeListener(this, logger, configManager);
+ 
+         modelRegistry = new ModelRegistry();
+@@ -169,14 +171,18 @@ public final class NilumPlugin extends JavaPlugin {
+         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ENTITY_ANIMATION_STOP_QUALIFIED);
+         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.BLOCK_ANIMATION_PLAY_QUALIFIED);
+         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.BLOCK_ANIMATION_STOP_QUALIFIED);
++        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ITEM_ANIMATION_PLAY_QUALIFIED);
++        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ITEM_ANIMATION_STOP_QUALIFIED);
+         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.OPEN_UI_QUALIFIED);
+         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_HUD_ATLAS_VISIBILITY_QUALIFIED);
+         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_HUD_ELEMENT_VISIBILITY_QUALIFIED);
++        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ITEM_DEFINED_ASSETS_QUALIFIED);
+         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.HELLO_ACK_QUALIFIED, handshakeListener);
+         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.TCP_UNAVAILABLE_QUALIFIED, handshakeListener);
+         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.MOD_LIST_QUALIFIED, handshakeListener);
+         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.KEYBIND_QUALIFIED, handshakeListener);
+         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.UI_CLOSED_QUALIFIED, handshakeListener);
++        getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.UI_BUTTON_CLICKED_QUALIFIED, handshakeListener);
+         getServer().getPluginManager().registerEvents(handshakeListener, this);
+         getServer().getPluginManager().registerEvents(new CustomBlockChunkSync(this, customBlockRegistry), this);
+         getServer().getPluginManager().registerEvents(
+@@ -329,6 +335,7 @@ public final class NilumPlugin extends JavaPlugin {
+         try {
+             itemDefinitionRegistry.loadDirectory(getDataFolder().toPath().resolve("items"));
+             logger.info("Loaded " + itemDefinitionRegistry.itemIds().size() + " item definition(s) from the items folder.");
++            handshakeListener.broadcastItemDefinedAssets();
+             return true;
+         } catch (IOException e) {
+             logger.error("Failed to reload the items folder", e);
+@@ -400,6 +407,10 @@ public final class NilumPlugin extends JavaPlugin {
+         return handshakeListener;
+     }
+ 
++    public NilumLogger logger() {
++        return logger;
++    }
++
+     public ModelRegistry models() {
+         return modelRegistry;
+     }
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/animation/AnimationService.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/animation/AnimationService.java
+index 9924b2e..96bb6df 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/animation/AnimationService.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/animation/AnimationService.java
+@@ -4,10 +4,13 @@ import io.github.r4t2.nilum.common.protocol.BlockAnimationPlayPacket;
+ import io.github.r4t2.nilum.common.protocol.BlockAnimationStopPacket;
+ import io.github.r4t2.nilum.common.protocol.EntityAnimationPlayPacket;
+ import io.github.r4t2.nilum.common.protocol.EntityAnimationStopPacket;
++import io.github.r4t2.nilum.common.protocol.ItemAnimationPlayPacket;
++import io.github.r4t2.nilum.common.protocol.ItemAnimationStopPacket;
+ import io.github.r4t2.nilum.common.protocol.NilumChannels;
+ import io.github.r4t2.nilum.paper.NilumPlugin;
+ import org.bukkit.Location;
+ import org.bukkit.entity.Player;
++import org.bukkit.inventory.MainHand;
+ 
+ import java.util.UUID;
+ 
+@@ -40,6 +43,22 @@ public final class AnimationService {
+                 location.getBlockX(), location.getBlockY(), location.getBlockZ()).encode());
+     }
+ 
++    /** mainHand is the caller's intent ("their main hand"); resolved here to the visual left/right side the client keys state by. */
++    public void playHeldItemAnimation(Player player, boolean mainHand, String animationName) {
++        broadcast(NilumChannels.ITEM_ANIMATION_PLAY_QUALIFIED, new ItemAnimationPlayPacket(
++                player.getUniqueId(), resolveVisualRightHand(player, mainHand), animationName, System.currentTimeMillis()).encode());
++    }
++
++    public void stopHeldItemAnimation(Player player, boolean mainHand) {
++        broadcast(NilumChannels.ITEM_ANIMATION_STOP_QUALIFIED, new ItemAnimationStopPacket(
++                player.getUniqueId(), resolveVisualRightHand(player, mainHand)).encode());
++    }
++
++    private static boolean resolveVisualRightHand(Player player, boolean mainHand) {
++        boolean mainIsRight = player.getMainHand() == MainHand.RIGHT;
++        return mainHand == mainIsRight;
++    }
++
+     private void broadcast(String channel, byte[] data) {
+         for (Player player : plugin.getServer().getOnlinePlayers()) {
+             if (plugin.handshakes().hasClient(player.getUniqueId())) {
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/api/NilumAPIImpl.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/api/NilumAPIImpl.java
+index bf265da..ec335b2 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/api/NilumAPIImpl.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/api/NilumAPIImpl.java
+@@ -77,6 +77,16 @@ public final class NilumAPIImpl implements NilumAPI {
+         plugin.animations().stopBlockAnimation(location);
+     }
+ 
++    @Override
++    public void playHeldItemAnimation(Player player, boolean mainHand, String animationName) {
++        plugin.animations().playHeldItemAnimation(player, mainHand, animationName);
++    }
++
++    @Override
++    public void stopHeldItemAnimation(Player player, boolean mainHand) {
++        plugin.animations().stopHeldItemAnimation(player, mainHand);
++    }
++
+     @Override
+     public void setHudFrame(Player player, String atlasId, String elementId, int frame) {
+         plugin.hud().setHudFrame(player, atlasId, elementId, frame);
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/handshake/HandshakeListener.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/handshake/HandshakeListener.java
+index e962204..0e31a43 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/handshake/HandshakeListener.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/handshake/HandshakeListener.java
+@@ -11,6 +11,7 @@ import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
+ import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
+ import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
+ import io.github.r4t2.nilum.common.protocol.HelloPacket;
++import io.github.r4t2.nilum.common.protocol.ItemDefinedAssetsPacket;
+ import io.github.r4t2.nilum.common.protocol.KeybindPacket;
+ import io.github.r4t2.nilum.common.protocol.UiClosedPacket;
+ import io.github.r4t2.nilum.common.protocol.ModEntry;
+@@ -18,11 +19,14 @@ import io.github.r4t2.nilum.common.protocol.ModListPacket;
+ import io.github.r4t2.nilum.common.protocol.ModListRequestPacket;
+ import io.github.r4t2.nilum.common.protocol.NilumChannels;
+ import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
++import io.github.r4t2.nilum.common.protocol.UiButtonClickedPacket;
+ import io.github.r4t2.nilum.common.tcp.NilumTcpAssetServer;
+ import io.github.r4t2.nilum.common.tcp.NilumTcpServer;
++import io.github.r4t2.nilum.common.ui.UiElement;
+ import io.github.r4t2.nilum.common.util.SemanticVersions;
+ import io.github.r4t2.nilum.paper.NilumPlugin;
+ import io.github.r4t2.nilum.paper.event.NilumKeybindEvent;
++import io.github.r4t2.nilum.paper.skript.NilumSkriptEffectRunner;
+ import net.kyori.adventure.text.Component;
+ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+ import org.bukkit.entity.Player;
+@@ -92,6 +96,16 @@ public final class HandshakeListener implements Listener, PluginMessageListener
+         }
+     }
+ 
++    /** Re-sends which models/icons have a real item definition, so an items reload updates the client's creative tab live. */
++    public void broadcastItemDefinedAssets() {
++        byte[] data = new ItemDefinedAssetsPacket(plugin.items().modelBasedItemPreviews(), plugin.items().iconBasedItemPreviews()).encode();
++        for (Player player : plugin.getServer().getOnlinePlayers()) {
++            if (hasClient(player.getUniqueId())) {
++                player.sendPluginMessage(plugin, NilumChannels.ITEM_DEFINED_ASSETS_QUALIFIED, data);
++            }
++        }
++    }
++
+     private List<AssetManifestEntry> combinedManifest() {
+         List<AssetManifestEntry> entries = new ArrayList<>(plugin.models().manifest());
+         entries.addAll(plugin.icons().manifest());
+@@ -121,7 +135,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener
+         String bindAddress = configManager.get(TcpConfig.BIND_ADDRESS);
+         int configuredPort = configManager.get(TcpConfig.PORT);
+ 
+-        NilumTcpServer server = new NilumTcpServer(this::onTcpConnected);
++        NilumTcpServer server = new NilumTcpServer(logger, this::onTcpConnected);
+         try {
+             int boundPort = server.start(bindAddress, configuredPort);
+             tcpServer = server;
+@@ -216,6 +230,8 @@ public final class HandshakeListener implements Listener, PluginMessageListener
+             onKeybind(player, message);
+         } else if (NilumChannels.UI_CLOSED_QUALIFIED.equals(channel)) {
+             onUiClosed(player, message);
++        } else if (NilumChannels.UI_BUTTON_CLICKED_QUALIFIED.equals(channel)) {
++            onUiButtonClicked(player, message);
+         }
+     }
+ 
+@@ -232,6 +248,27 @@ public final class HandshakeListener implements Listener, PluginMessageListener
+         plugin.uiSessions().onClosed(player, packet.uiId());
+     }
+ 
++    private void onUiButtonClicked(Player player, byte[] message) {
++        UiButtonClickedPacket packet = UiButtonClickedPacket.decode(message);
++        boolean hasUiOpen = plugin.uiSessions().openUiFor(player).filter(packet.uiId()::equals).isPresent();
++        if (!hasUiOpen) {
++            logger.warn(player.getName() + " clicked a button in custom UI '" + packet.uiId()
++                    + "', but doesn't have that UI open server-side, ignoring.");
++            return;
++        }
++
++        UiElement element = plugin.uis().descriptor(packet.uiId())
++                .map(descriptor -> descriptor.elements().get(packet.elementId()))
++                .orElse(null);
++        if (!(element instanceof UiElement.Button button)) {
++            logger.warn(player.getName() + " clicked element '" + packet.elementId() + "' in custom UI '"
++                    + packet.uiId() + "', which isn't a button, ignoring.");
++            return;
++        }
++
++        button.action().ifPresent(effectLine -> NilumSkriptEffectRunner.run(effectLine, player));
++    }
++
+     private void onHelloAck(Player player, byte[] message) {
+         UUID playerId = player.getUniqueId();
+         BukkitTask pending = pendingHandshakes.remove(playerId);
+@@ -255,6 +292,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener
+         NilumTcpServer server = tcpServer;
+         if (server != null) {
+             String token = server.offerConnection(playerId);
++            logger.info("Offering TCP side-channel " + tcpAdvertisedHost + ":" + tcpPort + " to " + player.getName() + ".");
+             player.sendPluginMessage(plugin, NilumChannels.TCP_OFFER_QUALIFIED,
+                     new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode());
+         }
+@@ -263,6 +301,8 @@ public final class HandshakeListener implements Listener, PluginMessageListener
+ 
+         player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED,
+                 new AssetManifestPacket(combinedManifest()).encode());
++        player.sendPluginMessage(plugin, NilumChannels.ITEM_DEFINED_ASSETS_QUALIFIED,
++                new ItemDefinedAssetsPacket(plugin.items().modelBasedItemPreviews(), plugin.items().iconBasedItemPreviews()).encode());
+ 
+         if (configManager.get(ModerationConfig.LOG_CLIENT_MODS)) {
+             player.sendPluginMessage(plugin, NilumChannels.MOD_LIST_REQUEST_QUALIFIED,
+@@ -297,7 +337,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener
+     private void onTcpConnected(UUID playerId, Socket socket) {
+         tcpConnections.put(playerId, socket);
+         logger.info("TCP side-channel connected for " + playerId + ", serving asset requests.");
+-        NilumTcpAssetServer.serve(socket, (kind, id) -> switch (kind) {
++        NilumTcpAssetServer.serve(socket, logger, (kind, id) -> switch (kind) {
+             case MODEL -> plugin.models().rawBytes(id).orElse(null);
+             case ICON -> plugin.icons().assetBytes(id).orElse(null);
+             case HUD_ATLAS -> plugin.hudAtlases().assetBytes(id).orElse(null);
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/item/ItemDefinition.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/item/ItemDefinition.java
+index 5b7c495..cd22ba1 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/item/ItemDefinition.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/item/ItemDefinition.java
+@@ -14,6 +14,7 @@ public record ItemDefinition(
+         Optional<String> displayName,
+         List<String> lore,
+         Map<String, Integer> enchantments,
+-        Optional<GlintDefinition> glint
++        Optional<GlintDefinition> glint,
++        List<String> hideGroups
+ ) {
+ }
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/item/ItemDefinitionRegistry.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/item/ItemDefinitionRegistry.java
+index 4c9f3a8..264e106 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/item/ItemDefinitionRegistry.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/item/ItemDefinitionRegistry.java
+@@ -1,6 +1,7 @@
+ package io.github.r4t2.nilum.paper.item;
+ 
+ import io.github.r4t2.nilum.common.logging.NilumLogger;
++import io.github.r4t2.nilum.common.protocol.ItemPreviewEntry;
+ import io.github.r4t2.nilum.paper.NilumKeys;
+ import net.kyori.adventure.text.Component;
+ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+@@ -19,6 +20,7 @@ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.util.ArrayList;
+ import java.util.HashMap;
++import java.util.LinkedHashMap;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Optional;
+@@ -61,6 +63,31 @@ public final class ItemDefinitionRegistry {
+         return Set.copyOf(definitionsById.keySet());
+     }
+ 
++    /** Preview data (name, lore, hide_groups) for every model referenced by a real item definition, so the client's creative tab can show more than a bare model. */
++    public List<ItemPreviewEntry> modelBasedItemPreviews() {
++        return previewsFor(ItemBase.Model.class, base -> ((ItemBase.Model) base).modelId());
++    }
++
++    /** Same idea as modelBasedItemPreviews(), for icon-based item definitions. */
++    public List<ItemPreviewEntry> iconBasedItemPreviews() {
++        return previewsFor(ItemBase.Icon.class, base -> ((ItemBase.Icon) base).iconId());
++    }
++
++    private List<ItemPreviewEntry> previewsFor(Class<? extends ItemBase> baseType, java.util.function.Function<ItemBase, String> assetIdOf) {
++        Map<String, ItemPreviewEntry> byAssetId = new LinkedHashMap<>();
++        for (ItemDefinition definition : definitionsById.values()) {
++            if (!baseType.isInstance(definition.base())) {
++                continue;
++            }
++            String assetId = assetIdOf.apply(definition.base());
++            // Several item definitions can reference the same underlying model/icon; the first
++            // one loaded wins the shared creative tab entry, same as the old Set-based dedup.
++            byAssetId.putIfAbsent(assetId, new ItemPreviewEntry(
++                    assetId, definition.displayName().orElse(""), definition.lore(), definition.hideGroups()));
++        }
++        return List.copyOf(byAssetId.values());
++    }
++
+     /** Builds a fresh ItemStack for this definition, or empty if the id isn't loaded (or its underlying model/icon isn't). */
+     public Optional<ItemStack> resolve(String id) {
+         ItemDefinition definition = definitionsById.get(id);
+@@ -99,6 +126,11 @@ public final class ItemDefinitionRegistry {
+             meta.addEnchant(enchantment, enchant.getValue(), true);
+         }
+ 
++        if (!definition.hideGroups().isEmpty()) {
++            meta.getPersistentDataContainer().set(NilumKeys.HIDE_GROUPS, PersistentDataType.STRING,
++                    String.join(",", definition.hideGroups()));
++        }
++
+         definition.glint().ifPresent(glint -> {
+             var pdc = meta.getPersistentDataContainer();
+             pdc.set(NilumKeys.GLINT_COLOR, PersistentDataType.STRING, String.format("%06X", glint.colorRgb()));
+@@ -134,7 +166,11 @@ public final class ItemDefinitionRegistry {
+ 
+         Optional<GlintDefinition> glint = parseGlint(id, section.getConfigurationSection("glint"));
+ 
+-        return new ItemDefinition(id, base, displayName, lore, enchantments, glint);
++        List<String> hideGroups = section.isSet("hide_groups")
++                ? Stream.of(section.getString("hide_groups", "").split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList()
++                : List.of();
++
++        return new ItemDefinition(id, base, displayName, lore, enchantments, glint, hideGroups);
+     }
+ 
+     private Optional<GlintDefinition> parseGlint(String id, ConfigurationSection glintSection) {
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/skript/NilumSkriptAddon.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/skript/NilumSkriptAddon.java
+index 10f5766..84ca8fd 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/skript/NilumSkriptAddon.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/skript/NilumSkriptAddon.java
+@@ -2,16 +2,19 @@ package io.github.r4t2.nilum.paper.skript;
+ 
+ import ch.njol.skript.Skript;
+ import io.github.r4t2.nilum.paper.NilumPlugin;
++import io.github.r4t2.nilum.paper.event.NilumKeybindEvent;
+ import io.github.r4t2.nilum.paper.event.NilumUiCloseEvent;
+ import io.github.r4t2.nilum.paper.skript.effects.EffGiveNilumItem;
+ import io.github.r4t2.nilum.paper.skript.effects.EffNilumBlock;
+ import io.github.r4t2.nilum.paper.skript.effects.EffNilumBlockAnimation;
+ import io.github.r4t2.nilum.paper.skript.effects.EffNilumEntityAnimation;
++import io.github.r4t2.nilum.paper.skript.effects.EffNilumHeldItemAnimation;
+ import io.github.r4t2.nilum.paper.skript.effects.EffNilumShaderPack;
+ import io.github.r4t2.nilum.paper.skript.effects.EffOpenNilumUi;
+ import io.github.r4t2.nilum.paper.skript.effects.EffPlaceNilumModel;
+ import io.github.r4t2.nilum.paper.skript.effects.EffSetNilumHudFrame;
+ import io.github.r4t2.nilum.paper.skript.effects.EffSetNilumHudVisibility;
++import io.github.r4t2.nilum.paper.skript.events.EvtNilumKeybind;
+ import io.github.r4t2.nilum.paper.skript.events.EvtNilumUiClose;
+ import io.github.r4t2.nilum.paper.skript.expressions.ExprClosedNilumUiId;
+ import io.github.r4t2.nilum.paper.skript.expressions.ExprNilumUiOfPlayer;
+@@ -35,6 +38,7 @@ public final class NilumSkriptAddon {
+         EffPlaceNilumModel.register(syntaxRegistry);
+         EffNilumBlock.register(syntaxRegistry);
+         EffNilumEntityAnimation.register(syntaxRegistry);
++        EffNilumHeldItemAnimation.register(syntaxRegistry);
+         EffNilumBlockAnimation.register(syntaxRegistry);
+         EffNilumShaderPack.register(syntaxRegistry);
+         EffOpenNilumUi.register(syntaxRegistry);
+@@ -45,6 +49,7 @@ public final class NilumSkriptAddon {
+         ExprClosedNilumUiId.register(syntaxRegistry);
+ 
+         EvtNilumUiClose.register(syntaxRegistry);
++        EvtNilumKeybind.register(syntaxRegistry);
+ 
+         EventValueRegistry eventValues = addon.registry(EventValueRegistry.class);
+         // Lets Skript's own generic "player" expression (and %player%/%uuid of player%
+@@ -52,5 +57,7 @@ public final class NilumSkriptAddon {
+         eventValues.register(EventValue.simple(NilumUiActionEvent.class, Player.class, NilumUiActionEvent::player));
+         // Same, for "player" inside "on ui close:".
+         eventValues.register(EventValue.simple(NilumUiCloseEvent.class, Player.class, NilumUiCloseEvent::getPlayer));
++        // Same, for "player" inside "on nilum keybind ...:".
++        eventValues.register(EventValue.simple(NilumKeybindEvent.class, Player.class, NilumKeybindEvent::getPlayer));
+     }
+ }
+diff --git a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/skript/effects/EffOpenNilumUi.java b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/skript/effects/EffOpenNilumUi.java
+index 7b54c03..e45f5ae 100644
+--- a/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/skript/effects/EffOpenNilumUi.java
++++ b/nilum-paper/src/main/java/io/github/r4t2/nilum/paper/skript/effects/EffOpenNilumUi.java
+@@ -9,9 +9,11 @@ import ch.njol.skript.lang.Expression;
+ import ch.njol.skript.lang.SkriptParser.ParseResult;
+ import ch.njol.util.Kleenean;
+ import io.github.r4t2.nilum.api.NilumAPI;
++import io.github.r4t2.nilum.paper.NilumPlugin;
+ import org.bukkit.Bukkit;
+ import org.bukkit.entity.Player;
+ import org.bukkit.event.Event;
++import org.bukkit.plugin.java.JavaPlugin;
+ import org.jetbrains.annotations.Nullable;
+ import org.skriptlang.skript.registration.SyntaxInfo;
+ import org.skriptlang.skript.registration.SyntaxRegistry;
+@@ -51,7 +53,11 @@ public class EffOpenNilumUi extends Effect {
+         if (api == null) {
+             return;
+         }
+-        api.openCustomUi(target, id);
++        if (!api.openCustomUi(target, id)) {
++            JavaPlugin.getPlugin(NilumPlugin.class).logger().warn("open nilum ui '" + id + "' for " + target.getName()
++                    + " failed: either '" + id + "' isn't a loaded custom UI (check it's in the ui folder and "
++                    + "loaded with no missing-texture warnings) or " + target.getName() + " hasn't completed the Nilum handshake yet.");
++        }
+     }
+ 
+     @Override

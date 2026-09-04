@@ -42,6 +42,7 @@ tasks.processResources {
 val clientOnlyModJson by tasks.registering {
     val remapJarTask = tasks.named<AbstractArchiveTask>("remapJar")
     dependsOn(remapJarTask)
+    inputs.file(remapJarTask.flatMap { it.archiveFile })
     val outputFile = layout.buildDirectory.file("generated/clientOnly/fabric.mod.json")
     outputs.file(outputFile)
     doLast {
@@ -68,6 +69,7 @@ val clientOnlyModJson by tasks.registering {
 val clientOnlyManifest by tasks.registering {
     val remapJarTask = tasks.named<AbstractArchiveTask>("remapJar")
     dependsOn(remapJarTask)
+    inputs.file(remapJarTask.flatMap { it.archiveFile })
     val outputFile = layout.buildDirectory.file("generated/clientOnly/MANIFEST.MF")
     outputs.file(outputFile)
     doLast {

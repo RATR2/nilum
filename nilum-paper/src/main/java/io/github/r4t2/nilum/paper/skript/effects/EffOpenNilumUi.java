@@ -9,9 +9,11 @@ import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.util.Kleenean;
 import io.github.r4t2.nilum.api.NilumAPI;
+import io.github.r4t2.nilum.paper.NilumPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
@@ -51,7 +53,11 @@ public class EffOpenNilumUi extends Effect {
         if (api == null) {
             return;
         }
-        api.openCustomUi(target, id);
+        if (!api.openCustomUi(target, id)) {
+            JavaPlugin.getPlugin(NilumPlugin.class).logger().warn("open nilum ui '" + id + "' for " + target.getName()
+                    + " failed: either '" + id + "' isn't a loaded custom UI (check it's in the ui folder and "
+                    + "loaded with no missing-texture warnings) or " + target.getName() + " hasn't completed the Nilum handshake yet.");
+        }
     }
 
     @Override

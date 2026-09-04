@@ -34,6 +34,26 @@ public final class AnimationPlaybackState {
         this.triggered = true;
     }
 
+    /**
+     * True at rest: never triggered, explicitly stopped, or a "once" animation that has finished
+     * playing (which keeps rendering the rest pose but, unlike "loop"/"hold", isn't meant to stay
+     * "active" forever after). False while a blend is still in flight.
+     */
+    public synchronized boolean isIdle(BbModel model, long nowMillis) {
+        if (blendFromPose != null) {
+            return false;
+        }
+        if (!triggered || animationName == null) {
+            return true;
+        }
+        BbAnimation animation = model.findAnimation(animationName).orElse(null);
+        if (animation == null || animation.length() <= 0) {
+            return true;
+        }
+        double elapsed = Math.max(0, (nowMillis - startTimeMillis) / 1000.0);
+        return "once".equals(animation.loop()) && elapsed >= animation.length();
+    }
+
     public synchronized Map<String, BbMatrix4> pose(BbModel model, long nowMillis) {
         Map<String, BbMatrix4> target = triggered ? resolveTriggeredPose(model, nowMillis) : BbBonePose.computeAutoLoop(model);
 

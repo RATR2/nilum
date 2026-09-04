@@ -1,0 +1,22 @@
+atlas_size: [320, 8]
+
+element health_bar:
+    origin: [0, 0]
+    frame_size: [32, 8]
+    frame_count: 10
+    layout: horizontal
+    type: auto
+    client_connector: round(map(number(minecraft:health), 0, number(minecraft:max_health), 0, 9))
+    screen_position: [10, 10]
+
+element health_number:
+    type: render_text
+    font: default
+    client_connector: round(number(minecraft:health))
+    screen_position: [46, 11]
+
+element player_name:
+    type: render_text
+    font: default
+    client_connector: text(name(client))
+    screen_position: [10, 22]

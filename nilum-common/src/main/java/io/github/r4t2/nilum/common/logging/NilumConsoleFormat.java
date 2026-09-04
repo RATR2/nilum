@@ -3,7 +3,7 @@ package io.github.r4t2.nilum.common.logging;
 
 public final class NilumConsoleFormat {
 
-    public static final String PREFIX_COLOR_HEX = "5E3191";
+    public static final String PREFIX_COLOR_HEX = "3B36FF";
     public static final String PREFIX_TEXT = "「Nilum 」";
 
     private static final String ANSI_ESCAPE = "";

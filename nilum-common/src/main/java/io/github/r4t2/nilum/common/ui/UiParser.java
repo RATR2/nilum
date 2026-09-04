@@ -59,30 +59,68 @@ public final class UiParser {
             throw new UiParseException("Unsupported UI type '" + type + "', only 'custom' is supported so far");
         }
 
+        UiAnchor anchor = parseAnchor(topLevel.getOrDefault("anchor", "top-left"));
+
         Map<String, UiElement> elements = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, String>> entry : elementFields.entrySet()) {
             elements.put(entry.getKey(), parseElement(entry.getKey(), entry.getValue()));
         }
 
-        return new UiDescriptor(elements);
+        return new UiDescriptor(anchor, elements);
+    }
+
+    private static UiAnchor parseAnchor(String raw) {
+        return switch (raw.toLowerCase(java.util.Locale.ROOT)) {
+            case "top-left" -> UiAnchor.TOP_LEFT;
+            case "center" -> UiAnchor.CENTER;
+            default -> throw new UiParseException("Unknown anchor '" + raw + "', expected 'top-left' or 'center'");
+        };
     }
 
     private static UiElement parseElement(String id, Map<String, String> fields) {
         String typeStr = require(fields, id, "type");
-        String imageFile = require(fields, id, "image");
         int[] position = requireIntArray(fields, "position", "Element '" + id + "'");
         int layer = fields.containsKey("layer") ? Integer.parseInt(fields.get("layer")) : 0;
         Optional<String> requirement = Optional.ofNullable(fields.get("requirement"));
 
         if (typeStr.equalsIgnoreCase("button")) {
+            String imageFile = require(fields, id, "image");
             String pressedImageFile = require(fields, id, "pressed");
             Optional<String> action = Optional.ofNullable(fields.get("action"));
             return new UiElement.Button(imageFile, pressedImageFile, position[0], position[1], layer, requirement, action);
         }
         if (typeStr.equalsIgnoreCase("image")) {
+            String imageFile = require(fields, id, "image");
             return new UiElement.Image(imageFile, position[0], position[1], layer, requirement);
         }
+        if (typeStr.equalsIgnoreCase("text")) {
+            return parseTextElement(id, fields, position, layer, requirement);
+        }
+        if (typeStr.equalsIgnoreCase("head")) {
+            String player = require(fields, id, "player");
+            return new UiElement.Head(player, position[0], position[1], layer, requirement);
+        }
         throw new UiParseException("Element '" + id + "' has unknown type '" + typeStr + "'");
+    }
+
+    private static UiElement.Text parseTextElement(String id, Map<String, String> fields, int[] position, int layer,
+                                                     Optional<String> requirement) {
+        String font = fields.getOrDefault("font", "default");
+        Optional<String> text = Optional.ofNullable(fields.get("text"));
+        Optional<String> clientConnector = Optional.ofNullable(fields.get("client_connector"));
+        if (text.isEmpty() && clientConnector.isEmpty()) {
+            throw new UiParseException("Element '" + id + "' is type 'text' but has neither 'text' nor 'client_connector'");
+        }
+        if (text.isPresent() && clientConnector.isPresent()) {
+            throw new UiParseException("Element '" + id + "' has both 'text' and 'client_connector', only one is allowed");
+        }
+        int color = fields.containsKey("color") ? parseColor(fields.get("color")) : 0xFFFFFFFF;
+        return new UiElement.Text(font, text, clientConnector, color, position[0], position[1], layer, requirement);
+    }
+
+    private static int parseColor(String raw) {
+        String hex = raw.startsWith("#") ? raw.substring(1) : raw;
+        return 0xFF000000 | Integer.parseInt(hex, 16);
     }
 
     private static String require(Map<String, String> fields, String id, String field) {

@@ -18,13 +18,22 @@ import net.minecraft.world.item.ItemStack;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /** Draws a Nilum full-.bbmodel item as its actual baked geometry, the same quads the in-world entity renderer draws. */
-public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer<String> {
+public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer<NilumModelItemSpecialRenderer.RenderArgument> {
+
+    /**
+     * @param bonePose        null falls back to auto-looping the model's first animation (non-held contexts: gui/ground/etc.)
+     * @param hiddenBoneUuids bones to exclude entirely, e.g. a held item at rest with configured hide_groups
+     */
+    public record RenderArgument(String modelId, Map<String, BbMatrix4> bonePose, Set<String> hiddenBoneUuids) {
+    }
 
     private final ClientModelStore modelStore;
     private final TextureUploader textureUploader;
@@ -36,19 +45,25 @@ public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer
     }
 
     @Override
-    public void submit(String modelId, ItemDisplayContext itemDisplayContext, PoseStack poseStack,
+    public void submit(RenderArgument argument, ItemDisplayContext itemDisplayContext, PoseStack poseStack,
                         SubmitNodeCollector collector, int light, int overlay, boolean hasFoil, int seed) {
-        if (modelId == null) {
+        if (argument == null) {
             return;
         }
+        String modelId = argument.modelId();
 
         BbModel model = modelStore.model(modelId).orElse(null);
         Map<String, List<BbBakedQuad>> quadsByBone = modelStore.bakedQuadsByBone(modelId).orElse(null);
         if (model == null || quadsByBone == null) {
             return;
         }
+        if (!argument.hiddenBoneUuids().isEmpty()) {
+            Map<String, List<BbBakedQuad>> filtered = new HashMap<>(quadsByBone);
+            argument.hiddenBoneUuids().forEach(filtered::remove);
+            quadsByBone = filtered;
+        }
 
-        Map<String, BbMatrix4> bonePose = BbBonePose.computeAutoLoop(model);
+        Map<String, BbMatrix4> bonePose = argument.bonePose() != null ? argument.bonePose() : BbBonePose.computeAutoLoop(model);
         List<BbBakedQuad> posed = BbPosedModel.apply(quadsByBone, bonePose);
         Map<Integer, List<BbBakedQuad>> quadsByTexture = NilumModelGeometry.groupByTexture(posed);
 
@@ -117,7 +132,7 @@ public final class NilumModelItemSpecialRenderer implements SpecialModelRenderer
     }
 
     @Override
-    public String extractArgument(ItemStack itemStack) {
+    public RenderArgument extractArgument(ItemStack itemStack) {
         return null;
     }
 }

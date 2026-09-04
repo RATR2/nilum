@@ -1,6 +1,7 @@
 package io.github.r4t2.nilum.fabric.creativetab;
 
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
+import io.github.r4t2.nilum.common.protocol.ItemPreviewEntry;
 import io.github.r4t2.nilum.fabric.render.IconAtlas;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
@@ -17,10 +18,12 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Four fixed Nilum creative tabs. Custom Items stays empty until something calls addCustomItem. */
+/** Four fixed Nilum creative tabs. Custom Items lists addCustomItem() entries plus every model/icon the server says has a real item definition. */
 public final class NilumCreativeTabs {
 
     private static final List<ItemStack> CUSTOM_ITEMS = new CopyOnWriteArrayList<>();
+    private static volatile List<ItemPreviewEntry> itemDefinedModels = List.of();
+    private static volatile List<ItemPreviewEntry> itemDefinedIcons = List.of();
 
     private static final ResourceKey<CreativeModeTab> ITEMS = key("items");
     private static final ResourceKey<CreativeModeTab> BLOCKS = key("blocks");
@@ -61,14 +64,19 @@ public final class NilumCreativeTabs {
                 entries.accept(NilumTaggedItems.iconItem(Items.PAPER, iconId));
             }
         });
-        ItemGroupEvents.modifyEntriesEvent(MODELS).register(entries -> {
-            for (String modelId : modelStore.modelIds()) {
-                entries.accept(NilumTaggedItems.modelItem(Items.PAPER, modelId));
-            }
-        });
+        // Deliberately not auto-populated from modelStore.modelIds()/iconAtlas.iconIds(): a loaded
+        // model or icon isn't necessarily meant to be a standalone item (block-only models,
+        // skeleton overrides, hand-IK calibration rigs). Only ids the server confirms have a real
+        // items/*.yml definition (see setItemDefinedAssets) show up here.
         ItemGroupEvents.modifyEntriesEvent(CUSTOM_ITEMS_TAB).register(entries -> {
             for (ItemStack stack : CUSTOM_ITEMS) {
                 entries.accept(stack);
+            }
+            for (ItemPreviewEntry preview : itemDefinedModels) {
+                entries.accept(NilumTaggedItems.modelItem(Items.PAPER, preview));
+            }
+            for (ItemPreviewEntry preview : itemDefinedIcons) {
+                entries.accept(NilumTaggedItems.iconItem(Items.PAPER, preview));
             }
         });
     }
@@ -76,6 +84,12 @@ public final class NilumCreativeTabs {
     /** Adds an item to the "Nilum Custom Items" tab; empty by default, meant for other code to populate. */
     public static void addCustomItem(ItemStack stack) {
         CUSTOM_ITEMS.add(stack);
+    }
+
+    /** Which loaded models/icons the server says have a real item definition, with their name/lore/hide_groups; drives the "Nilum Custom Items" tab. */
+    public static void setItemDefinedAssets(List<ItemPreviewEntry> models, List<ItemPreviewEntry> icons) {
+        itemDefinedModels = List.copyOf(models);
+        itemDefinedIcons = List.copyOf(icons);
     }
 
     private static ResourceKey<CreativeModeTab> key(String path) {

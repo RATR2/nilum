@@ -1,0 +1,5 @@
+model: table
+
+proxy:
+  mode: vanilla
+  vanilla_block: OAK_PLANKS

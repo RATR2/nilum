@@ -2,16 +2,19 @@ package io.github.r4t2.nilum.paper.skript;
 
 import ch.njol.skript.Skript;
 import io.github.r4t2.nilum.paper.NilumPlugin;
+import io.github.r4t2.nilum.paper.event.NilumKeybindEvent;
 import io.github.r4t2.nilum.paper.event.NilumUiCloseEvent;
 import io.github.r4t2.nilum.paper.skript.effects.EffGiveNilumItem;
 import io.github.r4t2.nilum.paper.skript.effects.EffNilumBlock;
 import io.github.r4t2.nilum.paper.skript.effects.EffNilumBlockAnimation;
 import io.github.r4t2.nilum.paper.skript.effects.EffNilumEntityAnimation;
+import io.github.r4t2.nilum.paper.skript.effects.EffNilumHeldItemAnimation;
 import io.github.r4t2.nilum.paper.skript.effects.EffNilumShaderPack;
 import io.github.r4t2.nilum.paper.skript.effects.EffOpenNilumUi;
 import io.github.r4t2.nilum.paper.skript.effects.EffPlaceNilumModel;
 import io.github.r4t2.nilum.paper.skript.effects.EffSetNilumHudFrame;
 import io.github.r4t2.nilum.paper.skript.effects.EffSetNilumHudVisibility;
+import io.github.r4t2.nilum.paper.skript.events.EvtNilumKeybind;
 import io.github.r4t2.nilum.paper.skript.events.EvtNilumUiClose;
 import io.github.r4t2.nilum.paper.skript.expressions.ExprClosedNilumUiId;
 import io.github.r4t2.nilum.paper.skript.expressions.ExprNilumUiOfPlayer;
@@ -35,6 +38,7 @@ public final class NilumSkriptAddon {
         EffPlaceNilumModel.register(syntaxRegistry);
         EffNilumBlock.register(syntaxRegistry);
         EffNilumEntityAnimation.register(syntaxRegistry);
+        EffNilumHeldItemAnimation.register(syntaxRegistry);
         EffNilumBlockAnimation.register(syntaxRegistry);
         EffNilumShaderPack.register(syntaxRegistry);
         EffOpenNilumUi.register(syntaxRegistry);
@@ -45,6 +49,7 @@ public final class NilumSkriptAddon {
         ExprClosedNilumUiId.register(syntaxRegistry);
 
         EvtNilumUiClose.register(syntaxRegistry);
+        EvtNilumKeybind.register(syntaxRegistry);
 
         EventValueRegistry eventValues = addon.registry(EventValueRegistry.class);
         // Lets Skript's own generic "player" expression (and %player%/%uuid of player%
@@ -52,5 +57,7 @@ public final class NilumSkriptAddon {
         eventValues.register(EventValue.simple(NilumUiActionEvent.class, Player.class, NilumUiActionEvent::player));
         // Same, for "player" inside "on ui close:".
         eventValues.register(EventValue.simple(NilumUiCloseEvent.class, Player.class, NilumUiCloseEvent::getPlayer));
+        // Same, for "player" inside "on nilum keybind ...:".
+        eventValues.register(EventValue.simple(NilumKeybindEvent.class, Player.class, NilumKeybindEvent::getPlayer));
     }
 }

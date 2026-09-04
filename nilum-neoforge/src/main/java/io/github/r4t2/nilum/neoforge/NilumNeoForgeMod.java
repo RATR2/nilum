@@ -9,12 +9,15 @@ import io.github.r4t2.nilum.neoforge.block.NilumBlocks;
 import io.github.r4t2.nilum.neoforge.logging.NeoForgeLogSink;
 import io.github.r4t2.nilum.neoforge.network.NilumActivateShaderPackPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumItemDefinedAssetsPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumAtlasPatchPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationPlayPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumBlockAnimationStopPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumChunkBlocksPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumDeactivateShaderPackPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumEntityAnimationPlayPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumItemAnimationPlayPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumItemAnimationStopPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumEntityAnimationStopPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloPayload;
@@ -33,6 +36,7 @@ import io.github.r4t2.nilum.neoforge.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudTextPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.neoforge.network.NilumUiButtonClickedPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumUiClosedPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
@@ -119,6 +123,7 @@ public final class NilumNeoForgeMod {
         registrar.playToServer(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC,
                 (payload, context) -> tcpUnavailableHandler.accept((ServerPlayer) context.player()));
         registrar.playToClient(NilumAssetManifestPayload.TYPE, NilumAssetManifestPayload.CODEC);
+        registrar.playToClient(NilumItemDefinedAssetsPayload.TYPE, NilumItemDefinedAssetsPayload.CODEC);
         registrar.playToClient(NilumModelSpawnPayload.TYPE, NilumModelSpawnPayload.CODEC);
         registrar.playToClient(NilumModListRequestPayload.TYPE, NilumModListRequestPayload.CODEC);
         // Only Paper's HandshakeListener currently requests/processes mod lists; a NeoForge-hosted
@@ -137,6 +142,8 @@ public final class NilumNeoForgeMod {
         registrar.playToClient(NilumEntityAnimationStopPayload.TYPE, NilumEntityAnimationStopPayload.CODEC);
         registrar.playToClient(NilumBlockAnimationPlayPayload.TYPE, NilumBlockAnimationPlayPayload.CODEC);
         registrar.playToClient(NilumBlockAnimationStopPayload.TYPE, NilumBlockAnimationStopPayload.CODEC);
+        registrar.playToClient(NilumItemAnimationPlayPayload.TYPE, NilumItemAnimationPlayPayload.CODEC);
+        registrar.playToClient(NilumItemAnimationStopPayload.TYPE, NilumItemAnimationStopPayload.CODEC);
         registrar.playToServer(NilumKeybindPayload.TYPE, NilumKeybindPayload.CODEC, (payload, context) -> { });
         // Paper still needs this: real registry access doesn't exist there, so it always proxies a
         // vanilla material and streams the overlay position/model over this same wire format.
@@ -145,6 +152,7 @@ public final class NilumNeoForgeMod {
         // Custom UI open/close is Skript/Paper-only for now, a NeoForge-hosted server has no
         // consumer for this, same as keybinds above.
         registrar.playToServer(NilumUiClosedPayload.TYPE, NilumUiClosedPayload.CODEC, (payload, context) -> { });
+        registrar.playToServer(NilumUiButtonClickedPayload.TYPE, NilumUiButtonClickedPayload.CODEC, (payload, context) -> { });
         registrar.playToClient(NilumSetHudAtlasVisibilityPayload.TYPE, NilumSetHudAtlasVisibilityPayload.CODEC);
         registrar.playToClient(NilumSetHudElementVisibilityPayload.TYPE, NilumSetHudElementVisibilityPayload.CODEC);
     }

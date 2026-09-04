@@ -1,0 +1,10 @@
+base: nilum:model:scanner
+name: "&d&lScanner"
+lore:
+  - "&7Example held-item model with working hand IK."
+  - "&7Not a finished model; tune further with the debug"
+  - "&7keybind and NilumHandTuneScreen."
+# Excluded from rendering (and, for "left arm"/"right arm", from the hand-IK arm substitution)
+# whenever the item isn't currently playing a triggered animation. Once an animation is playing,
+# these render normally and the animation's own keyframes control their moment-to-moment visibility.
+hide_groups: scan, left arm

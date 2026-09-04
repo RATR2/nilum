@@ -14,6 +14,7 @@ public record ItemDefinition(
         Optional<String> displayName,
         List<String> lore,
         Map<String, Integer> enchantments,
-        Optional<GlintDefinition> glint
+        Optional<GlintDefinition> glint,
+        List<String> hideGroups
 ) {
 }

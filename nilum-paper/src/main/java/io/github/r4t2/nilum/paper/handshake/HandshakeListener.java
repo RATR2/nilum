@@ -11,6 +11,7 @@ import io.github.r4t2.nilum.common.protocol.AssetManifestPacket;
 import io.github.r4t2.nilum.common.protocol.HandshakeProtocol;
 import io.github.r4t2.nilum.common.protocol.HelloAckPacket;
 import io.github.r4t2.nilum.common.protocol.HelloPacket;
+import io.github.r4t2.nilum.common.protocol.ItemDefinedAssetsPacket;
 import io.github.r4t2.nilum.common.protocol.KeybindPacket;
 import io.github.r4t2.nilum.common.protocol.UiClosedPacket;
 import io.github.r4t2.nilum.common.protocol.ModEntry;
@@ -18,11 +19,14 @@ import io.github.r4t2.nilum.common.protocol.ModListPacket;
 import io.github.r4t2.nilum.common.protocol.ModListRequestPacket;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
+import io.github.r4t2.nilum.common.protocol.UiButtonClickedPacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpAssetServer;
 import io.github.r4t2.nilum.common.tcp.NilumTcpServer;
+import io.github.r4t2.nilum.common.ui.UiElement;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.paper.NilumPlugin;
 import io.github.r4t2.nilum.paper.event.NilumKeybindEvent;
+import io.github.r4t2.nilum.paper.skript.NilumSkriptEffectRunner;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
@@ -92,6 +96,16 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         }
     }
 
+    /** Re-sends which models/icons have a real item definition, so an items reload updates the client's creative tab live. */
+    public void broadcastItemDefinedAssets() {
+        byte[] data = new ItemDefinedAssetsPacket(plugin.items().modelBasedItemPreviews(), plugin.items().iconBasedItemPreviews()).encode();
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            if (hasClient(player.getUniqueId())) {
+                player.sendPluginMessage(plugin, NilumChannels.ITEM_DEFINED_ASSETS_QUALIFIED, data);
+            }
+        }
+    }
+
     private List<AssetManifestEntry> combinedManifest() {
         List<AssetManifestEntry> entries = new ArrayList<>(plugin.models().manifest());
         entries.addAll(plugin.icons().manifest());
@@ -121,7 +135,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         String bindAddress = configManager.get(TcpConfig.BIND_ADDRESS);
         int configuredPort = configManager.get(TcpConfig.PORT);
 
-        NilumTcpServer server = new NilumTcpServer(this::onTcpConnected);
+        NilumTcpServer server = new NilumTcpServer(logger, this::onTcpConnected);
         try {
             int boundPort = server.start(bindAddress, configuredPort);
             tcpServer = server;
@@ -216,6 +230,8 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
             onKeybind(player, message);
         } else if (NilumChannels.UI_CLOSED_QUALIFIED.equals(channel)) {
             onUiClosed(player, message);
+        } else if (NilumChannels.UI_BUTTON_CLICKED_QUALIFIED.equals(channel)) {
+            onUiButtonClicked(player, message);
         }
     }
 
@@ -230,6 +246,27 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
     private void onUiClosed(Player player, byte[] message) {
         UiClosedPacket packet = UiClosedPacket.decode(message);
         plugin.uiSessions().onClosed(player, packet.uiId());
+    }
+
+    private void onUiButtonClicked(Player player, byte[] message) {
+        UiButtonClickedPacket packet = UiButtonClickedPacket.decode(message);
+        boolean hasUiOpen = plugin.uiSessions().openUiFor(player).filter(packet.uiId()::equals).isPresent();
+        if (!hasUiOpen) {
+            logger.warn(player.getName() + " clicked a button in custom UI '" + packet.uiId()
+                    + "', but doesn't have that UI open server-side, ignoring.");
+            return;
+        }
+
+        UiElement element = plugin.uis().descriptor(packet.uiId())
+                .map(descriptor -> descriptor.elements().get(packet.elementId()))
+                .orElse(null);
+        if (!(element instanceof UiElement.Button button)) {
+            logger.warn(player.getName() + " clicked element '" + packet.elementId() + "' in custom UI '"
+                    + packet.uiId() + "', which isn't a button, ignoring.");
+            return;
+        }
+
+        button.action().ifPresent(effectLine -> NilumSkriptEffectRunner.run(effectLine, player));
     }
 
     private void onHelloAck(Player player, byte[] message) {
@@ -255,6 +292,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         NilumTcpServer server = tcpServer;
         if (server != null) {
             String token = server.offerConnection(playerId);
+            logger.info("Offering TCP side-channel " + tcpAdvertisedHost + ":" + tcpPort + " to " + player.getName() + ".");
             player.sendPluginMessage(plugin, NilumChannels.TCP_OFFER_QUALIFIED,
                     new TcpOfferPacket(tcpAdvertisedHost, tcpPort, token).encode());
         }
@@ -263,6 +301,8 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
 
         player.sendPluginMessage(plugin, NilumChannels.ASSET_MANIFEST_QUALIFIED,
                 new AssetManifestPacket(combinedManifest()).encode());
+        player.sendPluginMessage(plugin, NilumChannels.ITEM_DEFINED_ASSETS_QUALIFIED,
+                new ItemDefinedAssetsPacket(plugin.items().modelBasedItemPreviews(), plugin.items().iconBasedItemPreviews()).encode());
 
         if (configManager.get(ModerationConfig.LOG_CLIENT_MODS)) {
             player.sendPluginMessage(plugin, NilumChannels.MOD_LIST_REQUEST_QUALIFIED,
@@ -297,7 +337,7 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
     private void onTcpConnected(UUID playerId, Socket socket) {
         tcpConnections.put(playerId, socket);
         logger.info("TCP side-channel connected for " + playerId + ", serving asset requests.");
-        NilumTcpAssetServer.serve(socket, (kind, id) -> switch (kind) {
+        NilumTcpAssetServer.serve(socket, logger, (kind, id) -> switch (kind) {
             case MODEL -> plugin.models().rawBytes(id).orElse(null);
             case ICON -> plugin.icons().assetBytes(id).orElse(null);
             case HUD_ATLAS -> plugin.hudAtlases().assetBytes(id).orElse(null);

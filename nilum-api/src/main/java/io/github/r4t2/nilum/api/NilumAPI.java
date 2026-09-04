@@ -42,6 +42,12 @@ public interface NilumAPI {
     /** Stops a triggered block animation, back to its rest pose. */
     void stopBlockAnimation(Location location);
 
+    /** Plays a named animation on whatever Nilum item player is holding in mainHand (or their off hand). */
+    void playHeldItemAnimation(Player player, boolean mainHand, String animationName);
+
+    /** Stops a triggered held-item animation, back to its rest pose. */
+    void stopHeldItemAnimation(Player player, boolean mainHand);
+
     /** Pushes a HUD atlas frame update to player. */
     void setHudFrame(Player player, String atlasId, String elementId, int frame);
 

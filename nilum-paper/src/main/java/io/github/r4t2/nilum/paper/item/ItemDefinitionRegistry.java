@@ -1,6 +1,7 @@
 package io.github.r4t2.nilum.paper.item;
 
 import io.github.r4t2.nilum.common.logging.NilumLogger;
+import io.github.r4t2.nilum.common.protocol.ItemPreviewEntry;
 import io.github.r4t2.nilum.paper.NilumKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -19,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,6 +63,31 @@ public final class ItemDefinitionRegistry {
         return Set.copyOf(definitionsById.keySet());
     }
 
+    /** Preview data (name, lore, hide_groups) for every model referenced by a real item definition, so the client's creative tab can show more than a bare model. */
+    public List<ItemPreviewEntry> modelBasedItemPreviews() {
+        return previewsFor(ItemBase.Model.class, base -> ((ItemBase.Model) base).modelId());
+    }
+
+    /** Same idea as modelBasedItemPreviews(), for icon-based item definitions. */
+    public List<ItemPreviewEntry> iconBasedItemPreviews() {
+        return previewsFor(ItemBase.Icon.class, base -> ((ItemBase.Icon) base).iconId());
+    }
+
+    private List<ItemPreviewEntry> previewsFor(Class<? extends ItemBase> baseType, java.util.function.Function<ItemBase, String> assetIdOf) {
+        Map<String, ItemPreviewEntry> byAssetId = new LinkedHashMap<>();
+        for (ItemDefinition definition : definitionsById.values()) {
+            if (!baseType.isInstance(definition.base())) {
+                continue;
+            }
+            String assetId = assetIdOf.apply(definition.base());
+            // Several item definitions can reference the same underlying model/icon; the first
+            // one loaded wins the shared creative tab entry, same as the old Set-based dedup.
+            byAssetId.putIfAbsent(assetId, new ItemPreviewEntry(
+                    assetId, definition.displayName().orElse(""), definition.lore(), definition.hideGroups()));
+        }
+        return List.copyOf(byAssetId.values());
+    }
+
     /** Builds a fresh ItemStack for this definition, or empty if the id isn't loaded (or its underlying model/icon isn't). */
     public Optional<ItemStack> resolve(String id) {
         ItemDefinition definition = definitionsById.get(id);
@@ -99,6 +126,11 @@ public final class ItemDefinitionRegistry {
             meta.addEnchant(enchantment, enchant.getValue(), true);
         }
 
+        if (!definition.hideGroups().isEmpty()) {
+            meta.getPersistentDataContainer().set(NilumKeys.HIDE_GROUPS, PersistentDataType.STRING,
+                    String.join(",", definition.hideGroups()));
+        }
+
         definition.glint().ifPresent(glint -> {
             var pdc = meta.getPersistentDataContainer();
             pdc.set(NilumKeys.GLINT_COLOR, PersistentDataType.STRING, String.format("%06X", glint.colorRgb()));
@@ -134,7 +166,11 @@ public final class ItemDefinitionRegistry {
 
         Optional<GlintDefinition> glint = parseGlint(id, section.getConfigurationSection("glint"));
 
-        return new ItemDefinition(id, base, displayName, lore, enchantments, glint);
+        List<String> hideGroups = section.isSet("hide_groups")
+                ? Stream.of(section.getString("hide_groups", "").split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList()
+                : List.of();
+
+        return new ItemDefinition(id, base, displayName, lore, enchantments, glint, hideGroups);
     }
 
     private Optional<GlintDefinition> parseGlint(String id, ConfigurationSection glintSection) {

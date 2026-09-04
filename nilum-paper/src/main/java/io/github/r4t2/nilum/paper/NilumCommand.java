@@ -53,7 +53,8 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             }
             case "reload" -> reload(sender, args);
             case "placemodel" -> placeModel(sender, args);
-            case "giveitem" -> giveItem(sender, args);
+            case "giveitem" -> giveItemDef(sender, args);
+            case "givemodel" -> giveModel(sender, args);
             case "giveicon" -> giveIcon(sender, args);
             case "hudframe" -> hudFrame(sender, args);
             case "placeblock" -> placeBlock(sender, args);
@@ -78,7 +79,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         return switch (subcommand) {
             case "reload" -> "nilum.command.reload";
             case "placemodel", "giveskeleton", "playanim", "stopanim" -> "nilum.command.model";
-            case "giveitem", "giveicon", "giveitemdef" -> "nilum.command.item";
+            case "giveitem", "givemodel", "giveicon", "giveitemdef" -> "nilum.command.item";
             case "placeblock", "removeblock", "playblockanim", "stopblockanim" -> "nilum.command.block";
             case "hudframe" -> "nilum.command.hud";
             case "shaderpack" -> "nilum.command.shaderpack";
@@ -102,13 +103,14 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text(
                 "/nilum placemodel <modelId> [x] [y] [z] [yaw] [pitch] -> Place a model. "
                         + "Coordinates and rotation default to ~ (your position/facing)."));
-        sender.sendMessage(Component.text("/nilum giveitem <modelId> [material] -> Give yourself a custom item."));
+        sender.sendMessage(Component.text("/nilum giveitem <id> -> Give yourself a defined item (name/lore/enchants included)."));
+        sender.sendMessage(Component.text(
+                "/nilum givemodel <modelId> [material] -> Give yourself a raw model item, no item definition needed."));
         sender.sendMessage(Component.text("/nilum giveicon <iconId> [material] -> Give yourself an icon-only custom item."));
         sender.sendMessage(Component.text("/nilum hudframe <atlasId>:<elementId> <frame> -> Set a HUD frame for yourself."));
         sender.sendMessage(Component.text(
                 "/nilum placeblock <blockId> [x] [y] [z] -> Place a real, rendered custom block."));
         sender.sendMessage(Component.text("/nilum removeblock [x] [y] [z] -> Remove a Nilum block."));
-        sender.sendMessage(Component.text("/nilum giveitemdef <id> -> Give yourself a defined item (name/lore/enchants included)."));
         sender.sendMessage(Component.text(
                 "/nilum shaderpack <id>|off [player] -> Switch yourself (or another online player) to a Nilum "
                         + "shaderpack, or back to normal. Needs Iris."));
@@ -419,13 +421,13 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         return Double.parseDouble(arg);
     }
 
-    private boolean giveItem(CommandSender sender, String[] args) {
+    private boolean giveModel(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(Component.text("Only a player can be given an item."));
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /nilum giveitem <modelId> [material]"));
+            sender.sendMessage(Component.text("Usage: /nilum givemodel <modelId> [material]"));
             return true;
         }
 
@@ -556,7 +558,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filterByPrefix(List.of("ver", "help", "reload", "placemodel", "giveitem", "giveicon",
+            return filterByPrefix(List.of("ver", "help", "reload", "placemodel", "giveitem", "givemodel", "giveicon",
                     "hudframe", "placeblock", "removeblock", "giveitemdef", "shaderpack", "giveskeleton",
                     "playanim", "stopanim", "playblockanim", "stopblockanim"), args[0]);
         }
@@ -565,11 +567,11 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             return switch (args[0].toLowerCase(Locale.ROOT)) {
                 case "reload" -> filterByPrefix(
                         List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "tcp", "config", "ui"), args[1]);
-                case "placemodel", "giveitem", "giveskeleton" -> filterByPrefix(plugin.models().modelIds(), args[1]);
+                case "placemodel", "givemodel", "giveskeleton" -> filterByPrefix(plugin.models().modelIds(), args[1]);
                 case "placeblock" -> filterByPrefix(plugin.blockDefinitions().blockIds(), args[1]);
                 case "playanim", "stopanim" -> filterByPrefix(List.of("self"), args[1]);
                 case "giveicon" -> filterByPrefix(plugin.icons().iconIds(), args[1]);
-                case "giveitemdef" -> filterByPrefix(plugin.items().itemIds(), args[1]);
+                case "giveitem", "giveitemdef" -> filterByPrefix(plugin.items().itemIds(), args[1]);
                 case "hudframe" -> filterByPrefix(plugin.hudAtlases().atlasIds().stream()
                         .map(id -> id + ":").toList(), args[1]);
                 case "shaderpack" -> {
@@ -581,7 +583,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             };
         }
 
-        if (args.length == 3 && (args[0].equalsIgnoreCase("giveitem") || args[0].equalsIgnoreCase("giveicon"))) {
+        if (args.length == 3 && (args[0].equalsIgnoreCase("givemodel") || args[0].equalsIgnoreCase("giveicon"))) {
             return filterByPrefix(Arrays.stream(Material.values()).map(Material::name).toList(), args[2]);
         }
 

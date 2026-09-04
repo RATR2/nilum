@@ -1,0 +1,9 @@
+base: DIAMOND_SWORD
+name: "&b&lStarter Blade"
+lore:
+  - "&7An example item definition."
+  - "&7Edit or delete this file, it's just a demo."
+enchantments:
+  "minecraft:sharpness": 3
+glint:
+  color: "#33CCFF"

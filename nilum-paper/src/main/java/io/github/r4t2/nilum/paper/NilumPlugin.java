@@ -115,6 +115,8 @@ public final class NilumPlugin extends JavaPlugin {
         logger = new NilumLogger(new PaperConsoleSink(), getDataFolder().toPath().resolve("logs").resolve("nilum.log"),
                 LoggingConfig.destinationLookup(configManager), configManager.get(LoggingConfig.MAX_LOG_FILES));
 
+        DefaultAssetInstaller.install(this, logger);
+
         handshakeListener = new HandshakeListener(this, logger, configManager);
 
         modelRegistry = new ModelRegistry();
@@ -169,14 +171,18 @@ public final class NilumPlugin extends JavaPlugin {
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ENTITY_ANIMATION_STOP_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.BLOCK_ANIMATION_PLAY_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.BLOCK_ANIMATION_STOP_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ITEM_ANIMATION_PLAY_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ITEM_ANIMATION_STOP_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.OPEN_UI_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_HUD_ATLAS_VISIBILITY_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_HUD_ELEMENT_VISIBILITY_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ITEM_DEFINED_ASSETS_QUALIFIED);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.HELLO_ACK_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.TCP_UNAVAILABLE_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.MOD_LIST_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.KEYBIND_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.UI_CLOSED_QUALIFIED, handshakeListener);
+        getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.UI_BUTTON_CLICKED_QUALIFIED, handshakeListener);
         getServer().getPluginManager().registerEvents(handshakeListener, this);
         getServer().getPluginManager().registerEvents(new CustomBlockChunkSync(this, customBlockRegistry), this);
         getServer().getPluginManager().registerEvents(
@@ -329,6 +335,7 @@ public final class NilumPlugin extends JavaPlugin {
         try {
             itemDefinitionRegistry.loadDirectory(getDataFolder().toPath().resolve("items"));
             logger.info("Loaded " + itemDefinitionRegistry.itemIds().size() + " item definition(s) from the items folder.");
+            handshakeListener.broadcastItemDefinedAssets();
             return true;
         } catch (IOException e) {
             logger.error("Failed to reload the items folder", e);
@@ -398,6 +405,10 @@ public final class NilumPlugin extends JavaPlugin {
 
     public HandshakeListener handshakes() {
         return handshakeListener;
+    }
+
+    public NilumLogger logger() {
+        return logger;
     }
 
     public ModelRegistry models() {

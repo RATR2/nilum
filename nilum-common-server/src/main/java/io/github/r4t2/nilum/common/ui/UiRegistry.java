@@ -24,10 +24,12 @@ public final class UiRegistry {
 
     private final Map<String, byte[]> assetBytesById = new ConcurrentHashMap<>();
     private final Map<String, String> hashById = new ConcurrentHashMap<>();
+    private final Map<String, UiDescriptor> descriptorById = new ConcurrentHashMap<>();
 
     public void loadDirectory(Path uiDirectory, Path texturesDirectory, Consumer<String> onWarning) throws IOException {
         assetBytesById.clear();
         hashById.clear();
+        descriptorById.clear();
 
         Files.createDirectories(uiDirectory);
 
@@ -71,10 +73,15 @@ public final class UiRegistry {
         byte[] assetBytes = new UiAssetPayload(images, descriptorBytes).encode();
         assetBytesById.put(uiId, assetBytes);
         hashById.put(uiId, SHA256.of(assetBytes));
+        descriptorById.put(uiId, descriptor);
     }
 
     public Optional<byte[]> assetBytes(String uiId) {
         return Optional.ofNullable(assetBytesById.get(uiId));
+    }
+
+    public Optional<UiDescriptor> descriptor(String uiId) {
+        return Optional.ofNullable(descriptorById.get(uiId));
     }
 
     public Set<String> uiIds() {

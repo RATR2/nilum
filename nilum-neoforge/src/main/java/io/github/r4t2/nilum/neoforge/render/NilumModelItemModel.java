@@ -3,32 +3,47 @@ package io.github.r4t2.nilum.neoforge.render;
 import io.github.r4t2.nilum.common.asset.ClientModelStore;
 import io.github.r4t2.nilum.common.model.BbBakedQuad;
 import io.github.r4t2.nilum.common.model.BbBakedVertex;
+import io.github.r4t2.nilum.common.model.BbMatrix4;
+import io.github.r4t2.nilum.common.model.BbModel;
+import io.github.r4t2.nilum.common.model.BbOutlinerGroup;
+import io.github.r4t2.nilum.common.model.ClientHeldItemAnimationStates;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.item.ItemModel;
 import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.world.entity.ItemOwner;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /** Wraps an ItemModel. Draws the model's baked geometry if the stack carries a Nilum full-model tag, otherwise delegates to the wrapped model. */
 public final class NilumModelItemModel implements ItemModel {
+
+    private static final Set<ItemDisplayContext> HELD_CONTEXTS = EnumSet.of(
+            ItemDisplayContext.THIRD_PERSON_LEFT_HAND, ItemDisplayContext.THIRD_PERSON_RIGHT_HAND,
+            ItemDisplayContext.FIRST_PERSON_LEFT_HAND, ItemDisplayContext.FIRST_PERSON_RIGHT_HAND);
 
     private final ItemModel original;
     private final ClientModelStore modelStore;
     private final NilumModelItemSpecialRenderer modelRenderer;
     private final NilumGlintSpecialRenderer glintRenderer;
+    private final ClientHeldItemAnimationStates heldItemAnimations;
 
     public NilumModelItemModel(ItemModel original, ClientModelStore modelStore, NilumModelItemSpecialRenderer modelRenderer,
-                                NilumGlintSpecialRenderer glintRenderer) {
+                                NilumGlintSpecialRenderer glintRenderer, ClientHeldItemAnimationStates heldItemAnimations) {
         this.original = original;
         this.modelStore = modelStore;
         this.modelRenderer = modelRenderer;
         this.glintRenderer = glintRenderer;
+        this.heldItemAnimations = heldItemAnimations;
     }
 
     @Override
@@ -52,7 +67,8 @@ public final class NilumModelItemModel implements ItemModel {
                 // ItemEntityRenderer translates dropped items by -Infinity, making them invisible.
                 // See vanilla's own SpecialModelWrapper.update(), which does the same setExtents(...) call.
                 layer.setExtents(() -> modelRenderer.extentsOf(modelId));
-                layer.setupSpecialModel(modelRenderer, modelId);
+                layer.setupSpecialModel(modelRenderer,
+                        buildRenderArgument(modelId, model, itemStack, displayContext, owner));
 
                 GlintRenderData glint = GlintTagReader.read(itemStack, glintQuadsOf(modelId));
                 if (glint != null) {
@@ -69,6 +85,42 @@ public final class NilumModelItemModel implements ItemModel {
         }
 
         original.update(state, itemStack, resolver, displayContext, level, owner, seed);
+    }
+
+    /** Held-hand contexts get a real per-(holder,hand) trigger state (rest by default); every other context (gui/ground/etc.) has no animation to be mid-trigger on, so it's always at rest and gets hide_groups applied directly. */
+    private NilumModelItemSpecialRenderer.RenderArgument buildRenderArgument(String modelId, BbModel model, ItemStack itemStack,
+                                                                              ItemDisplayContext displayContext, @Nullable ItemOwner owner) {
+        LivingEntity holder = !HELD_CONTEXTS.contains(displayContext) || owner == null ? null : owner.asLivingEntity();
+        if (holder == null) {
+            return new NilumModelItemSpecialRenderer.RenderArgument(modelId, null, hiddenBoneUuidsFor(model, itemStack));
+        }
+
+        boolean rightHand = !displayContext.leftHand();
+        heldItemAnimations.noteCurrentModel(holder.getUUID(), rightHand, modelId);
+        var animationState = heldItemAnimations.get(holder.getUUID(), rightHand, model);
+        Map<String, BbMatrix4> bonePose = animationState.pose(model, System.currentTimeMillis());
+
+        Set<String> hiddenBoneUuids = animationState.isIdle(model, System.currentTimeMillis())
+                ? hiddenBoneUuidsFor(model, itemStack)
+                : Set.of();
+
+        return new NilumModelItemSpecialRenderer.RenderArgument(modelId, bonePose, hiddenBoneUuids);
+    }
+
+    private static Set<String> hiddenBoneUuidsFor(BbModel model, ItemStack itemStack) {
+        String raw = NilumItemTags.get(itemStack, "nilum:hide_groups");
+        if (raw == null || raw.isBlank()) {
+            return Set.of();
+        }
+        Set<String> uuids = new HashSet<>();
+        for (String name : raw.split(",")) {
+            String trimmed = name.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            model.findGroup(trimmed).map(BbOutlinerGroup::uuid).ifPresent(uuids::add);
+        }
+        return uuids;
     }
 
     private List<GlintQuad> glintQuadsOf(String modelId) {

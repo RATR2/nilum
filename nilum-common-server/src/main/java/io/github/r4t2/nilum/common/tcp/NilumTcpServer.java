@@ -1,5 +1,7 @@
 package io.github.r4t2.nilum.common.tcp;
 
+import io.github.r4t2.nilum.common.logging.NilumLogger;
+
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -11,15 +13,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /** Server side of the TCP side-channel: */
 public final class NilumTcpServer {
 
     private static final int HANDSHAKE_READ_TIMEOUT_MILLIS = 5000;
-    private static final Logger LOGGER = Logger.getLogger("nilum");
 
+    private final NilumLogger logger;
     private final Map<String, UUID> pendingTokens = new ConcurrentHashMap<>();
     private final BiConsumer<UUID, Socket> onConnected;
     private final ExecutorService connectionHandlers = Executors.newCachedThreadPool(r -> {
@@ -31,7 +31,8 @@ public final class NilumTcpServer {
     private ServerSocket serverSocket;
     private Thread acceptThread;
 
-    public NilumTcpServer(BiConsumer<UUID, Socket> onConnected) {
+    public NilumTcpServer(NilumLogger logger, BiConsumer<UUID, Socket> onConnected) {
+        this.logger = logger;
         this.onConnected = onConnected;
     }
 
@@ -76,7 +77,7 @@ public final class NilumTcpServer {
                 connectionHandlers.submit(() -> handleConnection(socket));
             } catch (IOException e) {
                 if (!serverSocket.isClosed()) {
-                    LOGGER.log(Level.WARNING, "Nilum TCP accept loop error", e);
+                    logger.warn("TCP side-channel accept loop error", e);
                 }
             }
         }
@@ -88,12 +89,15 @@ public final class NilumTcpServer {
             String token = new DataInputStream(socket.getInputStream()).readUTF();
             UUID playerId = pendingTokens.remove(token);
             if (playerId == null) {
+                logger.warn("TCP side-channel connection from " + socket.getRemoteSocketAddress()
+                        + " presented an unknown or already-used token, dropping it.");
                 closeQuietly(socket);
                 return;
             }
             socket.setSoTimeout(0);
             onConnected.accept(playerId, socket);
         } catch (IOException e) {
+            logger.warn("TCP side-channel handshake with " + socket.getRemoteSocketAddress() + " failed", e);
             closeQuietly(socket);
         }
     }
