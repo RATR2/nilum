@@ -76,7 +76,6 @@ Status tracker
 
 - [x] Skript addon
 - [x] `skriptvar(name)` reads a real Skript global variable from the HUD expression language (read-only for now, write support planned for the Custom UI action language)
-- [ ] Denizen extension
 - [x] Public API + permission gating
 - [ ] Connect/disconnect events for other plugins
 
