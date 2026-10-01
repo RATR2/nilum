@@ -36,6 +36,7 @@ import io.github.r4t2.nilum.fabric.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.fabric.network.NilumSetHudTextPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.fabric.network.NilumTrustPendingPayload;
 import io.github.r4t2.nilum.fabric.network.NilumUiButtonClickedPayload;
 import io.github.r4t2.nilum.fabric.network.NilumUiClosedPayload;
 import net.fabricmc.api.ModInitializer;
@@ -84,6 +85,10 @@ public final class NilumFabricMod implements ModInitializer {
         PayloadTypeRegistry.configurationC2S().register(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC);
+        // Same dual registration as hello_ack above: the client doesn't know which phase applies
+        // until it actually receives hello, so trust_pending has to be ready on both.
+        PayloadTypeRegistry.configurationC2S().register(NilumTrustPendingPayload.TYPE, NilumTrustPendingPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(NilumTrustPendingPayload.TYPE, NilumTrustPendingPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumTcpOfferPayload.TYPE, NilumTcpOfferPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumAssetManifestPayload.TYPE, NilumAssetManifestPayload.CODEC);

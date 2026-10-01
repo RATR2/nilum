@@ -16,6 +16,7 @@ import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.fabric.network.NilumTrustPendingPayload;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.FabricServerConfigurationNetworkHandler;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
@@ -70,6 +71,7 @@ public final class FabricServerHandshake {
 
         ServerConfigurationConnectionEvents.CONFIGURE.register(handshake::onConfigure);
         ServerConfigurationNetworking.registerGlobalReceiver(NilumHelloAckPayload.TYPE, handshake::onHelloAck);
+        ServerConfigurationNetworking.registerGlobalReceiver(NilumTrustPendingPayload.TYPE, handshake::onTrustPending);
 
         ServerPlayNetworking.registerGlobalReceiver(NilumTcpUnavailablePayload.TYPE,
                 (payload, context) -> handshake.onTcpUnavailable(context.player()));
@@ -154,6 +156,16 @@ public final class FabricServerHandshake {
                 + ", version=" + ack.modVersion() + ").");
 
         ((FabricServerConfigurationNetworkHandler) handler).completeTask(NilumHandshakeTask.TYPE);
+    }
+
+    /**
+     * The client is showing the player a trust prompt and will send hello_ack once they answer
+     * it. Disarm the configuration-task timeout so a slow decision doesn't get them kicked for
+     * "not responding" while they're actually looking right at the dialog.
+     */
+    private void onTrustPending(NilumTrustPendingPayload payload, ServerConfigurationNetworking.Context context) {
+        UUID playerId = context.networkHandler().getOwner().id();
+        pendingHandshakes.remove(playerId);
     }
 
     private void onJoin(ServerPlayer player) {

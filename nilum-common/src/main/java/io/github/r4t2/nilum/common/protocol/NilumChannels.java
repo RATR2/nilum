@@ -10,6 +10,11 @@ public final class NilumChannels {
     public static final String HELLO_ACK = "hello_ack";
     public static final String HELLO_ACK_QUALIFIED = NAMESPACE + ":" + HELLO_ACK;
 
+    /** Sent by the client the instant it decides to show the player a trust prompt, so the server
+     * knows a real Nilum client is there and stops waiting for {@link #HELLO_ACK} on a timer. */
+    public static final String TRUST_PENDING = "trust_pending";
+    public static final String TRUST_PENDING_QUALIFIED = NAMESPACE + ":" + TRUST_PENDING;
+
     public static final String TCP_OFFER = "tcp_offer";
     public static final String TCP_OFFER_QUALIFIED = NAMESPACE + ":" + TCP_OFFER;
 

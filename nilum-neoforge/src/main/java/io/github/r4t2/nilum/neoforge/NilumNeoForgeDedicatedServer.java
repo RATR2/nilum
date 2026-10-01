@@ -5,6 +5,7 @@ import io.github.r4t2.nilum.common.hosting.NilumAssetHost;
 import io.github.r4t2.nilum.common.logging.NilumLogger;
 import io.github.r4t2.nilum.neoforge.handshake.NeoForgeServerHandshake;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloAckPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumTrustPendingPayload;
 import io.github.r4t2.nilum.neoforge.server.NilumNeoForgeServerBlocks;
 import io.github.r4t2.nilum.neoforge.server.NilumNeoForgeServerModels;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,7 +19,9 @@ import java.util.function.Consumer;
 /** Dedicated-server-only setup: real asset hosting, server handshake, hosted model/block registration. */
 public final class NilumNeoForgeDedicatedServer {
 
-    public record Handlers(BiConsumer<NilumHelloAckPayload, IPayloadContext> helloAck, Consumer<ServerPlayer> tcpUnavailable) {
+    public record Handlers(BiConsumer<NilumHelloAckPayload, IPayloadContext> helloAck,
+                            Consumer<ServerPlayer> tcpUnavailable,
+                            BiConsumer<NilumTrustPendingPayload, IPayloadContext> trustPending) {
     }
 
     private NilumNeoForgeDedicatedServer() {
@@ -40,6 +43,6 @@ public final class NilumNeoForgeDedicatedServer {
         NilumNeoForgeServerModels.register(assetHost, logger);
         NilumNeoForgeServerBlocks.register(assetHost, logger);
 
-        return new Handlers(handshake::onHelloAck, handshake::onTcpUnavailable);
+        return new Handlers(handshake::onHelloAck, handshake::onTcpUnavailable, handshake::onTrustPending);
     }
 }

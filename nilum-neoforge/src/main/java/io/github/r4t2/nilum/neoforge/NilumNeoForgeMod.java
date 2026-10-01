@@ -36,6 +36,7 @@ import io.github.r4t2.nilum.neoforge.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudTextPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.neoforge.network.NilumTrustPendingPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumUiButtonClickedPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumUiClosedPayload;
 import net.minecraft.server.level.ServerPlayer;
@@ -67,6 +68,7 @@ public final class NilumNeoForgeMod {
     private final NilumLogger logger;
     private final BiConsumer<NilumHelloAckPayload, IPayloadContext> helloAckHandler;
     private final Consumer<ServerPlayer> tcpUnavailableHandler;
+    private final BiConsumer<NilumTrustPendingPayload, IPayloadContext> trustPendingHandler;
 
     public NilumNeoForgeMod(IEventBus modEventBus, ModContainer modContainer) {
         String modVersion = modContainer.getModInfo().getVersion().toString();
@@ -97,9 +99,11 @@ public final class NilumNeoForgeMod {
                     NilumNeoForgeDedicatedServer.register(modEventBus, configManager, logger, modVersion, configDir);
             this.helloAckHandler = handlers.helloAck();
             this.tcpUnavailableHandler = handlers.tcpUnavailable();
+            this.trustPendingHandler = handlers.trustPending();
         } else {
             this.helloAckHandler = (payload, context) -> { };
             this.tcpUnavailableHandler = player -> { };
+            this.trustPendingHandler = (payload, context) -> { };
         }
 
         modEventBus.addListener(this::onRegisterPayloadHandlers);
@@ -119,6 +123,13 @@ public final class NilumNeoForgeMod {
         registrar.configurationToServer(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC, helloAckHandler::accept);
         registrar.playToClient(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
         registrar.playToServer(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC, helloAckHandler::accept);
+        // Same dual registration as hello_ack above: the client doesn't know which phase applies
+        // until it actually receives hello, so trust_pending has to be ready on both. A
+        // NeoForge-hosted server's own handshake only ever runs in configuration phase (see
+        // NeoForgeServerHandshake), so the play-phase direction is a no-op here, same as keybind/UI
+        // channels above that only Paper consumes.
+        registrar.configurationToServer(NilumTrustPendingPayload.TYPE, NilumTrustPendingPayload.CODEC, trustPendingHandler::accept);
+        registrar.playToServer(NilumTrustPendingPayload.TYPE, NilumTrustPendingPayload.CODEC, (payload, context) -> { });
         registrar.playToClient(NilumTcpOfferPayload.TYPE, NilumTcpOfferPayload.CODEC);
         registrar.playToServer(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC,
                 (payload, context) -> tcpUnavailableHandler.accept((ServerPlayer) context.player()));

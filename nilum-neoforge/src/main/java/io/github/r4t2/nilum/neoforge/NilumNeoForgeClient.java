@@ -37,6 +37,7 @@ import io.github.r4t2.nilum.common.protocol.SetHudTextPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
+import io.github.r4t2.nilum.common.trust.TrustStore;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.common.util.ServerCacheId;
 import io.github.r4t2.nilum.neoforge.block.ClientBlockRegistry;
@@ -82,6 +83,7 @@ import io.github.r4t2.nilum.neoforge.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudTextPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.neoforge.network.NilumTrustPendingPayload;
 import io.github.r4t2.nilum.neoforge.render.IconAtlas;
 import io.github.r4t2.nilum.neoforge.render.NilumGlintSpecialRenderer;
 import io.github.r4t2.nilum.neoforge.render.NilumIconItemModel;
@@ -91,6 +93,7 @@ import io.github.r4t2.nilum.neoforge.render.NilumItemDisplayRenderer;
 import io.github.r4t2.nilum.neoforge.render.NilumModelItemModel;
 import io.github.r4t2.nilum.neoforge.render.NilumModelItemSpecialRenderer;
 import io.github.r4t2.nilum.neoforge.render.ShaderCapability;
+import io.github.r4t2.nilum.neoforge.trust.NilumTrustPromptScreen;
 import io.github.r4t2.nilum.neoforge.render.TextureUploader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.item.ItemModel;
@@ -130,6 +133,7 @@ final class NilumNeoForgeClient {
     static void register(IEventBus modEventBus, NilumLogger logger, String modVersion) {
         Path assetCacheRoot = FMLPaths.CONFIGDIR.get().resolve("nilum-cache");
         AssetCache assetCache = new AssetCache(assetCacheRoot);
+        TrustStore trustStore = new TrustStore(FMLPaths.CONFIGDIR.get().resolve("nilum").resolve("trusted_servers.txt"));
         ClientModelStore modelStore = new ClientModelStore();
         ClientModelPlacements placements = new ClientModelPlacements();
         ClientHeldItemAnimationStates heldItemAnimations = new ClientHeldItemAnimationStates();
@@ -227,7 +231,7 @@ final class NilumNeoForgeClient {
 
         modEventBus.addListener((RegisterClientPayloadHandlersEvent event) -> {
             event.register(NilumHelloPayload.TYPE, (payload, context) ->
-                    handleHello(payload, context, logger, modVersion, assetCache, assetCacheRoot));
+                    handleHello(payload, context, logger, modVersion, assetCache, assetCacheRoot, trustStore));
             event.register(NilumTcpOfferPayload.TYPE, (payload, context) -> handleTcpOffer(payload, logger, assetSync));
             event.register(NilumAssetManifestPayload.TYPE, (payload, context) -> {
                 List<AssetManifestEntry> entries = AssetManifestPacket.decode(payload.data()).entries();
@@ -367,13 +371,38 @@ final class NilumNeoForgeClient {
     }
 
     private static void handleHello(NilumHelloPayload payload, IPayloadContext context, NilumLogger logger, String modVersion,
-                                     AssetCache assetCache, Path assetCacheRoot) {
+                                     AssetCache assetCache, Path assetCacheRoot, TrustStore trustStore) {
         HelloPacket hello = HelloPacket.decode(payload.data());
 
-        String serverId = ServerCacheId.sanitize(Minecraft.getInstance().getCurrentServer() == null
-                ? null : Minecraft.getInstance().getCurrentServer().ip);
+        String currentServerIp = Minecraft.getInstance().getCurrentServer() == null
+                ? null : Minecraft.getInstance().getCurrentServer().ip;
+        String serverId = ServerCacheId.sanitize(currentServerIp);
         assetCache.rebase(assetCacheRoot.resolve(serverId));
 
+        // context is captured and reply()'d later, once the player answers the trust prompt;
+        // this only works because reply() resolves the connection at call time rather than
+        // freezing it to this specific packet-handling frame (verify this holds for both
+        // configuration and play phase before shipping, see NilumTrustPromptScreen).
+        Runnable sendAck = () -> sendHelloAck(hello, context, logger, modVersion);
+
+        if (trustStore.isTrusted(serverId)) {
+            sendAck.run();
+            return;
+        }
+
+        // Tell the server a real Nilum client is here before the player has answered the prompt,
+        // so its join-time kick timer doesn't fire while they're still looking at the dialog.
+        context.reply(new NilumTrustPendingPayload(new byte[0]));
+        String displayAddress = currentServerIp == null ? "this server" : currentServerIp;
+        Minecraft.getInstance().setScreen(new NilumTrustPromptScreen(displayAddress,
+                () -> {
+                    trustStore.trust(serverId);
+                    sendAck.run();
+                },
+                () -> logger.info("Declined the Nilum trust prompt for " + displayAddress + ".")));
+    }
+
+    private static void sendHelloAck(HelloPacket hello, IPayloadContext context, NilumLogger logger, String modVersion) {
         if (SemanticVersions.isNewer(modVersion, hello.serverModVersion())) {
             logger.warn("This Nilum client (" + modVersion + ") is newer than the server ("
                     + hello.serverModVersion() + "), some features may not be available.");

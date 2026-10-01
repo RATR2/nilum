@@ -144,7 +144,8 @@ Status tracker
 
 - [x] Missing-collision-group console warning
 - [x] `collision_intent` flag
-- [ ] Trust/consent prompt on connect
+- [x] Trust/consent prompt on connect, remembered per-server like vanilla resource pack trust
+- [ ] A way to forget/clear a remembered trust decision (command or config), see Trust/consent prompt above
 - [ ] TCP warning suppress command
 - [ ] Progressive HUD load indicators
 - [x] VRAM budget eviction

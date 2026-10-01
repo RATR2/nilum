@@ -15,6 +15,7 @@ import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumTrustPendingPayload;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -151,6 +152,18 @@ public final class NeoForgeServerHandshake {
                 + ", version=" + ack.modVersion() + ").");
 
         context.finishCurrentTask(NilumHandshakeTask.TYPE);
+    }
+
+    /**
+     * The client is showing the player a trust prompt and will send hello_ack once they answer
+     * it. Disarm the configuration-task timeout so a slow decision doesn't get them kicked for
+     * "not responding" while they're actually looking right at the dialog.
+     */
+    public void onTrustPending(NilumTrustPendingPayload payload, IPayloadContext context) {
+        if (!(context.listener() instanceof ServerConfigurationPacketListenerImpl listener)) {
+            return;
+        }
+        pendingHandshakes.remove(listener.getOwner().id());
     }
 
     public void onTcpUnavailable(ServerPlayer player) {
