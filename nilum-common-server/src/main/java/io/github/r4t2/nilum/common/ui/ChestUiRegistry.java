@@ -1,0 +1,98 @@
+package io.github.r4t2.nilum.common.ui;
+
+import io.github.r4t2.nilum.common.protocol.AssetKind;
+import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
+import io.github.r4t2.nilum.common.util.SHA256;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+
+/** Server-side registry of chest UIs: a type: chest <id>.ui descriptor plus its background texture, served/hashed as a UiAssetPayload. */
+public final class ChestUiRegistry {
+
+    private final Map<String, byte[]> assetBytesById = new ConcurrentHashMap<>();
+    private final Map<String, String> hashById = new ConcurrentHashMap<>();
+    private final Map<String, ChestUiDescriptor> descriptorById = new ConcurrentHashMap<>();
+
+    public void loadDirectory(Path uiDirectory, Path texturesDirectory, Consumer<String> onWarning) throws IOException {
+        assetBytesById.clear();
+        hashById.clear();
+        descriptorById.clear();
+
+        Files.createDirectories(uiDirectory);
+
+        try (Stream<Path> files = Files.list(uiDirectory)) {
+            for (Path descriptorFile : files.filter(ChestUiRegistry::isUiFile).toList()) {
+                String uiId = stripExtension(descriptorFile.getFileName().toString(), ".ui");
+                try {
+                    String source = Files.readString(descriptorFile, StandardCharsets.UTF_8);
+                    // Custom (overlay) type files belong to UiRegistry, which shares this folder; skip silently.
+                    if (!UiParser.peekType(source).equalsIgnoreCase("chest")) {
+                        continue;
+                    }
+                    load(uiId, source, texturesDirectory, onWarning);
+                } catch (RuntimeException | IOException e) {
+                    onWarning.accept("Failed to load chest UI '" + uiId + "': " + e);
+                }
+            }
+        }
+    }
+
+    private void load(String uiId, String source, Path texturesDirectory, Consumer<String> onWarning) throws IOException {
+        byte[] descriptorBytes = source.getBytes(StandardCharsets.UTF_8);
+        ChestUiDescriptor descriptor = ChestUiParser.parse(source);
+
+        Map<String, byte[]> images = new LinkedHashMap<>();
+        Path textureFile = texturesDirectory.resolve(descriptor.background());
+        if (!Files.isRegularFile(textureFile)) {
+            onWarning.accept("Chest UI '" + uiId + "' references background '" + descriptor.background()
+                    + "', which doesn't exist in the textures folder.");
+        } else {
+            images.put(descriptor.background(), Files.readAllBytes(textureFile));
+        }
+
+        byte[] assetBytes = new UiAssetPayload(images, descriptorBytes).encode();
+        assetBytesById.put(uiId, assetBytes);
+        hashById.put(uiId, SHA256.of(assetBytes));
+        descriptorById.put(uiId, descriptor);
+    }
+
+    public Optional<byte[]> assetBytes(String uiId) {
+        return Optional.ofNullable(assetBytesById.get(uiId));
+    }
+
+    public Optional<ChestUiDescriptor> descriptor(String uiId) {
+        return Optional.ofNullable(descriptorById.get(uiId));
+    }
+
+    public Set<String> uiIds() {
+        return Set.copyOf(assetBytesById.keySet());
+    }
+
+    public List<AssetManifestEntry> manifest() {
+        List<AssetManifestEntry> entries = new ArrayList<>();
+        for (Map.Entry<String, String> entry : hashById.entrySet()) {
+            entries.add(new AssetManifestEntry(entry.getKey(), entry.getValue(), AssetKind.CHEST_UI));
+        }
+        return entries;
+    }
+
+    private static boolean isUiFile(Path path) {
+        return Files.isRegularFile(path) && path.getFileName().toString().endsWith(".ui");
+    }
+
+    private static String stripExtension(String fileName, String extension) {
+        return fileName.substring(0, fileName.length() - extension.length());
+    }
+}

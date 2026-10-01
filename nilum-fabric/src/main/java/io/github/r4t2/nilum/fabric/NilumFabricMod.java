@@ -28,12 +28,15 @@ import io.github.r4t2.nilum.fabric.network.NilumKeybindPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumModelSpawnPayload;
+import io.github.r4t2.nilum.fabric.network.NilumOpenChestUiPayload;
 import io.github.r4t2.nilum.fabric.network.NilumOpenUiPayload;
 import io.github.r4t2.nilum.fabric.network.NilumSetHudAtlasVisibilityPayload;
 import io.github.r4t2.nilum.fabric.network.NilumSetHudElementVisibilityPayload;
 import io.github.r4t2.nilum.fabric.network.NilumRegisterClientVarPayload;
 import io.github.r4t2.nilum.fabric.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.fabric.network.NilumSetHudTextPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetUiElementVisibilityPayload;
+import io.github.r4t2.nilum.fabric.network.NilumSetUiTextPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
 import io.github.r4t2.nilum.fabric.network.NilumTrustPendingPayload;
@@ -118,6 +121,9 @@ public final class NilumFabricMod implements ModInitializer {
         PayloadTypeRegistry.playC2S().register(NilumUiButtonClickedPayload.TYPE, NilumUiButtonClickedPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumSetHudAtlasVisibilityPayload.TYPE, NilumSetHudAtlasVisibilityPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NilumSetHudElementVisibilityPayload.TYPE, NilumSetHudElementVisibilityPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumSetUiTextPayload.TYPE, NilumSetUiTextPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumSetUiElementVisibilityPayload.TYPE, NilumSetUiElementVisibilityPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NilumOpenChestUiPayload.TYPE, NilumOpenChestUiPayload.CODEC);
 
         LOGGER.info("Nilum initialized.");
     }

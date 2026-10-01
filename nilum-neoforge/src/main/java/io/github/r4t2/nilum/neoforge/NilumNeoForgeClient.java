@@ -34,6 +34,8 @@ import io.github.r4t2.nilum.common.protocol.OpenUiPacket;
 import io.github.r4t2.nilum.common.protocol.SetHudAtlasVisibilityPacket;
 import io.github.r4t2.nilum.common.protocol.SetHudElementVisibilityPacket;
 import io.github.r4t2.nilum.common.protocol.SetHudTextPacket;
+import io.github.r4t2.nilum.common.protocol.SetUiElementVisibilityPacket;
+import io.github.r4t2.nilum.common.protocol.SetUiTextPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
@@ -50,6 +52,7 @@ import io.github.r4t2.nilum.neoforge.creativetab.NilumCreativeTabs;
 import io.github.r4t2.nilum.neoforge.font.ClientFontStore;
 import io.github.r4t2.nilum.neoforge.font.FontInstaller;
 import io.github.r4t2.nilum.neoforge.hud.ClientHudAtlasStore;
+import io.github.r4t2.nilum.neoforge.network.NilumOpenChestUiPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumOpenUiPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudAtlasVisibilityPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudElementVisibilityPayload;
@@ -81,6 +84,8 @@ import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumRegisterClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudTextPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetUiElementVisibilityPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetUiTextPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTrustPendingPayload;
@@ -178,8 +183,16 @@ final class NilumNeoForgeClient {
             fontStore.install(fontId, data);
         };
 
+        // No NeoForge glyph-provider integration yet (see nilum-fabric's font_icons pipeline), so
+        // streamed icons are cached but not rendered on this loader for now.
+        BiConsumer<String, byte[]> fontIconSink = (iconId, data) -> { };
+
+        // No NeoForge mixin infrastructure (see nilum-fabric's ContainerScreenMixin), so a chest
+        // UI's real inventory/items/click actions all work, but its custom background texture doesn't.
+        BiConsumer<String, byte[]> chestUiSink = (uiId, data) -> { };
+
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
-                shaderPackSink, fontSink, customUiStore::add, logger,
+                shaderPackSink, fontSink, fontIconSink, customUiStore::add, chestUiSink, logger,
                 runnable -> Minecraft.getInstance().execute(runnable));
         TextureUploader textureUploader = new TextureUploader();
         // A model reloading with new bytes under the same id (e.g. a default-retexture block
@@ -283,10 +296,13 @@ final class NilumNeoForgeClient {
             event.register(NilumOpenUiPayload.TYPE, (payload, context) -> {
                 OpenUiPacket packet = OpenUiPacket.decode(payload.data());
                 customUiStore.get(packet.uiId()).ifPresentOrElse(
-                        ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui, logger, fontStore)),
+                        ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui, logger, fontStore, clientVars)),
                         () -> logger.warn("Server opened custom UI '" + packet.uiId()
                                 + "' but it isn't cached on this client yet."));
             });
+            // No background texture swap on NeoForge (see chestUiSink above); the real
+            // inventory/items/click actions still work via vanilla's own container protocol.
+            event.register(NilumOpenChestUiPayload.TYPE, (payload, context) -> { });
             event.register(NilumSetHudAtlasVisibilityPayload.TYPE, (payload, context) -> {
                 SetHudAtlasVisibilityPacket packet = SetHudAtlasVisibilityPacket.decode(payload.data());
                 hudAtlases.setAtlasVisible(packet.atlasId(), packet.visible());
@@ -294,6 +310,18 @@ final class NilumNeoForgeClient {
             event.register(NilumSetHudElementVisibilityPayload.TYPE, (payload, context) -> {
                 SetHudElementVisibilityPacket packet = SetHudElementVisibilityPacket.decode(payload.data());
                 hudAtlases.setElementVisible(packet.atlasId(), packet.elementId(), packet.visible());
+            });
+            event.register(NilumSetUiTextPayload.TYPE, (payload, context) -> {
+                SetUiTextPacket packet = SetUiTextPacket.decode(payload.data());
+                if (Minecraft.getInstance().screen instanceof NilumCustomUiScreen screen && screen.uiId().equals(packet.uiId())) {
+                    screen.updateElementText(packet.elementId(), packet.text());
+                }
+            });
+            event.register(NilumSetUiElementVisibilityPayload.TYPE, (payload, context) -> {
+                SetUiElementVisibilityPacket packet = SetUiElementVisibilityPacket.decode(payload.data());
+                if (Minecraft.getInstance().screen instanceof NilumCustomUiScreen screen && screen.uiId().equals(packet.uiId())) {
+                    screen.setElementVisible(packet.elementId(), packet.visible());
+                }
             });
             event.register(NilumEntityAnimationPlayPayload.TYPE, (payload, context) -> {
                 EntityAnimationPlayPacket packet = EntityAnimationPlayPacket.decode(payload.data());
@@ -331,8 +359,9 @@ final class NilumNeoForgeClient {
                 String modelId = heldItemAnimations.currentModelId(packet.holderId(), packet.rightHand());
                 BbModel model = modelId == null ? null : modelStore.model(modelId).orElse(null);
                 if (model != null) {
+                    String loopModeOverride = packet.loopModeOverride().isBlank() ? null : packet.loopModeOverride();
                     heldItemAnimations.get(packet.holderId(), packet.rightHand(), model)
-                            .play(model, packet.animationName(), packet.startTimeMillis(), System.currentTimeMillis());
+                            .play(model, packet.animationName(), packet.startTimeMillis(), System.currentTimeMillis(), loopModeOverride);
                 }
             });
             event.register(NilumItemAnimationStopPayload.TYPE, (payload, context) -> {

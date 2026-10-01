@@ -37,6 +37,12 @@ public final class UiRegistry {
             for (Path descriptorFile : files.filter(UiRegistry::isUiFile).toList()) {
                 String uiId = stripExtension(descriptorFile.getFileName().toString(), ".ui");
                 try {
+                    String source = Files.readString(descriptorFile, StandardCharsets.UTF_8);
+                    // Non-"custom" typed files (e.g. type: chest) belong to a different registry
+                    // sharing this same folder; skip them silently rather than warning.
+                    if (!UiParser.peekType(source).equalsIgnoreCase("custom")) {
+                        continue;
+                    }
                     load(uiId, descriptorFile, texturesDirectory, onWarning);
                 } catch (RuntimeException | IOException e) {
                     onWarning.accept("Failed to load custom UI '" + uiId + "': " + e);

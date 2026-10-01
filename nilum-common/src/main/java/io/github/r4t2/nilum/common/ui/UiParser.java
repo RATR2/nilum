@@ -1,10 +1,13 @@
 package io.github.r4t2.nilum.common.ui;
 
+import io.github.r4t2.nilum.common.util.ScreenValue;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /** Parses a .ui descriptor in the same hand-rolled grammar as .atlas: top-level key: value lines plus element blocks. */
 public final class UiParser {
@@ -14,6 +17,20 @@ public final class UiParser {
     private static final Pattern TOP_LEVEL_LINE = Pattern.compile("^(\\S[\\w.-]*):\\s*(.*)$");
 
     private UiParser() {
+    }
+
+    /** Reads just the top-level 'type' field without fully parsing, so a registry can tell whose file this is. */
+    public static String peekType(String source) {
+        for (String line : source.split("\n", -1)) {
+            if (line.isBlank() || line.stripLeading().startsWith("#") || Character.isWhitespace(line.charAt(0))) {
+                continue;
+            }
+            Matcher topMatcher = TOP_LEVEL_LINE.matcher(line);
+            if (topMatcher.matches() && topMatcher.group(1).equals("type")) {
+                return unquote(topMatcher.group(2).trim());
+            }
+        }
+        return "custom";
     }
 
     public static UiDescriptor parse(String source) {
@@ -79,7 +96,7 @@ public final class UiParser {
 
     private static UiElement parseElement(String id, Map<String, String> fields) {
         String typeStr = require(fields, id, "type");
-        int[] position = requireIntArray(fields, "position", "Element '" + id + "'");
+        ScreenValue[] position = requireScreenValueArray(fields, "position", "Element '" + id + "'");
         int layer = fields.containsKey("layer") ? Integer.parseInt(fields.get("layer")) : 0;
         Optional<String> requirement = Optional.ofNullable(fields.get("requirement"));
 
@@ -87,11 +104,14 @@ public final class UiParser {
             String imageFile = require(fields, id, "image");
             String pressedImageFile = require(fields, id, "pressed");
             Optional<String> action = Optional.ofNullable(fields.get("action"));
-            return new UiElement.Button(imageFile, pressedImageFile, position[0], position[1], layer, requirement, action);
+            Size size = parseSize(fields);
+            return new UiElement.Button(imageFile, pressedImageFile, position[0], position[1], layer, requirement, action,
+                    size.width(), size.height());
         }
         if (typeStr.equalsIgnoreCase("image")) {
             String imageFile = require(fields, id, "image");
-            return new UiElement.Image(imageFile, position[0], position[1], layer, requirement);
+            Size size = parseSize(fields);
+            return new UiElement.Image(imageFile, position[0], position[1], layer, requirement, size.width(), size.height());
         }
         if (typeStr.equalsIgnoreCase("text")) {
             return parseTextElement(id, fields, position, layer, requirement);
@@ -103,19 +123,21 @@ public final class UiParser {
         throw new UiParseException("Element '" + id + "' has unknown type '" + typeStr + "'");
     }
 
-    private static UiElement.Text parseTextElement(String id, Map<String, String> fields, int[] position, int layer,
+    private static UiElement.Text parseTextElement(String id, Map<String, String> fields, ScreenValue[] position, int layer,
                                                      Optional<String> requirement) {
         String font = fields.getOrDefault("font", "default");
         Optional<String> text = Optional.ofNullable(fields.get("text"));
         Optional<String> clientConnector = Optional.ofNullable(fields.get("client_connector"));
-        if (text.isEmpty() && clientConnector.isEmpty()) {
-            throw new UiParseException("Element '" + id + "' is type 'text' but has neither 'text' nor 'client_connector'");
+        Optional<String> serverConnector = Optional.ofNullable(fields.get("server_connector"));
+        long present = Stream.of(text, clientConnector, serverConnector).filter(Optional::isPresent).count();
+        if (present == 0) {
+            throw new UiParseException("Element '" + id + "' is type 'text' but has none of 'text', 'client_connector', 'server_connector'");
         }
-        if (text.isPresent() && clientConnector.isPresent()) {
-            throw new UiParseException("Element '" + id + "' has both 'text' and 'client_connector', only one is allowed");
+        if (present > 1) {
+            throw new UiParseException("Element '" + id + "' has more than one of 'text', 'client_connector', 'server_connector'; only one is allowed");
         }
         int color = fields.containsKey("color") ? parseColor(fields.get("color")) : 0xFFFFFFFF;
-        return new UiElement.Text(font, text, clientConnector, color, position[0], position[1], layer, requirement);
+        return new UiElement.Text(font, text, clientConnector, serverConnector, color, position[0], position[1], layer, requirement);
     }
 
     private static int parseColor(String raw) {
@@ -131,23 +153,31 @@ public final class UiParser {
         return value;
     }
 
-    private static int[] requireIntArray(Map<String, String> fields, String field, String context) {
+    private record Size(Optional<ScreenValue> width, Optional<ScreenValue> height) {
+    }
+
+    /** Independent on-screen draw size for image/button, defaulting to the texture's native size when absent. */
+    private static Size parseSize(Map<String, String> fields) {
+        if (!fields.containsKey("size")) {
+            return new Size(Optional.empty(), Optional.empty());
+        }
+        ScreenValue[] parsed = requireScreenValueArray(fields, "size", "'size'");
+        return new Size(Optional.of(parsed[0]), Optional.of(parsed[1]));
+    }
+
+    private static ScreenValue[] requireScreenValueArray(Map<String, String> fields, String field, String context) {
         String raw = fields.get(field);
         if (raw == null) {
             throw new UiParseException(context + " is missing required '" + field + "' field");
         }
-        return parseIntArray(raw);
-    }
-
-    private static int[] parseIntArray(String raw) {
         String trimmed = raw.trim();
         if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
             trimmed = trimmed.substring(1, trimmed.length() - 1);
         }
         String[] parts = trimmed.split(",");
-        int[] values = new int[parts.length];
+        ScreenValue[] values = new ScreenValue[parts.length];
         for (int i = 0; i < parts.length; i++) {
-            values[i] = Integer.parseInt(parts[i].trim());
+            values[i] = ScreenValue.parse(parts[i]);
         }
         return values;
     }

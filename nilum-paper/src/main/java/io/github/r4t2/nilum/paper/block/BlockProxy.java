@@ -19,7 +19,7 @@ public sealed interface BlockProxy {
     }
 
     /** Mechanics enforced manually; wireBlock must still be a real breakable material. Creative insta-break is always suppressed. */
-    record Custom(Material wireBlock, double breakTimeSeconds, boolean explosionResistant) implements BlockProxy {
+    record Custom(Material wireBlock, double breakTimeSeconds, boolean explosionResistant, int xpPerBreak) implements BlockProxy {
         @Override
         public Material wireMaterial() {
             return wireBlock;

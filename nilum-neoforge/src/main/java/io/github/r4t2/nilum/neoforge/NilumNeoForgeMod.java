@@ -28,12 +28,15 @@ import io.github.r4t2.nilum.neoforge.network.NilumKeybindPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModListPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumOpenChestUiPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumOpenUiPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudAtlasVisibilityPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudElementVisibilityPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumRegisterClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudTextPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetUiElementVisibilityPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetUiTextPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTrustPendingPayload;
@@ -160,11 +163,14 @@ public final class NilumNeoForgeMod {
         // vanilla material and streams the overlay position/model over this same wire format.
         registrar.playToClient(NilumChunkBlocksPayload.TYPE, NilumChunkBlocksPayload.CODEC);
         registrar.playToClient(NilumOpenUiPayload.TYPE, NilumOpenUiPayload.CODEC);
+        registrar.playToClient(NilumOpenChestUiPayload.TYPE, NilumOpenChestUiPayload.CODEC);
         // Custom UI open/close is Skript/Paper-only for now, a NeoForge-hosted server has no
         // consumer for this, same as keybinds above.
         registrar.playToServer(NilumUiClosedPayload.TYPE, NilumUiClosedPayload.CODEC, (payload, context) -> { });
         registrar.playToServer(NilumUiButtonClickedPayload.TYPE, NilumUiButtonClickedPayload.CODEC, (payload, context) -> { });
         registrar.playToClient(NilumSetHudAtlasVisibilityPayload.TYPE, NilumSetHudAtlasVisibilityPayload.CODEC);
         registrar.playToClient(NilumSetHudElementVisibilityPayload.TYPE, NilumSetHudElementVisibilityPayload.CODEC);
+        registrar.playToClient(NilumSetUiTextPayload.TYPE, NilumSetUiTextPayload.CODEC);
+        registrar.playToClient(NilumSetUiElementVisibilityPayload.TYPE, NilumSetUiElementVisibilityPayload.CODEC);
     }
 }

@@ -128,7 +128,8 @@ public final class BlockDefinitionRegistry {
                 }
                 yield new BlockProxy.Custom(wireBlock,
                         proxySection.getDouble("break_time_seconds", 1.0),
-                        proxySection.getBoolean("explosion_resistant", false));
+                        proxySection.getBoolean("explosion_resistant", false),
+                        proxySection.getInt("xp", 0));
             }
             default -> throw new IllegalArgumentException("block definition '" + id
                     + "' has unknown proxy.mode '" + mode + "' (expected 'vanilla' or 'custom')");

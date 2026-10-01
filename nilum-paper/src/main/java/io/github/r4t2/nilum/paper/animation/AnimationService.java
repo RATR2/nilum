@@ -45,8 +45,14 @@ public final class AnimationService {
 
     /** mainHand is the caller's intent ("their main hand"); resolved here to the visual left/right side the client keys state by. */
     public void playHeldItemAnimation(Player player, boolean mainHand, String animationName) {
+        playHeldItemAnimation(player, mainHand, animationName, null);
+    }
+
+    /** @param loopModeOverride "once", "hold", or "loop" to force a mode instead of the animation's own authored one; null for no override */
+    public void playHeldItemAnimation(Player player, boolean mainHand, String animationName, String loopModeOverride) {
         broadcast(NilumChannels.ITEM_ANIMATION_PLAY_QUALIFIED, new ItemAnimationPlayPacket(
-                player.getUniqueId(), resolveVisualRightHand(player, mainHand), animationName, System.currentTimeMillis()).encode());
+                player.getUniqueId(), resolveVisualRightHand(player, mainHand), animationName, System.currentTimeMillis(),
+                loopModeOverride == null ? "" : loopModeOverride).encode());
     }
 
     public void stopHeldItemAnimation(Player player, boolean mainHand) {

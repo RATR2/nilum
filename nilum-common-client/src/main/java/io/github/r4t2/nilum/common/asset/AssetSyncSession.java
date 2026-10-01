@@ -18,7 +18,9 @@ public final class AssetSyncSession {
     private final BiConsumer<String, byte[]> hudAtlasSink;
     private final BiConsumer<String, byte[]> shaderPackSink;
     private final BiConsumer<String, byte[]> fontSink;
+    private final BiConsumer<String, byte[]> fontIconSink;
     private final BiConsumer<String, byte[]> customUiSink;
+    private final BiConsumer<String, byte[]> chestUiSink;
     private final NilumLogger logger;
     private final Executor mainThreadExecutor;
 
@@ -34,7 +36,8 @@ public final class AssetSyncSession {
      */
     public AssetSyncSession(AssetCache cache, ClientModelStore modelStore, BiConsumer<String, byte[]> iconSink,
                              BiConsumer<String, byte[]> hudAtlasSink, BiConsumer<String, byte[]> shaderPackSink,
-                             BiConsumer<String, byte[]> fontSink, BiConsumer<String, byte[]> customUiSink,
+                             BiConsumer<String, byte[]> fontSink, BiConsumer<String, byte[]> fontIconSink,
+                             BiConsumer<String, byte[]> customUiSink, BiConsumer<String, byte[]> chestUiSink,
                              NilumLogger logger, Executor mainThreadExecutor) {
         this.cache = cache;
         this.modelStore = modelStore;
@@ -42,7 +45,9 @@ public final class AssetSyncSession {
         this.hudAtlasSink = hudAtlasSink;
         this.shaderPackSink = shaderPackSink;
         this.fontSink = fontSink;
+        this.fontIconSink = fontIconSink;
         this.customUiSink = customUiSink;
+        this.chestUiSink = chestUiSink;
         this.logger = logger;
         this.mainThreadExecutor = mainThreadExecutor;
     }
@@ -113,7 +118,9 @@ public final class AssetSyncSession {
                 case HUD_ATLAS -> hudAtlasSink.accept(entry.assetId(), data);
                 case SHADER_PACK -> shaderPackSink.accept(entry.assetId(), data);
                 case FONT -> fontSink.accept(entry.assetId(), data);
+                case FONT_ICON -> fontIconSink.accept(entry.assetId(), data);
                 case CUSTOM_UI -> customUiSink.accept(entry.assetId(), data);
+                case CHEST_UI -> chestUiSink.accept(entry.assetId(), data);
             }
         } catch (RuntimeException e) {
             logger.warn("Failed to parse asset '" + entry.assetId() + "'", e);

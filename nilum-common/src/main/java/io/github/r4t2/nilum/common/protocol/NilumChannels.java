@@ -87,6 +87,12 @@ public final class NilumChannels {
     public static final String UI_BUTTON_CLICKED = "ui_button_clicked";
     public static final String UI_BUTTON_CLICKED_QUALIFIED = NAMESPACE + ":" + UI_BUTTON_CLICKED;
 
+    public static final String SET_UI_TEXT = "set_ui_text";
+    public static final String SET_UI_TEXT_QUALIFIED = NAMESPACE + ":" + SET_UI_TEXT;
+
+    public static final String SET_UI_ELEMENT_VISIBILITY = "set_ui_element_visibility";
+    public static final String SET_UI_ELEMENT_VISIBILITY_QUALIFIED = NAMESPACE + ":" + SET_UI_ELEMENT_VISIBILITY;
+
     public static final String ITEM_DEFINED_ASSETS = "item_defined_assets";
     public static final String ITEM_DEFINED_ASSETS_QUALIFIED = NAMESPACE + ":" + ITEM_DEFINED_ASSETS;
 
@@ -101,6 +107,9 @@ public final class NilumChannels {
 
     public static final String ITEM_ANIMATION_STOP = "item_animation_stop";
     public static final String ITEM_ANIMATION_STOP_QUALIFIED = NAMESPACE + ":" + ITEM_ANIMATION_STOP;
+
+    public static final String OPEN_CHEST_UI = "open_chest_ui";
+    public static final String OPEN_CHEST_UI_QUALIFIED = NAMESPACE + ":" + OPEN_CHEST_UI;
 
     private NilumChannels() {
     }

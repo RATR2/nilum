@@ -16,14 +16,21 @@ public final class AnimationPlaybackState {
     private boolean triggered = false;
     private String animationName;
     private long startTimeMillis;
+    private String loopModeOverride;
     private Map<String, BbMatrix4> blendFromPose;
     private long blendStartMillis;
 
     public synchronized void play(BbModel model, String animationName, long startTimeMillis, long nowMillis) {
+        play(model, animationName, startTimeMillis, nowMillis, null);
+    }
+
+    /** @param loopModeOverride "once", "hold", or "loop" to force a mode instead of the animation's own authored one; null for no override */
+    public synchronized void play(BbModel model, String animationName, long startTimeMillis, long nowMillis, String loopModeOverride) {
         blendFromPose = pose(model, nowMillis);
         blendStartMillis = nowMillis;
         this.animationName = animationName;
         this.startTimeMillis = startTimeMillis;
+        this.loopModeOverride = loopModeOverride;
         this.triggered = true;
     }
 
@@ -31,6 +38,7 @@ public final class AnimationPlaybackState {
         blendFromPose = pose(model, nowMillis);
         blendStartMillis = nowMillis;
         this.animationName = null;
+        this.loopModeOverride = null;
         this.triggered = true;
     }
 
@@ -51,7 +59,7 @@ public final class AnimationPlaybackState {
             return true;
         }
         double elapsed = Math.max(0, (nowMillis - startTimeMillis) / 1000.0);
-        return "once".equals(animation.loop()) && elapsed >= animation.length();
+        return "once".equals(effectiveLoopMode(animation)) && elapsed >= animation.length();
     }
 
     public synchronized Map<String, BbMatrix4> pose(BbModel model, long nowMillis) {
@@ -79,13 +87,17 @@ public final class AnimationPlaybackState {
         }
 
         double elapsed = Math.max(0, (nowMillis - startTimeMillis) / 1000.0);
-        return switch (animation.loop()) {
+        return switch (effectiveLoopMode(animation)) {
             case "hold" -> BbBonePose.compute(model, animation, Math.min(elapsed, animation.length()));
             case "once" -> elapsed >= animation.length()
                     ? BbBonePose.compute(model, null, 0)
                     : BbBonePose.compute(model, animation, elapsed);
             default -> BbBonePose.compute(model, animation, elapsed % animation.length());
         };
+    }
+
+    private String effectiveLoopMode(BbAnimation animation) {
+        return loopModeOverride != null ? loopModeOverride : animation.loop();
     }
 
     private static Map<String, BbMatrix4> lerpPoses(Map<String, BbMatrix4> from, Map<String, BbMatrix4> to, float t) {

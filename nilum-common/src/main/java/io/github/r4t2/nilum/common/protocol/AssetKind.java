@@ -7,5 +7,7 @@ public enum AssetKind {
     HUD_ATLAS,
     SHADER_PACK,
     FONT,
-    CUSTOM_UI
+    FONT_ICON,
+    CUSTOM_UI,
+    CHEST_UI
 }

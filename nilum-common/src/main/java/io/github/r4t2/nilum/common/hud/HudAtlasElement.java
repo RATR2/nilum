@@ -1,13 +1,26 @@
 package io.github.r4t2.nilum.common.hud;
 
+import io.github.r4t2.nilum.common.util.ScreenValue;
+
 import java.util.Optional;
 
 /** One named region of a HUD atlas: a spritesheet frame strip (Sprite), its own texture (Image), or rendered text (Text). */
 public sealed interface HudAtlasElement {
 
-    int screenX();
+    ScreenValue screenX();
 
-    int screenY();
+    ScreenValue screenY();
+
+    /**
+     * Which screen corner/edge/center screenX/screenY are measured from. Defaults to top-left
+     * (screenX/screenY as literal pixels, matching this format's original behavior) for every
+     * type except Duplicate, which always stays top-left: its bounding box grows with a
+     * server-driven count, so anchoring it from the right/bottom/center would shift the whole
+     * strip every time that count changes.
+     */
+    default HudElementAnchor anchor() {
+        return HudElementAnchor.TOP_LEFT;
+    }
 
     /** Pixel rect within a frame strip for one frame index, clamped to frameCount. Shared by Sprite/Image/Duplicate. */
     static int frameOrigin(HudElementLayout activeLayout, HudElementLayout layout, int origin, int frameSize, int frameCount, int frame) {
@@ -26,8 +39,11 @@ public sealed interface HudAtlasElement {
             HudElementType type,
             Optional<String> clientConnector,
             int staticFrame,
-            int screenX,
-            int screenY
+            ScreenValue screenX,
+            ScreenValue screenY,
+            HudElementAnchor anchor,
+            Optional<ScreenValue> screenWidth,
+            Optional<ScreenValue> screenHeight
     ) implements HudAtlasElement {
 
         public int frameOriginX(int frame) {
@@ -51,8 +67,11 @@ public sealed interface HudAtlasElement {
             HudElementType type,
             Optional<String> clientConnector,
             int staticFrame,
-            int screenX,
-            int screenY
+            ScreenValue screenX,
+            ScreenValue screenY,
+            HudElementAnchor anchor,
+            Optional<ScreenValue> screenWidth,
+            Optional<ScreenValue> screenHeight
     ) implements HudAtlasElement {
 
         public int frameOriginX(int frame) {
@@ -73,8 +92,9 @@ public sealed interface HudAtlasElement {
             Optional<String> clientConnector,
             Optional<String> serverConnector,
             Optional<String> format,
-            int screenX,
-            int screenY
+            ScreenValue screenX,
+            ScreenValue screenY,
+            HudElementAnchor anchor
     ) implements HudAtlasElement {
     }
 
@@ -92,8 +112,8 @@ public sealed interface HudAtlasElement {
             int imageFrame,
             int offsetX,
             int offsetY,
-            int screenX,
-            int screenY
+            ScreenValue screenX,
+            ScreenValue screenY
     ) implements HudAtlasElement {
 
         public int frameOriginX() {

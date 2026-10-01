@@ -1,6 +1,7 @@
 package io.github.r4t2.nilum.fabric.font;
 
 import com.mojang.blaze3d.font.GlyphProvider;
+import io.github.r4t2.nilum.fabric.NilumFabricClient;
 import io.github.r4t2.nilum.fabric.NilumFabricMod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -42,7 +43,10 @@ public final class ClientFontStore {
         Identifier fontSetId = Identifier.fromNamespaceAndPath("nilum", "font/" + fontId);
         GlyphStitcher stitcher = new GlyphStitcher(Minecraft.getInstance().getTextureManager(), fontSetId);
         FontSet fontSet = new FontSet(stitcher);
-        fontSet.reload(List.of(new GlyphProvider.Conditional(provider, FontOption.Filter.ALWAYS_PASS)), Set.of());
+        fontSet.reload(List.of(
+                new GlyphProvider.Conditional(provider, FontOption.Filter.ALWAYS_PASS),
+                new GlyphProvider.Conditional(NilumFabricClient.FONT_ICON_PROVIDER, FontOption.Filter.ALWAYS_PASS)
+        ), Set.of());
         return new Font(new NilumFontProvider(fontSet));
     }
 

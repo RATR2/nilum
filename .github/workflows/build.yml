@@ -76,6 +76,7 @@ jobs:
           echo "has_workflow=$HAS_WORKFLOW" >> "$GITHUB_OUTPUT"
           echo "has_build=$HAS_BUILD" >> "$GITHUB_OUTPUT"
           echo "sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "full_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Bump version
         if: steps.classify.outputs.is_bot == 'false' && steps.classify.outputs.has_workflow == 'true' && steps.classify.outputs.requested_version != ''
@@ -97,5 +98,6 @@ jobs:
         env:
           NILUM_BUILDS_TOKEN: ${{ secrets.NILUM_BUILDS_TOKEN }}
           COMMIT_SHA: ${{ steps.classify.outputs.sha }}
+          COMMIT_SHA_FULL: ${{ steps.classify.outputs.full_sha }}
           GH_TOKEN: ${{ github.token }}
         run: scripts/ci/build-and-publish-branch.sh

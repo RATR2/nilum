@@ -112,7 +112,9 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         entries.addAll(plugin.hudAtlases().manifest());
         entries.addAll(plugin.shaderPacks().manifest());
         entries.addAll(plugin.fonts().manifest());
+        entries.addAll(plugin.fontIcons().manifest());
         entries.addAll(plugin.uis().manifest());
+        entries.addAll(plugin.chestUis().manifest());
         return entries;
     }
 
@@ -359,7 +361,9 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
             case HUD_ATLAS -> plugin.hudAtlases().assetBytes(id).orElse(null);
             case SHADER_PACK -> plugin.shaderPacks().rawBytes(id).orElse(null);
             case FONT -> plugin.fonts().rawBytes(id).orElse(null);
+            case FONT_ICON -> plugin.fontIcons().rawBytes(id).orElse(null);
             case CUSTOM_UI -> plugin.uis().assetBytes(id).orElse(null);
+            case CHEST_UI -> plugin.chestUis().assetBytes(id).orElse(null);
         });
     }
 

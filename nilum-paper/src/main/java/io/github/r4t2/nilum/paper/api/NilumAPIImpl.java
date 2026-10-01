@@ -83,6 +83,11 @@ public final class NilumAPIImpl implements NilumAPI {
     }
 
     @Override
+    public void playHeldItemAnimation(Player player, boolean mainHand, String animationName, String loopMode) {
+        plugin.animations().playHeldItemAnimation(player, mainHand, animationName, loopMode);
+    }
+
+    @Override
     public void stopHeldItemAnimation(Player player, boolean mainHand) {
         plugin.animations().stopHeldItemAnimation(player, mainHand);
     }
@@ -114,7 +119,10 @@ public final class NilumAPIImpl implements NilumAPI {
 
     @Override
     public boolean openCustomUi(Player player, String uiId) {
-        return plugin.uiSessions().open(player, uiId);
+        if (plugin.uis().descriptor(uiId).isPresent()) {
+            return plugin.uiSessions().open(player, uiId);
+        }
+        return plugin.chestUiSessions().open(player, uiId);
     }
 
     @Override

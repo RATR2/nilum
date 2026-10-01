@@ -141,6 +141,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             case "blocks" -> reloadAndReport(sender, plugin.reloadBlocks(), "Block definitions", "reload the blocks folder");
             case "shaderpacks" -> reloadAndReport(sender, plugin.reloadShaderPacks(), "Shader packs", "reload the shaderpacks folder");
             case "fonts" -> reloadAndReport(sender, plugin.reloadFonts(), "Fonts", "reload the fonts folder");
+            case "font_icons" -> reloadAndReport(sender, plugin.reloadFontIcons(), "Font icons", "reload the font_icons folder");
             case "tcp" -> reloadAndReport(sender, plugin.reloadTcp(), "TCP side-channel", "reload the TCP side-channel");
             case "config" -> reloadAndReport(sender, plugin.reloadSettings(), "Config", "reload the config");
             case "ui" -> reloadAndReport(sender, plugin.reloadUis(), "Custom UIs", "reload the ui folder");
@@ -581,7 +582,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2) {
             return switch (args[0].toLowerCase(Locale.ROOT)) {
                 case "reload" -> filterByPrefix(
-                        List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "tcp", "config", "ui", "worldgen"), args[1]);
+                        List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "font_icons", "tcp", "config", "ui", "worldgen"), args[1]);
                 case "placemodel", "givemodel", "giveskeleton" -> filterByPrefix(plugin.models().modelIds(), args[1]);
                 case "placeblock" -> filterByPrefix(plugin.blockDefinitions().blockIds(), args[1]);
                 case "playanim", "stopanim" -> filterByPrefix(List.of("self"), args[1]);
