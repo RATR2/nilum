@@ -96,8 +96,9 @@ Status tracker
 
 ## Custom Biomes
 
-- [ ] Custom biome definitions (custom generation settings)
-- [ ] Custom block support in custom biome generation
+- [x] Custom biome definitions (custom generation settings), Paper-only, generated as a real vanilla datapack (restart required to apply, see `/nilum reload worldgen`)
+- [ ] Custom biome/dimension datapack generation on Fabric/NeoForge-hosted servers (Paper landed first, see Modded Server Hosting)
+- [ ] Custom block support in custom biome generation (needs a post-generation chunk pass; Nilum blocks can't be placed by vanilla feature/surface-rule machinery)
 - [ ] Datapack-like per-biome shader configuration
 
 ## Modded Server Hosting
@@ -113,8 +114,8 @@ Status tracker
 
 ## Dimensions
 
-- [ ] Custom world generation (define new chunk/noise generation settings)
-- [ ] Custom dimensions that use a defined custom world gen
+- [x] Custom world generation (define new chunk/noise generation settings), Phase 1: flat generator over a defined biome, generated as a real vanilla datapack -- noise-based terrain (surface rules, density functions) is a future phase
+- [x] Custom dimensions that use a defined custom world gen
 
 ## Custom UIs
 

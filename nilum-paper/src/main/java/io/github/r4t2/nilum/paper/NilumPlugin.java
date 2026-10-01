@@ -16,6 +16,8 @@ import io.github.r4t2.nilum.common.model.ModelLoadError;
 import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.common.shader.ShaderPackRegistry;
+import io.github.r4t2.nilum.common.worldgen.DatapackWriter;
+import io.github.r4t2.nilum.common.worldgen.WorldgenDefinitionRegistry;
 import io.github.r4t2.nilum.paper.animation.AnimationService;
 import io.github.r4t2.nilum.api.NilumAPI;
 import io.github.r4t2.nilum.paper.api.NilumAPIImpl;
@@ -74,6 +76,7 @@ public final class NilumPlugin extends JavaPlugin {
     private FontRegistry fontRegistry;
     private AnimationService animationService;
     private NilumCollisionRegistry collisionRegistry;
+    private WorldgenDefinitionRegistry worldgenDefinitionRegistry;
     private UiRegistry uiRegistry;
     private UiSessionService uiSessionService;
     private String buildCommit = "unknown";
@@ -150,6 +153,8 @@ public final class NilumPlugin extends JavaPlugin {
         animationService = new AnimationService(this);
         reloadFonts();
         reloadUis();
+        worldgenDefinitionRegistry = new WorldgenDefinitionRegistry(logger);
+        reloadWorldgen();
         hudTextService.start(configManager.get(HudTextConfig.ENABLED), configManager.get(HudTextConfig.UPDATE_INTERVAL_TICKS));
 
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.HELLO_QUALIFIED);
@@ -357,6 +362,33 @@ public final class NilumPlugin extends JavaPlugin {
             return true;
         } catch (IOException e) {
             logger.error("Failed to reload the blocks folder", e);
+            return false;
+        }
+    }
+
+    /**
+     * Regenerates the nilum_worldgen datapack from the biomes/dimensions folders into the default
+     * world's datapacks folder. Unlike every other reload*() here, this does <b>not</b> take
+     * effect live: Minecraft only reads biome/dimension/dimension_type registries once, from
+     * datapacks, at server bootstrap, so a restart is required for the regenerated files to apply.
+     *
+     * @return true if the reload succeeded.
+     */
+    public boolean reloadWorldgen() {
+        try {
+            worldgenDefinitionRegistry.loadBiomes(getDataFolder().toPath().resolve("biomes"));
+            worldgenDefinitionRegistry.loadDimensions(getDataFolder().toPath().resolve("dimensions"));
+
+            Path datapackRoot = getServer().getWorlds().get(0).getWorldFolder().toPath()
+                    .resolve("datapacks").resolve("nilum_worldgen");
+            DatapackWriter.writeAll(datapackRoot, worldgenDefinitionRegistry);
+
+            logger.info("Regenerated the nilum_worldgen datapack: " + worldgenDefinitionRegistry.biomeIds().size()
+                    + " biome(s), " + worldgenDefinitionRegistry.dimensionIds().size() + " dimension(s), written to "
+                    + datapackRoot + " -- restart the server to apply them.");
+            return true;
+        } catch (IOException e) {
+            logger.error("Failed to reload the biomes/dimensions folders", e);
             return false;
         }
     }
