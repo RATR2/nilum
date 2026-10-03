@@ -24,4 +24,4 @@ git commit -m "release: nilum ${VERSION} (${COMMIT_SHA})"
 git push -u origin "release/${VERSION}"
 
 cd "${NILUM_ROOT}"
-publish_api_release "${VERSION}" "${COMMIT_SHA}"
+publish_api_release "${VERSION}" "${COMMIT_SHA_FULL}"

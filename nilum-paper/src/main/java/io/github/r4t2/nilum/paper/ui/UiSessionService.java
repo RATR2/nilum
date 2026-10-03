@@ -2,6 +2,8 @@ package io.github.r4t2.nilum.paper.ui;
 
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.common.protocol.OpenUiPacket;
+import io.github.r4t2.nilum.common.protocol.SetUiElementVisibilityPacket;
+import io.github.r4t2.nilum.common.protocol.SetUiTextPacket;
 import io.github.r4t2.nilum.paper.NilumPlugin;
 import io.github.r4t2.nilum.paper.event.NilumUiCloseEvent;
 import org.bukkit.entity.Player;
@@ -31,11 +33,32 @@ public final class UiSessionService {
         }
         openUiByPlayer.put(player.getUniqueId(), uiId);
         player.sendPluginMessage(plugin, NilumChannels.OPEN_UI_QUALIFIED, new OpenUiPacket(uiId).encode());
+        plugin.uiState().onOpen(player, uiId);
         return true;
     }
 
     public Optional<String> openUiFor(Player player) {
         return Optional.ofNullable(openUiByPlayer.get(player.getUniqueId()));
+    }
+
+    /** A snapshot of every player currently in a UI session, for UiStateService's own periodic tick. */
+    public Map<UUID, String> openSessions() {
+        return Map.copyOf(openUiByPlayer);
+    }
+
+    public void setElementVisible(Player player, String uiId, String elementId, boolean visible) {
+        send(player, NilumChannels.SET_UI_ELEMENT_VISIBILITY_QUALIFIED,
+                new SetUiElementVisibilityPacket(uiId, elementId, visible).encode());
+    }
+
+    public void setElementText(Player player, String uiId, String elementId, String text) {
+        send(player, NilumChannels.SET_UI_TEXT_QUALIFIED, new SetUiTextPacket(uiId, elementId, text).encode());
+    }
+
+    private void send(Player player, String channel, byte[] data) {
+        if (plugin.handshakes().hasClient(player.getUniqueId())) {
+            player.sendPluginMessage(plugin, channel, data);
+        }
     }
 
     public void onClosed(Player player, String uiId) {

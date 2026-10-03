@@ -16,6 +16,7 @@ import io.github.r4t2.nilum.fabric.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.fabric.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.fabric.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.fabric.network.NilumTrustPendingPayload;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.FabricServerConfigurationNetworkHandler;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
@@ -70,6 +71,7 @@ public final class FabricServerHandshake {
 
         ServerConfigurationConnectionEvents.CONFIGURE.register(handshake::onConfigure);
         ServerConfigurationNetworking.registerGlobalReceiver(NilumHelloAckPayload.TYPE, handshake::onHelloAck);
+        ServerConfigurationNetworking.registerGlobalReceiver(NilumTrustPendingPayload.TYPE, handshake::onTrustPending);
 
         ServerPlayNetworking.registerGlobalReceiver(NilumTcpUnavailablePayload.TYPE,
                 (payload, context) -> handshake.onTcpUnavailable(context.player()));
@@ -154,6 +156,18 @@ public final class FabricServerHandshake {
                 + ", version=" + ack.modVersion() + ").");
 
         ((FabricServerConfigurationNetworkHandler) handler).completeTask(NilumHandshakeTask.TYPE);
+    }
+
+    /**
+     * The client is showing a trust prompt and sends hello_ack once answered. Refreshes the
+     * configuration-task deadline instead of clearing it, so a slow decision doesn't get the
+     * player kicked for not responding while the dialog is up, but denying it or closing it
+     * without answering still eventually times out and disconnects them rather than leaving
+     * them stuck in configuration forever.
+     */
+    private void onTrustPending(NilumTrustPendingPayload payload, ServerConfigurationNetworking.Context context) {
+        ServerConfigurationPacketListenerImpl handler = context.networkHandler();
+        pendingHandshakes.put(handler.getOwner().id(), new PendingHandshake(handler, currentTick + TIMEOUT_TICKS));
     }
 
     private void onJoin(ServerPlayer player) {

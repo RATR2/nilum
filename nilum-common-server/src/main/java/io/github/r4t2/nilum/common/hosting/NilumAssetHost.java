@@ -1,6 +1,7 @@
 package io.github.r4t2.nilum.common.hosting;
 
 import io.github.r4t2.nilum.common.block.BlockDefinitionRegistry;
+import io.github.r4t2.nilum.common.font.FontIconRegistry;
 import io.github.r4t2.nilum.common.font.FontRegistry;
 import io.github.r4t2.nilum.common.hud.HudAtlasRegistry;
 import io.github.r4t2.nilum.common.icon.IconFileConfig;
@@ -12,6 +13,7 @@ import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.AssetKind;
 import io.github.r4t2.nilum.common.protocol.AssetManifestEntry;
 import io.github.r4t2.nilum.common.shader.ShaderPackRegistry;
+import io.github.r4t2.nilum.common.ui.ChestUiRegistry;
 import io.github.r4t2.nilum.common.ui.UiRegistry;
 
 import java.io.IOException;
@@ -29,7 +31,9 @@ public final class NilumAssetHost {
     private final HudAtlasRegistry hudAtlases = new HudAtlasRegistry();
     private final ShaderPackRegistry shaderPacks = new ShaderPackRegistry();
     private final FontRegistry fonts = new FontRegistry();
+    private final FontIconRegistry fontIcons = new FontIconRegistry();
     private final UiRegistry uis = new UiRegistry();
+    private final ChestUiRegistry chestUis = new ChestUiRegistry();
     private final BlockDefinitionRegistry blocks;
 
     private final Path modelsDirectory;
@@ -38,6 +42,7 @@ public final class NilumAssetHost {
     private final Path texturesDirectory;
     private final Path shaderPacksDirectory;
     private final Path fontsDirectory;
+    private final Path fontIconsDirectory;
     private final Path uiDirectory;
     private final Path blocksDirectory;
     private final NilumLogger logger;
@@ -49,6 +54,7 @@ public final class NilumAssetHost {
         this.texturesDirectory = configDir.resolve("textures");
         this.shaderPacksDirectory = configDir.resolve("shaderpacks");
         this.fontsDirectory = configDir.resolve("fonts");
+        this.fontIconsDirectory = configDir.resolve("font_icons");
         this.uiDirectory = configDir.resolve("ui");
         this.blocksDirectory = configDir.resolve("blocks");
         this.logger = logger;
@@ -92,9 +98,21 @@ public final class NilumAssetHost {
         }
 
         try {
+            fontIcons.loadDirectory(fontIconsDirectory);
+        } catch (IOException e) {
+            logger.error("Failed to load the font_icons folder", e);
+        }
+
+        try {
             uis.loadDirectory(uiDirectory, texturesDirectory, logger::warn);
         } catch (IOException e) {
             logger.error("Failed to load the ui folder", e);
+        }
+
+        try {
+            chestUis.loadDirectory(uiDirectory, texturesDirectory, logger::warn);
+        } catch (IOException e) {
+            logger.error("Failed to load the ui folder (chest UIs)", e);
         }
     }
 
@@ -127,7 +145,9 @@ public final class NilumAssetHost {
         entries.addAll(hudAtlases.manifest());
         entries.addAll(shaderPacks.manifest());
         entries.addAll(fonts.manifest());
+        entries.addAll(fontIcons.manifest());
         entries.addAll(uis.manifest());
+        entries.addAll(chestUis.manifest());
         return entries;
     }
 
@@ -139,7 +159,9 @@ public final class NilumAssetHost {
             case HUD_ATLAS -> hudAtlases.assetBytes(id).orElse(null);
             case SHADER_PACK -> shaderPacks.rawBytes(id).orElse(null);
             case FONT -> fonts.rawBytes(id).orElse(null);
+            case FONT_ICON -> fontIcons.rawBytes(id).orElse(null);
             case CUSTOM_UI -> uis.assetBytes(id).orElse(null);
+            case CHEST_UI -> chestUis.assetBytes(id).orElse(null);
         };
     }
 
@@ -163,8 +185,16 @@ public final class NilumAssetHost {
         return fonts;
     }
 
+    public FontIconRegistry fontIcons() {
+        return fontIcons;
+    }
+
     public UiRegistry uis() {
         return uis;
+    }
+
+    public ChestUiRegistry chestUis() {
+        return chestUis;
     }
 
     public BlockDefinitionRegistry blocks() {

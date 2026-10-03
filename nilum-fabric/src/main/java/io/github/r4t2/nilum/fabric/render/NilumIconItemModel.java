@@ -40,10 +40,9 @@ public final class NilumIconItemModel implements ItemModel {
     public void update(ItemStackRenderState state, ItemStack itemStack, ItemModelResolver resolver,
                         ItemDisplayContext displayContext, @Nullable ClientLevel level, @Nullable ItemOwner owner, int seed) {
         String iconId = NilumItemTags.get(itemStack, "nilum:icon_id");
-        // Vanilla's own data-dependent ItemModels (e.g. ConditionalItemModel) append an identity
+        // Vanilla's data-dependent ItemModels (e.g. ConditionalItemModel) append an identity
         // element for whatever they branched on, so GUI-slot render-state caching can tell two
-        // stacks that resolve differently apart. Without this, two different icon ids sharing a
-        // base material would look identical to that cache and one could serve the other's render.
+        // differently-resolved stacks apart. Without this, two icon ids sharing a base material would look identical to that cache and one could serve the other's render.
         state.appendModelIdentityElement(this);
         state.appendModelIdentityElement(iconId == null ? "no-icon" : iconId);
 
@@ -59,17 +58,15 @@ public final class NilumIconItemModel implements ItemModel {
                 layer.setTransform(itemTransform);
             }
             // Without this, LayerRenderState.extents stays at its default empty-array supplier,
-            // ItemStackRenderState.getModelBoundingBox() ends up with minY=+Infinity, and
-            // ItemEntityRenderer translates dropped items by -Infinity, making them invisible.
-            // See vanilla's own SpecialModelWrapper.update(), which does the same setExtents(...) call.
+            // getModelBoundingBox() ends up with minY=+Infinity, and ItemEntityRenderer translates
+            // dropped items by -Infinity, making them invisible. Same setExtents(...) call vanilla's own SpecialModelWrapper.update() makes.
             layer.setExtents(() -> NilumIconSpecialRenderer.EXTENTS);
             layer.setupSpecialModel(iconRenderer, iconId);
 
             GlintRenderData glint = GlintTagReader.read(itemStack, ICON_GLINT_QUADS);
             if (glint != null) {
-                // Same quad shape and same per-context transform as the icon layer above, so the
-                // glint is masked to the icon's real shape and tracks its exact positioning
-                // instead of floating as an unrelated overlay.
+                // Same quad shape and per-context transform as the icon layer above, so the glint
+                // is masked to the icon's real shape and tracks its positioning instead of floating as an unrelated overlay.
                 ItemStackRenderState.LayerRenderState glintLayer = state.newLayer();
                 if (itemTransform != null) {
                     glintLayer.setTransform(itemTransform);

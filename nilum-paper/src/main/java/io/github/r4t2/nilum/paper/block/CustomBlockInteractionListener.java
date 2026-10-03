@@ -5,6 +5,8 @@ import io.github.r4t2.nilum.paper.item.DropEntry;
 import io.github.r4t2.nilum.paper.item.ItemDefinitionRegistry;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -13,14 +15,17 @@ import org.bukkit.event.block.BlockDamageAbortEvent;
 import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Keeps CustomBlockRegistry honest against every way a Nilum block can be destroyed, applies drops, approximates break timing. */
+/** Keeps CustomBlockRegistry honest against every way a Nilum block can be destroyed, applies drops, enforces exact break timing. */
 public final class CustomBlockInteractionListener implements Listener {
 
     private final NilumPlugin plugin;
@@ -30,6 +35,9 @@ public final class CustomBlockInteractionListener implements Listener {
 
     /** Digging-start timestamp per (player, position); only tracked for BlockProxy.Custom blocks. */
     private final Map<String, Long> diggingStartMillis = new ConcurrentHashMap<>();
+    private final Map<String, BukkitTask> breakTasks = new ConcurrentHashMap<>();
+    /** Keys currently mid-finishBreak(), so onBlockBreak can tell our own forced completion apart from a natural one to reject. */
+    private final Set<String> forcedCompletionKeys = ConcurrentHashMap.newKeySet();
 
     public CustomBlockInteractionListener(NilumPlugin plugin, CustomBlockRegistry registry, ItemDefinitionRegistry itemDefinitions) {
         this.plugin = plugin;
@@ -41,60 +49,130 @@ public final class CustomBlockInteractionListener implements Listener {
     public void onBlockDamage(BlockDamageEvent event) {
         if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
             // Creative should break these exactly like any other block: instant, no waiting.
-            // The approximate break-time enforcement below only applies outside creative.
+            // The break-time enforcement below only applies outside creative.
             return;
         }
-        registry.definitionAt(event.getBlock().getLocation()).ifPresent(definition -> {
-            if (definition.proxy() instanceof BlockProxy.Custom) {
+        Location location = event.getBlock().getLocation();
+        registry.definitionAt(location).ifPresent(definition -> {
+            if (definition.proxy() instanceof BlockProxy.Custom custom) {
                 // Deny insta-break for Custom-mode blocks; vanilla's own instant destroy would
                 // otherwise bypass breakTimeSeconds entirely.
                 event.setInstaBreak(false);
-                // putIfAbsent, not put: BlockDamageEvent fires on every damage tick while the
-                // player holds the mouse down, so overwriting the start time each tick would
-                // keep resetting elapsed time back to ~0 and the break would never complete.
-                diggingStartMillis.putIfAbsent(diggingKey(event.getPlayer(), event.getBlock().getLocation()), System.currentTimeMillis());
+                String key = diggingKey(event.getPlayer(), location);
+                // putIfAbsent, not put: BlockDamageEvent fires every damage tick while the mouse is
+                // held, so overwriting the start time each tick would reset elapsed time to ~0 and
+                // the break would never complete.
+                if (diggingStartMillis.putIfAbsent(key, System.currentTimeMillis()) == null) {
+                    startBreakTask(key, event.getPlayer(), location, definition, custom);
+                }
             }
         });
     }
 
+    /**
+     * Drives the crack overlay directly (Player.sendBlockDamage) instead of trusting vanilla's own
+     * hardness-based rate, and completes the break itself at exactly breakTimeSeconds regardless of
+     * how fast or slow the wire block's real hardness would otherwise finish it.
+     */
+    private void startBreakTask(String key, Player player, Location location, BlockDefinition definition, BlockProxy.Custom custom) {
+        BukkitTask task = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+            Long startedAt = diggingStartMillis.get(key);
+            if (startedAt == null) {
+                return;
+            }
+            long elapsedMillis = System.currentTimeMillis() - startedAt;
+            float progress = (float) Math.min(1.0, elapsedMillis / (custom.breakTimeSeconds() * 1000));
+            player.sendBlockDamage(location, progress);
+            if (progress >= 1.0F) {
+                finishBreak(key, player, location, definition, custom);
+            }
+        }, 0L, 1L);
+        breakTasks.put(key, task);
+    }
+
     @EventHandler
     public void onBlockDamageAbort(BlockDamageAbortEvent event) {
-        diggingStartMillis.remove(diggingKey(event.getPlayer(), event.getBlock().getLocation()));
+        String key = diggingKey(event.getPlayer(), event.getBlock().getLocation());
+        diggingStartMillis.remove(key);
+        BukkitTask task = breakTasks.remove(key);
+        if (task != null) {
+            task.cancel();
+            event.getPlayer().sendBlockDamage(event.getBlock().getLocation(), 0F);
+        }
+    }
+
+    /** Completes a Custom-mode block's break once our own timer (not vanilla's) says breakTimeSeconds has elapsed. */
+    private void finishBreak(String key, Player player, Location location, BlockDefinition definition, BlockProxy.Custom custom) {
+        BukkitTask task = breakTasks.remove(key);
+        if (task != null) {
+            task.cancel();
+        }
+        diggingStartMillis.remove(key);
+
+        BlockBreakEvent event = new BlockBreakEvent(location.getBlock(), player);
+        event.setExpToDrop(custom.xpPerBreak());
+        forcedCompletionKeys.add(key);
+        try {
+            plugin.getServer().getPluginManager().callEvent(event);
+        } finally {
+            forcedCompletionKeys.remove(key);
+        }
+        if (event.isCancelled()) {
+            player.sendBlockDamage(location, 0F);
+            return;
+        }
+
+        location.getBlock().setType(Material.AIR);
+        rollAndDropItems(definition, location);
+        registry.forget(location);
+        CustomBlockBroadcaster.broadcastRemoval(plugin, location);
+
+        ItemStack tool = player.getInventory().getItemInMainHand();
+        if (!tool.getType().isAir()) {
+            player.damageItemStack(EquipmentSlot.HAND, 1);
+        }
+        if (event.getExpToDrop() > 0) {
+            location.getWorld().spawn(location.toCenterLocation(), ExperienceOrb.class,
+                    orb -> orb.setExperience(event.getExpToDrop()));
+        }
     }
 
     @EventHandler
     public void onBlockBreak(BlockBreakEvent event) {
         Location location = event.getBlock().getLocation();
-        var definition = registry.definitionAt(location);
-        if (definition.isEmpty()) {
+        var definitionOpt = registry.definitionAt(location);
+        if (definitionOpt.isEmpty()) {
+            return;
+        }
+        BlockDefinition definition = definitionOpt.get();
+
+        if (definition.proxy() instanceof BlockProxy.Custom && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
+            String key = diggingKey(event.getPlayer(), location);
+            if (!forcedCompletionKeys.contains(key)) {
+                // Not our own forced completion (see finishBreak): a natural vanilla-timed break never
+                // completes a Custom-mode block anymore, since our scheduled task is now the sole
+                // authority on when breakTimeSeconds has actually elapsed.
+                event.setCancelled(true);
+            }
+            // Either cancelled above, or this is our own forced completion, whose removal, drops,
+            // durability, and XP already happened directly in finishBreak().
             return;
         }
 
-        if (definition.get().proxy() instanceof BlockProxy.Custom custom
-                && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
-            String key = diggingKey(event.getPlayer(), location);
-            Long startedAt = diggingStartMillis.get(key);
-            long elapsedMillis = startedAt == null ? 0 : System.currentTimeMillis() - startedAt;
-            if (elapsedMillis < (long) (custom.breakTimeSeconds() * 1000)) {
-                // Too early; vanilla's own real-hardness timing completed faster than our
-                // configured duration. Deny it; the player has to keep holding.
-                event.setCancelled(true);
-                return;
-            }
-            diggingStartMillis.remove(key);
-        }
-
-        if (!definition.get().drops().isEmpty()) {
+        if (!definition.drops().isEmpty()) {
             event.setDropItems(false);
-            for (DropEntry dropEntry : definition.get().drops()) {
-                for (ItemStack stack : dropEntry.roll(itemDefinitions, random)) {
-                    location.getWorld().dropItemNaturally(location, stack);
-                }
-            }
+            rollAndDropItems(definition, location);
         }
-
         registry.forget(location);
         CustomBlockBroadcaster.broadcastRemoval(plugin, location);
+    }
+
+    private void rollAndDropItems(BlockDefinition definition, Location location) {
+        for (DropEntry dropEntry : definition.drops()) {
+            for (ItemStack stack : dropEntry.roll(itemDefinitions, random)) {
+                location.getWorld().dropItemNaturally(location, stack);
+            }
+        }
     }
 
     @EventHandler

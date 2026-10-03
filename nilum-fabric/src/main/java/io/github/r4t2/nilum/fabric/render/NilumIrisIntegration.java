@@ -22,9 +22,9 @@ public final class NilumIrisIntegration {
             Path staged = scratchDir.resolve(packId + "_staged.zip");
             Files.write(staged, zipBytes);
             try {
-                // ShaderpackDirectoryManager.copyPackIntoDirectory uses a plain Files.copy with no
-                // REPLACE_EXISTING; it throws FileAlreadyExistsException if anything's already
-                // sitting at that name. Clear the target first so this is a real install-or-update.
+                // ShaderpackDirectoryManager.copyPackIntoDirectory uses plain Files.copy with no
+                // REPLACE_EXISTING, throwing FileAlreadyExistsException if anything's already there;
+                // clear the target first so this is a real install-or-update.
                 Path target = Iris.getShaderpacksDirectory().resolve(packId + ".zip");
                 Files.deleteIfExists(target);
                 Iris.getShaderpacksDirectoryManager().copyPackIntoDirectory(packId + ".zip", staged);
@@ -67,11 +67,10 @@ public final class NilumIrisIntegration {
         try {
             config.save();
             // loadShaderpackWhenPossible() only sets a flag Iris's own handleKeybinds() consumes,
-            // and loadShaderpack() alone (tried first) only updates which pack is *configured*;
-            // neither actually tears down and rebuilds the active rendering pipeline, which is why
-            // the GUI showed the new pack selected while the world kept rendering the old one.
-            // reload() is the real full sequence: destroy the current pipeline, load the new
-            // pack, rebuild, the same thing /iris reload runs.
+            // and loadShaderpack() alone (tried first) only updates which pack is configured;
+            // neither actually tears down and rebuilds the active rendering pipeline. reload() is
+            // the real full sequence: destroy the current pipeline, load the new pack, rebuild,
+            // the same thing /iris reload runs.
             Iris.reload();
         } catch (IOException e) {
             throw new UncheckedIOException(e);

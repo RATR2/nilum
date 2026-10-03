@@ -112,7 +112,9 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         entries.addAll(plugin.hudAtlases().manifest());
         entries.addAll(plugin.shaderPacks().manifest());
         entries.addAll(plugin.fonts().manifest());
+        entries.addAll(plugin.fontIcons().manifest());
         entries.addAll(plugin.uis().manifest());
+        entries.addAll(plugin.chestUis().manifest());
         return entries;
     }
 
@@ -222,6 +224,8 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
     public void onPluginMessageReceived(String channel, Player player, byte[] message) {
         if (NilumChannels.HELLO_ACK_QUALIFIED.equals(channel)) {
             onHelloAck(player, message);
+        } else if (NilumChannels.TRUST_PENDING_QUALIFIED.equals(channel)) {
+            onTrustPending(player);
         } else if (NilumChannels.TCP_UNAVAILABLE_QUALIFIED.equals(channel)) {
             onTcpUnavailable(player);
         } else if (NilumChannels.MOD_LIST_QUALIFIED.equals(channel)) {
@@ -267,6 +271,20 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
         }
 
         button.action().ifPresent(effectLine -> NilumSkriptEffectRunner.run(effectLine, player));
+    }
+
+    /**
+     * The client is showing the player a trust prompt and will send "hello_ack" once they
+     * answer it. Disarm the join-time kick timer so a slow decision doesn't get them kicked for
+     * "not responding" while they're actually looking right at the dialog.
+     */
+    private void onTrustPending(Player player) {
+        UUID playerId = player.getUniqueId();
+        BukkitTask pending = pendingHandshakes.remove(playerId);
+        if (pending != null) {
+            pending.cancel();
+            logger.debug(player.getName() + " is showing the Nilum trust prompt, waiting for a response.");
+        }
     }
 
     private void onHelloAck(Player player, byte[] message) {
@@ -343,7 +361,9 @@ public final class HandshakeListener implements Listener, PluginMessageListener 
             case HUD_ATLAS -> plugin.hudAtlases().assetBytes(id).orElse(null);
             case SHADER_PACK -> plugin.shaderPacks().rawBytes(id).orElse(null);
             case FONT -> plugin.fonts().rawBytes(id).orElse(null);
+            case FONT_ICON -> plugin.fontIcons().rawBytes(id).orElse(null);
             case CUSTOM_UI -> plugin.uis().assetBytes(id).orElse(null);
+            case CHEST_UI -> plugin.chestUis().assetBytes(id).orElse(null);
         });
     }
 

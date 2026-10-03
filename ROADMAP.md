@@ -35,7 +35,7 @@ Status tracker
 - [x] All built-in functions + value sources
 - [x] Server client-variable push
 - [x] Custom font streaming (`.ttf` -> `nilum/font/` on the client)
-- [ ] Font provider icons (image -> Private Use Area codepoint, inline in text)
+- [x] Font provider icons (`<icon:id>`, auto-assigned PUA codepoint, works in any font incl. vanilla's default, Fabric only)
 - [x] Dynamic text HUD elements (`type: render_text`)
 - [x] Actually use a streamed custom font when rendering text
 - [x] `server_connector` + PlaceholderAPI integration for server-resolved text values
@@ -47,6 +47,8 @@ Status tracker
 - [x] `render_text` elements combining `client_connector` and `server_connector` via `format`
 - [x] `type: image` HUD elements
 - [x] Per-player HUD atlas/element visibility toggle, plus Skript effects for it and for setting a frame directly
+- [x] Per-element `anchor` (9-point, screen-size-aware at render time, Sprite/Image/Text; Duplicate stays fixed-pixel since its bounding box is count-dependent)
+- [x] Percent-based `screen_position`/`screen_size` (`"50%"` alongside literal pixels), independent-scale draw for Sprite/Image so size, not just position, tracks the player's real screen
 
 ## Custom Blocks
 
@@ -55,7 +57,7 @@ Status tracker
 - [x] Break/place/explosion handling, approximate break timing
 - [x] Item definitions + drop tables
 - [x] Separate render pass with face/frustum/distance culling
-- [ ] Exact break timing (currently approximate, on purpose)
+- [x] Exact break timing
 
 ## Shaders & Glints
 
@@ -76,7 +78,6 @@ Status tracker
 
 - [x] Skript addon
 - [x] `skriptvar(name)` reads a real Skript global variable from the HUD expression language (read-only for now, write support planned for the Custom UI action language)
-- [ ] Denizen extension
 - [x] Public API + permission gating
 - [ ] Connect/disconnect events for other plugins
 
@@ -90,15 +91,16 @@ Status tracker
 - [x] Custom player skeleton rendering
 - [x] Real player skin support
 - [x] Server-driven animation triggering protocol (play/stop/blend), placed models and held items
-- [ ] Per-trigger loop-mode override for held items
+- [x] Per-trigger loop-mode override for held items
 - [x] Player hand IK animation for held items (Fabric only; live-tunable via `NilumHandTuneScreen`)
 - [x] Empty-hand marker borrowing (driven by the other hand's item/animation)
 - [x] Blockbench authoring: standalone "Nilum Animation" format (`nilum-blockbench-plugin`)
 
 ## Custom Biomes
 
-- [ ] Custom biome definitions (custom generation settings)
-- [ ] Custom block support in custom biome generation
+- [x] Custom biome definitions (custom generation settings), Paper-only, generated as a real vanilla datapack (restart required to apply, see `/nilum reload worldgen`)
+- [ ] Custom biome/dimension datapack generation on Fabric/NeoForge-hosted servers (Paper landed first, see Modded Server Hosting)
+- [ ] Custom block support in custom biome generation (needs a post-generation chunk pass; Nilum blocks can't be placed by vanilla feature/surface-rule machinery)
 - [ ] Datapack-like per-biome shader configuration
 
 ## Modded Server Hosting
@@ -114,8 +116,8 @@ Status tracker
 
 ## Dimensions
 
-- [ ] Custom world generation (define new chunk/noise generation settings)
-- [ ] Custom dimensions that use a defined custom world gen
+- [x] Custom world generation (define new chunk/noise generation settings), Phase 1: flat generator over a defined biome, generated as a real vanilla datapack -- noise-based terrain (surface rules, density functions) is a future phase
+- [x] Custom dimensions that use a defined custom world gen
 
 ## Custom UIs
 
@@ -123,11 +125,13 @@ Status tracker
 - [x] Button layers (default/pressed images, click action, drag-off-cancel)
 - [x] `type: text` (literal or one-time expression, inline head tags)
 - [x] `type: head` (standalone player head glyph)
-- [ ] Per-player variable state (skript-var-flavored get/set)
-- [ ] Per-layer `requirement` (conditional visibility)
-- [ ] Live-updating text (server-pushed, like HUD's `server_connector`)
-- [ ] `type: chest` (custom GUI texture on a real chest inventory)
-- [ ] Custom buttons inside chest UI (feasibility unconfirmed)
+- [x] Per-player variable state (real Skript vars via action's real effect line, `{player}` in skriptvar keys)
+- [x] Per-layer `requirement` (conditional visibility, server-evaluated and live-pushed)
+- [x] Live-updating text (`server_connector`, live-pushed like HUD's)
+- [x] `type: chest` (custom GUI texture on a real chest inventory, Fabric only for the texture swap)
+- [x] Custom buttons inside chest UI (real slots, click action, requirement gating at open time)
+- [x] Percent-based `position` (`"50%"`, same `ScreenValue` type as HUD, resolved against the real screen at layout time)
+- [x] Optional `size` on image/button (independent-scale destination draw, native texture size when absent)
 
 ## Distribution
 
@@ -145,7 +149,8 @@ Status tracker
 
 - [x] Missing-collision-group console warning
 - [x] `collision_intent` flag
-- [ ] Trust/consent prompt on connect
+- [x] Trust/consent prompt on connect, remembered per-server like vanilla resource pack trust
+- [ ] A way to forget/clear a remembered trust decision (command or config), see Trust/consent prompt above
 - [ ] TCP warning suppress command
 - [ ] Progressive HUD load indicators
 - [x] VRAM budget eviction

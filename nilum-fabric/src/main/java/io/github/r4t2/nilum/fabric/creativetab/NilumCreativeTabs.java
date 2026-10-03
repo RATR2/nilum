@@ -65,9 +65,9 @@ public final class NilumCreativeTabs {
             }
         });
         // Deliberately not auto-populated from modelStore.modelIds()/iconAtlas.iconIds(): a loaded
-        // model or icon isn't necessarily meant to be a standalone item (block-only models,
-        // skeleton overrides, hand-IK calibration rigs). Only ids the server confirms have a real
-        // items/*.yml definition (see setItemDefinedAssets) show up here.
+        // model or icon isn't necessarily a standalone item (block-only models, skeleton overrides,
+        // hand-IK calibration rigs). Only ids the server confirms have a real items/*.yml
+        // definition (see setItemDefinedAssets) show up here.
         ItemGroupEvents.modifyEntriesEvent(CUSTOM_ITEMS_TAB).register(entries -> {
             for (ItemStack stack : CUSTOM_ITEMS) {
                 entries.accept(stack);

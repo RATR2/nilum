@@ -47,9 +47,9 @@ public final class NilumIconSpecialRenderer implements SpecialModelRenderer<Stri
 
         RenderType renderType = RenderTypes.entityCutoutNoCull(iconAtlas.textureId());
 
-        // ItemTransform.apply() always ends with an unconditional pose.translate(-0.5, -0.5, -0.5) -
-        // vanilla's own generated-item quads are built spanning 0..1 (not centered on 0,0,0) so that
-        // shift re-centers them. Match that convention here so our own transform math lines up with it.
+        // ItemTransform.apply() always ends with pose.translate(-0.5, -0.5, -0.5); vanilla's own
+        // generated-item quads span 0..1, not centered on 0,0,0, so that shift re-centers them.
+        // Match that convention here so our own transform math lines up with it.
         collector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
             emitVertex(vertexConsumer, pose, 0f, 0f, u0, v1, light, overlay);
             emitVertex(vertexConsumer, pose, 1f, 0f, u1, v1, light, overlay);

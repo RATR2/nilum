@@ -140,9 +140,8 @@ public final class ItemDefinitionRegistry {
                 pdc.set(NilumKeys.GLINT_TEXTURE, PersistentDataType.STRING, glint.textureIconId());
             }
             // Suppress vanilla's own foil at the source via the real supported API, rather than
-            // fighting the client's private per-layer state. A custom-glinted item should never
-            // show both vanilla's shimmer and ours stacked together, even if it's also genuinely
-            // enchanted.
+            // fighting the client's private per-layer state; a custom-glinted item should never
+            // show both vanilla's shimmer and ours stacked together, even if genuinely enchanted.
             meta.setEnchantmentGlintOverride(false);
         });
 

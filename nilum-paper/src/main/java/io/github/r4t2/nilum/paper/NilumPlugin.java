@@ -8,6 +8,7 @@ import io.github.r4t2.nilum.common.config.LoggingConfig;
 import io.github.r4t2.nilum.common.config.ModerationConfig;
 import io.github.r4t2.nilum.common.config.NilumConfigManager;
 import io.github.r4t2.nilum.common.config.TcpConfig;
+import io.github.r4t2.nilum.common.font.FontIconRegistry;
 import io.github.r4t2.nilum.common.font.FontRegistry;
 import io.github.r4t2.nilum.common.hud.HudAtlasRegistry;
 import io.github.r4t2.nilum.common.icon.IconRegistry;
@@ -16,6 +17,8 @@ import io.github.r4t2.nilum.common.model.ModelLoadError;
 import io.github.r4t2.nilum.common.model.ModelRegistry;
 import io.github.r4t2.nilum.common.protocol.NilumChannels;
 import io.github.r4t2.nilum.common.shader.ShaderPackRegistry;
+import io.github.r4t2.nilum.common.worldgen.DatapackWriter;
+import io.github.r4t2.nilum.common.worldgen.WorldgenDefinitionRegistry;
 import io.github.r4t2.nilum.paper.animation.AnimationService;
 import io.github.r4t2.nilum.api.NilumAPI;
 import io.github.r4t2.nilum.paper.api.NilumAPIImpl;
@@ -38,9 +41,13 @@ import io.github.r4t2.nilum.paper.item.ItemDefinitionRegistry;
 import io.github.r4t2.nilum.paper.logging.PaperConsoleSink;
 import io.github.r4t2.nilum.paper.model.ModelDisplayService;
 import io.github.r4t2.nilum.paper.shader.ShaderPackService;
+import io.github.r4t2.nilum.common.ui.ChestUiRegistry;
 import io.github.r4t2.nilum.common.ui.UiRegistry;
 import io.github.r4t2.nilum.paper.texture.TextureUsageTracker;
+import io.github.r4t2.nilum.paper.ui.ChestUiInteractionListener;
+import io.github.r4t2.nilum.paper.ui.ChestUiSessionService;
 import io.github.r4t2.nilum.paper.ui.UiSessionService;
+import io.github.r4t2.nilum.paper.ui.UiStateService;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -63,6 +70,7 @@ public final class NilumPlugin extends JavaPlugin {
     private HudAtlasRegistry hudAtlasRegistry;
     private HudAtlasService hudAtlasService;
     private HudTextService hudTextService;
+    private UiStateService uiStateService;
     private ModelDisplayService modelDisplayService;
     private CustomItemService customItemService;
     private IconItemService iconItemService;
@@ -72,10 +80,14 @@ public final class NilumPlugin extends JavaPlugin {
     private ShaderPackRegistry shaderPackRegistry;
     private ShaderPackService shaderPackService;
     private FontRegistry fontRegistry;
+    private FontIconRegistry fontIconRegistry;
     private AnimationService animationService;
     private NilumCollisionRegistry collisionRegistry;
+    private WorldgenDefinitionRegistry worldgenDefinitionRegistry;
     private UiRegistry uiRegistry;
     private UiSessionService uiSessionService;
+    private ChestUiRegistry chestUiRegistry;
+    private ChestUiSessionService chestUiSessionService;
     private String buildCommit = "unknown";
 
     @Override
@@ -130,8 +142,12 @@ public final class NilumPlugin extends JavaPlugin {
         // broadcast, and combinedManifest() reads every registry unconditionally.
         shaderPackRegistry = new ShaderPackRegistry();
         fontRegistry = new FontRegistry();
+        fontIconRegistry = new FontIconRegistry();
         uiRegistry = new UiRegistry();
         uiSessionService = new UiSessionService(this);
+        uiStateService = new UiStateService(this, logger);
+        chestUiRegistry = new ChestUiRegistry();
+        chestUiSessionService = new ChestUiSessionService(this);
         reloadModels();
         reloadIcons();
         reloadHudAtlases();
@@ -149,8 +165,12 @@ public final class NilumPlugin extends JavaPlugin {
         shaderPackService = new ShaderPackService(this);
         animationService = new AnimationService(this);
         reloadFonts();
+        reloadFontIcons();
         reloadUis();
+        worldgenDefinitionRegistry = new WorldgenDefinitionRegistry(logger);
+        reloadWorldgen();
         hudTextService.start(configManager.get(HudTextConfig.ENABLED), configManager.get(HudTextConfig.UPDATE_INTERVAL_TICKS));
+        uiStateService.start(configManager.get(HudTextConfig.ENABLED), configManager.get(HudTextConfig.UPDATE_INTERVAL_TICKS));
 
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.HELLO_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.TCP_OFFER_QUALIFIED);
@@ -177,7 +197,11 @@ public final class NilumPlugin extends JavaPlugin {
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_HUD_ATLAS_VISIBILITY_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_HUD_ELEMENT_VISIBILITY_QUALIFIED);
         getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.ITEM_DEFINED_ASSETS_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_UI_TEXT_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.SET_UI_ELEMENT_VISIBILITY_QUALIFIED);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, NilumChannels.OPEN_CHEST_UI_QUALIFIED);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.HELLO_ACK_QUALIFIED, handshakeListener);
+        getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.TRUST_PENDING_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.TCP_UNAVAILABLE_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.MOD_LIST_QUALIFIED, handshakeListener);
         getServer().getMessenger().registerIncomingPluginChannel(this, NilumChannels.KEYBIND_QUALIFIED, handshakeListener);
@@ -188,6 +212,7 @@ public final class NilumPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new CustomBlockInteractionListener(this, customBlockRegistry, itemDefinitionRegistry), this);
         getServer().getPluginManager().registerEvents(new NilumCollisionListener(collisionRegistry), this);
+        getServer().getPluginManager().registerEvents(new ChestUiInteractionListener(this), this);
 
         var command = getCommand("nilum");
         if (command != null) {
@@ -225,6 +250,7 @@ public final class NilumPlugin extends JavaPlugin {
                 ReadmeGenerator.generate(getDataFolder().toPath());
             }
             hudTextService.start(configManager.get(HudTextConfig.ENABLED), configManager.get(HudTextConfig.UPDATE_INTERVAL_TICKS));
+            uiStateService.start(configManager.get(HudTextConfig.ENABLED), configManager.get(HudTextConfig.UPDATE_INTERVAL_TICKS));
             logger.info("Config reloaded.");
             return true;
         } catch (IOException e) {
@@ -255,10 +281,10 @@ public final class NilumPlugin extends JavaPlugin {
             }
             logger.info("Loaded " + modelRegistry.modelIds().size() + " model(s) from the models folder.");
             // loadDirectory() above wipes every model id, including synthetic ones generated from
-            // block definitions' "textures:" section; regenerate those now so a models reload
-            // doesn't silently break any block using default retexture mode. Null on first boot,
-            // since this runs before blockDefinitionRegistry is constructed. reloadBlocks() sends
-            // its own manifest broadcast, so only send one here if it didn't already.
+            // block definitions' "textures:" section; regenerate those now so a models reload doesn't
+            // silently break default-retexture blocks. blockDefinitionRegistry is null on first boot
+            // (constructed after this runs); reloadBlocks() broadcasts its own manifest, so only send
+            // one here if it didn't already.
             if (blockDefinitionRegistry != null) {
                 reloadBlocks();
             } else {
@@ -319,9 +345,13 @@ public final class NilumPlugin extends JavaPlugin {
     /** @return true if the reload succeeded. */
     public boolean reloadUis() {
         try {
-            uiRegistry.loadDirectory(getDataFolder().toPath().resolve("ui"),
-                    getDataFolder().toPath().resolve("textures"), logger::warn);
-            logger.info("Loaded " + uiRegistry.uiIds().size() + " custom UI(s) from the ui folder.");
+            Path uiDirectory = getDataFolder().toPath().resolve("ui");
+            Path texturesDirectory = getDataFolder().toPath().resolve("textures");
+            uiRegistry.loadDirectory(uiDirectory, texturesDirectory, logger::warn);
+            chestUiRegistry.loadDirectory(uiDirectory, texturesDirectory, logger::warn);
+            logger.info("Loaded " + uiRegistry.uiIds().size() + " custom UI(s) and "
+                    + chestUiRegistry.uiIds().size() + " chest UI(s) from the ui folder.");
+            uiStateService.refresh();
             handshakeListener.broadcastAssetManifest();
             return true;
         } catch (IOException e) {
@@ -360,6 +390,33 @@ public final class NilumPlugin extends JavaPlugin {
         }
     }
 
+    /**
+     * Regenerates the nilum_worldgen datapack from the biomes/dimensions folders into the default
+     * world's datapacks folder. Unlike every other reload*() here, this does <b>not</b> take
+     * effect live: Minecraft only reads biome/dimension/dimension_type registries once, from
+     * datapacks, at server bootstrap, so a restart is required for the regenerated files to apply.
+     *
+     * @return true if the reload succeeded.
+     */
+    public boolean reloadWorldgen() {
+        try {
+            worldgenDefinitionRegistry.loadBiomes(getDataFolder().toPath().resolve("biomes"));
+            worldgenDefinitionRegistry.loadDimensions(getDataFolder().toPath().resolve("dimensions"));
+
+            Path datapackRoot = getServer().getWorlds().get(0).getWorldFolder().toPath()
+                    .resolve("datapacks").resolve("nilum_worldgen");
+            DatapackWriter.writeAll(datapackRoot, worldgenDefinitionRegistry);
+
+            logger.info("Regenerated the nilum_worldgen datapack: " + worldgenDefinitionRegistry.biomeIds().size()
+                    + " biome(s), " + worldgenDefinitionRegistry.dimensionIds().size() + " dimension(s), written to "
+                    + datapackRoot + " -- restart the server to apply them.");
+            return true;
+        } catch (IOException e) {
+            logger.error("Failed to reload the biomes/dimensions folders", e);
+            return false;
+        }
+    }
+
     /** @return true if the reload succeeded. */
     public boolean reloadShaderPacks() {
         try {
@@ -382,6 +439,19 @@ public final class NilumPlugin extends JavaPlugin {
             return true;
         } catch (IOException e) {
             logger.error("Failed to reload the fonts folder", e);
+            return false;
+        }
+    }
+
+    /** @return true if the reload succeeded. */
+    public boolean reloadFontIcons() {
+        try {
+            fontIconRegistry.loadDirectory(getDataFolder().toPath().resolve("font_icons"));
+            logger.info("Loaded " + fontIconRegistry.iconIds().size() + " font icon(s) from the font_icons folder.");
+            handshakeListener.broadcastAssetManifest();
+            return true;
+        } catch (IOException e) {
+            logger.error("Failed to reload the font_icons folder", e);
             return false;
         }
     }
@@ -447,6 +517,18 @@ public final class NilumPlugin extends JavaPlugin {
         return uiSessionService;
     }
 
+    public UiStateService uiState() {
+        return uiStateService;
+    }
+
+    public ChestUiRegistry chestUis() {
+        return chestUiRegistry;
+    }
+
+    public ChestUiSessionService chestUiSessions() {
+        return chestUiSessionService;
+    }
+
     public CustomBlockRegistry customBlocks() {
         return customBlockRegistry;
     }
@@ -461,6 +543,10 @@ public final class NilumPlugin extends JavaPlugin {
 
     public FontRegistry fonts() {
         return fontRegistry;
+    }
+
+    public FontIconRegistry fontIcons() {
+        return fontIconRegistry;
     }
 
     public AnimationService animations() {

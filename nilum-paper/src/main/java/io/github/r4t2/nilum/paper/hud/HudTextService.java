@@ -121,10 +121,10 @@ public final class HudTextService {
             if (skriptAvailable) {
                 ValueSource base = valueSource;
                 valueSource = (function, key) -> function.equals("skriptvar")
-                        ? SkriptVariableValueSource.resolveNumeric(key) : base.resolve(function, key);
+                        ? SkriptVariableValueSource.resolveNumeric(key, player) : base.resolve(function, key);
                 TextValueSource baseText = textSource;
                 textSource = (function, key) -> function.equals("skriptvar")
-                        ? SkriptVariableValueSource.resolveText(key) : baseText.resolve(function, key);
+                        ? SkriptVariableValueSource.resolveText(key, player) : baseText.resolve(function, key);
             }
 
             for (Map.Entry<String, List<ServerTextElement>> entry : elementsByAtlas.entrySet()) {

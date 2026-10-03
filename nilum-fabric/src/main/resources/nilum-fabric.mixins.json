@@ -4,7 +4,9 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "LivingEntityRendererMixin",
-    "ItemInHandRendererMixin"
+    "ItemInHandRendererMixin",
+    "FontManagerMixin",
+    "ContainerScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

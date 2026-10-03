@@ -28,14 +28,18 @@ import io.github.r4t2.nilum.neoforge.network.NilumKeybindPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModListPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModListRequestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumOpenChestUiPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumOpenUiPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudAtlasVisibilityPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudElementVisibilityPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumRegisterClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudTextPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetUiElementVisibilityPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetUiTextPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.neoforge.network.NilumTrustPendingPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumUiButtonClickedPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumUiClosedPayload;
 import net.minecraft.server.level.ServerPlayer;
@@ -67,6 +71,7 @@ public final class NilumNeoForgeMod {
     private final NilumLogger logger;
     private final BiConsumer<NilumHelloAckPayload, IPayloadContext> helloAckHandler;
     private final Consumer<ServerPlayer> tcpUnavailableHandler;
+    private final BiConsumer<NilumTrustPendingPayload, IPayloadContext> trustPendingHandler;
 
     public NilumNeoForgeMod(IEventBus modEventBus, ModContainer modContainer) {
         String modVersion = modContainer.getModInfo().getVersion().toString();
@@ -97,9 +102,11 @@ public final class NilumNeoForgeMod {
                     NilumNeoForgeDedicatedServer.register(modEventBus, configManager, logger, modVersion, configDir);
             this.helloAckHandler = handlers.helloAck();
             this.tcpUnavailableHandler = handlers.tcpUnavailable();
+            this.trustPendingHandler = handlers.trustPending();
         } else {
             this.helloAckHandler = (payload, context) -> { };
             this.tcpUnavailableHandler = player -> { };
+            this.trustPendingHandler = (payload, context) -> { };
         }
 
         modEventBus.addListener(this::onRegisterPayloadHandlers);
@@ -119,6 +126,12 @@ public final class NilumNeoForgeMod {
         registrar.configurationToServer(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC, helloAckHandler::accept);
         registrar.playToClient(NilumHelloPayload.TYPE, NilumHelloPayload.CODEC);
         registrar.playToServer(NilumHelloAckPayload.TYPE, NilumHelloAckPayload.CODEC, helloAckHandler::accept);
+        // Same dual registration as hello_ack above: the client doesn't know which phase applies until
+        // it receives hello, so trust_pending must be ready on both. The NeoForge handshake only runs
+        // in configuration (see NeoForgeServerHandshake), so play-phase here is a no-op, same as the
+        // keybind/UI channels above that only Paper consumes.
+        registrar.configurationToServer(NilumTrustPendingPayload.TYPE, NilumTrustPendingPayload.CODEC, trustPendingHandler::accept);
+        registrar.playToServer(NilumTrustPendingPayload.TYPE, NilumTrustPendingPayload.CODEC, (payload, context) -> { });
         registrar.playToClient(NilumTcpOfferPayload.TYPE, NilumTcpOfferPayload.CODEC);
         registrar.playToServer(NilumTcpUnavailablePayload.TYPE, NilumTcpUnavailablePayload.CODEC,
                 (payload, context) -> tcpUnavailableHandler.accept((ServerPlayer) context.player()));
@@ -149,11 +162,14 @@ public final class NilumNeoForgeMod {
         // vanilla material and streams the overlay position/model over this same wire format.
         registrar.playToClient(NilumChunkBlocksPayload.TYPE, NilumChunkBlocksPayload.CODEC);
         registrar.playToClient(NilumOpenUiPayload.TYPE, NilumOpenUiPayload.CODEC);
+        registrar.playToClient(NilumOpenChestUiPayload.TYPE, NilumOpenChestUiPayload.CODEC);
         // Custom UI open/close is Skript/Paper-only for now, a NeoForge-hosted server has no
         // consumer for this, same as keybinds above.
         registrar.playToServer(NilumUiClosedPayload.TYPE, NilumUiClosedPayload.CODEC, (payload, context) -> { });
         registrar.playToServer(NilumUiButtonClickedPayload.TYPE, NilumUiButtonClickedPayload.CODEC, (payload, context) -> { });
         registrar.playToClient(NilumSetHudAtlasVisibilityPayload.TYPE, NilumSetHudAtlasVisibilityPayload.CODEC);
         registrar.playToClient(NilumSetHudElementVisibilityPayload.TYPE, NilumSetHudElementVisibilityPayload.CODEC);
+        registrar.playToClient(NilumSetUiTextPayload.TYPE, NilumSetUiTextPayload.CODEC);
+        registrar.playToClient(NilumSetUiElementVisibilityPayload.TYPE, NilumSetUiElementVisibilityPayload.CODEC);
     }
 }

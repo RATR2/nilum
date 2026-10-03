@@ -49,11 +49,9 @@ public final class NilumGlintSpecialRenderer implements SpecialModelRenderer<Gli
             textureId = iconAtlas.textureId();
         }
 
-        // eyes() blends via BlendFunction.TRANSLUCENT (plain alpha blending), not vanilla's real
-        // BlendFunction.GLINT, so alpha directly controls opacity, and full alpha means fully
-        // replacing whatever's underneath rather than shimmering over it. Cap it well below 255
-        // so the base texture always stays visible; replicating GLINT's exact blend would mean
-        // building a custom RenderPipeline from vanilla's private internals.
+        // eyes() blends via TRANSLUCENT (plain alpha), not vanilla's real GLINT, so full alpha
+        // means replacing what's underneath rather than shimmering over it; cap it well below 255.
+        // Replicating GLINT's exact blend would mean building a custom RenderPipeline from vanilla's private internals.
         double seconds = System.currentTimeMillis() / 1000.0;
         float offset = (float) ((seconds * data.speed() * SCROLL_SCALE) % 1.0);
 
@@ -76,13 +74,10 @@ public final class NilumGlintSpecialRenderer implements SpecialModelRenderer<Gli
 
     private static void emitVertex(VertexConsumer consumer, PoseStack.Pose pose, GlintQuad.GlintVertex vertex,
                                     float offset, int r, int g, int b, int a, int light, int overlay) {
-        // Deliberately NOT wrapped into [0,1) here; vanilla scrolls its glint by transforming the
-        // whole mesh's UV uniformly and lets the GPU's own texture wrapping handle the tiling.
-        // Wrapping each vertex independently on the CPU instead made different quads/vertices
-        // cross the 1.0 boundary at different moments (they don't share a base UV), so parts of
-        // the mesh would reset out of sync with each other, looking like the shimmer randomly
-        // reversing. Letting raw values pass through and relying on the texture's native
-        // REPEAT addressing keeps the whole mesh scrolling together, smoothly.
+        // Deliberately NOT wrapped into [0,1) here; vanilla scrolls by transforming the whole
+        // mesh's UV uniformly and lets the GPU's REPEAT addressing handle tiling. Wrapping each
+        // vertex independently on the CPU made quads cross the 1.0 boundary at different moments
+        // (no shared base UV), desyncing the mesh into a randomly-reversing shimmer.
         consumer.addVertex(pose, vertex.x(), vertex.y(), vertex.z())
                 .setColor(r, g, b, a)
                 .setUv(vertex.u() + offset, vertex.v() + offset)
@@ -94,8 +89,7 @@ public final class NilumGlintSpecialRenderer implements SpecialModelRenderer<Gli
     @Override
     public void getExtents(Consumer<Vector3fc> consumer) {
         // Real per-layer extents come from LayerRenderState.setExtents(...), set by whichever
-        // wrapper (icon/model) builds the glint quads, same pattern as
-        // NilumModelItemSpecialRenderer for the same reason (no per-argument extents hook exists).
+        // wrapper (icon/model) builds the glint quads, same as NilumModelItemSpecialRenderer: no per-argument extents hook exists.
     }
 
     @Override

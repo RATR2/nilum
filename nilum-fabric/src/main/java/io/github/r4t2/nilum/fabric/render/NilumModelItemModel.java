@@ -61,18 +61,18 @@ public final class NilumModelItemModel implements ItemModel {
                 ItemStackRenderState.LayerRenderState layer = state.newLayer();
                 layer.setTransform(itemTransform);
                 // Without this, LayerRenderState.extents stays at its default empty-array supplier,
-                // ItemStackRenderState.getModelBoundingBox() ends up with minY=+Infinity, and
-                // ItemEntityRenderer translates dropped items by -Infinity, making them invisible.
-                // See vanilla's own SpecialModelWrapper.update(), which does the same setExtents(...) call.
+                // getModelBoundingBox() ends up with minY=+Infinity, and ItemEntityRenderer
+                // translates dropped items by -Infinity, making them invisible; the same
+                // setExtents() call vanilla's own SpecialModelWrapper.update() makes.
                 layer.setExtents(() -> modelRenderer.extentsOf(modelId));
                 layer.setupSpecialModel(modelRenderer,
                         buildRenderArgument(modelId, model, itemStack, displayContext, owner));
 
                 GlintRenderData glint = GlintTagReader.read(itemStack, glintQuadsOf(modelId));
                 if (glint != null) {
-                    // Same baked quads and same per-context transform as the model layer above,
-                    // so the glint is masked to the model's real shape and tracks its exact
-                    // positioning instead of floating as an unrelated overlay.
+                    // Same baked quads and per-context transform as the model layer above, so the
+                    // glint is masked to the model's real shape and tracks its exact positioning
+                    // instead of floating as an unrelated overlay.
                     ItemStackRenderState.LayerRenderState glintLayer = state.newLayer();
                     glintLayer.setTransform(itemTransform);
                     glintLayer.setExtents(() -> modelRenderer.extentsOf(modelId));

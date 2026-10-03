@@ -67,10 +67,9 @@ public final class NilumCreativeTabs {
                 }
             } else if (event.getTabKey().equals(CUSTOM_ITEMS_TAB.getKey())) {
                 // Deliberately not auto-populated from modelStore.modelIds()/iconAtlas.iconIds() for
-                // MODELS/ITEMS: a loaded model or icon isn't necessarily meant to be a standalone item
-                // (block-only models, skeleton overrides, hand-IK calibration rigs). Only ids the
-                // server confirms have a real items/*.yml definition (see setItemDefinedAssets) show
-                // up here.
+                // MODELS/ITEMS: a loaded model or icon isn't necessarily a standalone item (block-only
+                // models, skeleton overrides, hand-IK calibration rigs). Only ids the server confirms
+                // have a real items/*.yml definition (see setItemDefinedAssets) show up here.
                 for (ItemStack stack : CUSTOM_ITEMS) {
                     event.accept(stack);
                 }

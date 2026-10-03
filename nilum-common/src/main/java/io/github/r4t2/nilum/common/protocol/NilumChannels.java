@@ -10,6 +10,11 @@ public final class NilumChannels {
     public static final String HELLO_ACK = "hello_ack";
     public static final String HELLO_ACK_QUALIFIED = NAMESPACE + ":" + HELLO_ACK;
 
+    /** Sent by the client the instant it decides to show the player a trust prompt, so the server
+     * knows a real Nilum client is there and stops waiting for HELLO_ACK on a timer. */
+    public static final String TRUST_PENDING = "trust_pending";
+    public static final String TRUST_PENDING_QUALIFIED = NAMESPACE + ":" + TRUST_PENDING;
+
     public static final String TCP_OFFER = "tcp_offer";
     public static final String TCP_OFFER_QUALIFIED = NAMESPACE + ":" + TCP_OFFER;
 
@@ -82,6 +87,12 @@ public final class NilumChannels {
     public static final String UI_BUTTON_CLICKED = "ui_button_clicked";
     public static final String UI_BUTTON_CLICKED_QUALIFIED = NAMESPACE + ":" + UI_BUTTON_CLICKED;
 
+    public static final String SET_UI_TEXT = "set_ui_text";
+    public static final String SET_UI_TEXT_QUALIFIED = NAMESPACE + ":" + SET_UI_TEXT;
+
+    public static final String SET_UI_ELEMENT_VISIBILITY = "set_ui_element_visibility";
+    public static final String SET_UI_ELEMENT_VISIBILITY_QUALIFIED = NAMESPACE + ":" + SET_UI_ELEMENT_VISIBILITY;
+
     public static final String ITEM_DEFINED_ASSETS = "item_defined_assets";
     public static final String ITEM_DEFINED_ASSETS_QUALIFIED = NAMESPACE + ":" + ITEM_DEFINED_ASSETS;
 
@@ -96,6 +107,9 @@ public final class NilumChannels {
 
     public static final String ITEM_ANIMATION_STOP = "item_animation_stop";
     public static final String ITEM_ANIMATION_STOP_QUALIFIED = NAMESPACE + ":" + ITEM_ANIMATION_STOP;
+
+    public static final String OPEN_CHEST_UI = "open_chest_ui";
+    public static final String OPEN_CHEST_UI_QUALIFIED = NAMESPACE + ":" + OPEN_CHEST_UI;
 
     private NilumChannels() {
     }

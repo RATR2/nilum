@@ -45,6 +45,9 @@ public interface NilumAPI {
     /** Plays a named animation on whatever Nilum item player is holding in mainHand (or their off hand). */
     void playHeldItemAnimation(Player player, boolean mainHand, String animationName);
 
+    /** Same, but forces loopMode ("once", "hold", or "loop") instead of the animation's own authored one. */
+    void playHeldItemAnimation(Player player, boolean mainHand, String animationName, String loopMode);
+
     /** Stops a triggered held-item animation, back to its rest pose. */
     void stopHeldItemAnimation(Player player, boolean mainHand);
 

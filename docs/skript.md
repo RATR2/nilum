@@ -38,11 +38,13 @@ Play/Stop Nilum Block Animation
 
 Play/Stop Nilum Held Item Animation
 
-- Patterns: `play nilum animation %string% on %player%'[s] (main|off) hand`, `stop nilum animation on %player%'[s] (main|off) hand`
+- Patterns: `play nilum animation %string% on %player%'[s] (main|off) hand`, `play nilum animation %string% on %player%'[s] (main|off) hand with loop mode (once|hold|loop)`, `stop nilum animation on %player%'[s] (main|off) hand`
 - Plays or stops a named animation on the Nilum item a player is holding in that hand. Unlike
   entity/block animations, a held item starts at rest (not auto-looping) until triggered; any
   groups listed in that item's `hide_groups` stay hidden until an animation is actually playing.
-- Examples: `play nilum animation "scan" on player's main hand`, `stop nilum animation on player's main hand`
+- `with loop mode` forces `once`/`hold`/`loop` for this trigger instead of the animation's own
+  authored loop mode in the `.bbmodel`.
+- Examples: `play nilum animation "scan" on player's main hand`, `play nilum animation "scan" on player's main hand with loop mode hold`, `stop nilum animation on player's main hand`
 
 Switch/Reset Nilum Shaderpack
 
@@ -53,8 +55,11 @@ Switch/Reset Nilum Shaderpack
 Open Nilum UI
 
 - Pattern: `open [nilum] ui %string% for %player%`
-- Opens a Nilum custom UI for a player.
+- Opens a Nilum UI for a player, whether it's a `type: custom` overlay or a `type: chest` real inventory.
 - Example: `open nilum ui "main_menu" for player`
+- A `type: chest` UI's `element` blocks use `slot`/`item`/`name`/`lore`/`action`/`requirement` fields instead
+  of the overlay type's `position`/`image`; its `action` field is a Skript effect line, run the same way a
+  custom UI button's `action` is, when a player clicks that slot.
 
 Set Nilum HUD Visibility
 

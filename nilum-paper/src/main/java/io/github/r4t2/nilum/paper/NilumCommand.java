@@ -99,7 +99,8 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/nilum ver -> Show the plugin version."));
         sender.sendMessage(Component.text("/nilum help -> Show this message."));
         sender.sendMessage(Component.text(
-                "/nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config|ui> -> Reload part of Nilum."));
+                "/nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config|ui|worldgen> -> Reload part of Nilum. "
+                        + "worldgen regenerates the biome/dimension datapack but needs a server restart to apply."));
         sender.sendMessage(Component.text(
                 "/nilum placemodel <modelId> [x] [y] [z] [yaw] [pitch] -> Place a model. "
                         + "Coordinates and rotation default to ~ (your position/facing)."));
@@ -128,7 +129,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
 
     private boolean reload(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config|ui>"));
+            sender.sendMessage(Component.text("Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config|ui|worldgen>"));
             return true;
         }
 
@@ -140,12 +141,14 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             case "blocks" -> reloadAndReport(sender, plugin.reloadBlocks(), "Block definitions", "reload the blocks folder");
             case "shaderpacks" -> reloadAndReport(sender, plugin.reloadShaderPacks(), "Shader packs", "reload the shaderpacks folder");
             case "fonts" -> reloadAndReport(sender, plugin.reloadFonts(), "Fonts", "reload the fonts folder");
+            case "font_icons" -> reloadAndReport(sender, plugin.reloadFontIcons(), "Font icons", "reload the font_icons folder");
             case "tcp" -> reloadAndReport(sender, plugin.reloadTcp(), "TCP side-channel", "reload the TCP side-channel");
             case "config" -> reloadAndReport(sender, plugin.reloadSettings(), "Config", "reload the config");
             case "ui" -> reloadAndReport(sender, plugin.reloadUis(), "Custom UIs", "reload the ui folder");
+            case "worldgen" -> reloadWorldgenAndReport(sender);
             default -> {
                 sender.sendMessage(Component.text(
-                        "Unknown reload target '" + args[1] + "'. Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config|ui>"));
+                        "Unknown reload target '" + args[1] + "'. Usage: /nilum reload <models|icons|hud|items|blocks|shaderpacks|fonts|tcp|config|ui|worldgen>"));
                 yield true;
             }
         };
@@ -155,6 +158,19 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text(success
                 ? subjectCapitalized + " reloaded."
                 : "Failed to " + failureAction + ", check the console/log for details."));
+        return true;
+    }
+
+    /**
+     * Unlike every other reload target, regenerating the worldgen datapack never takes effect
+     * live -- Minecraft only reads biome/dimension registries once, from datapacks, at server
+     * bootstrap -- so the success message has to say so instead of implying it already applied.
+     */
+    private boolean reloadWorldgenAndReport(CommandSender sender) {
+        boolean success = plugin.reloadWorldgen();
+        sender.sendMessage(Component.text(success
+                ? "Biome/dimension datapack regenerated. Restart the server to apply it."
+                : "Failed to reload the biomes/dimensions folders, check the console/log for details."));
         return true;
     }
 
@@ -179,7 +195,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             float pitch = (float) parseCoordinate(args.length > 6 ? args[6] : "~", base.getPitch());
             location = new Location(base.getWorld(), x, y, z, yaw, pitch);
         } catch (NumberFormatException e) {
-            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            sender.sendMessage(Component.text("Invalid coordinate, use a number or ~ (optionally ~offset)."));
             return true;
         }
 
@@ -222,7 +238,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
 
         UUID entityId = resolveEntityTarget(sender, args[1]);
         if (entityId == null) {
-            sender.sendMessage(Component.text("Unknown target '" + args[1] + "' - use 'self' or an entity UUID."));
+            sender.sendMessage(Component.text("Unknown target '" + args[1] + "', use 'self' or an entity UUID."));
             return true;
         }
 
@@ -240,7 +256,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
 
         UUID entityId = resolveEntityTarget(sender, args[1]);
         if (entityId == null) {
-            sender.sendMessage(Component.text("Unknown target '" + args[1] + "' - use 'self' or an entity UUID."));
+            sender.sendMessage(Component.text("Unknown target '" + args[1] + "', use 'self' or an entity UUID."));
             return true;
         }
 
@@ -275,7 +291,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         try {
             location = coordinateLocation(player, args, 2);
         } catch (NumberFormatException e) {
-            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            sender.sendMessage(Component.text("Invalid coordinate, use a number or ~ (optionally ~offset)."));
             return true;
         }
 
@@ -300,7 +316,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         try {
             location = coordinateLocation(player, args, 1);
         } catch (NumberFormatException e) {
-            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            sender.sendMessage(Component.text("Invalid coordinate, use a number or ~ (optionally ~offset)."));
             return true;
         }
 
@@ -343,7 +359,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             double z = parseCoordinate(args.length > 4 ? args[4] : "~", base.getZ());
             location = new Location(base.getWorld(), x, y, z);
         } catch (NumberFormatException e) {
-            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            sender.sendMessage(Component.text("Invalid coordinate, use a number or ~ (optionally ~offset)."));
             return true;
         }
 
@@ -374,7 +390,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
             double z = parseCoordinate(args.length > 3 ? args[3] : "~", base.getZ());
             location = new Location(base.getWorld(), x, y, z);
         } catch (NumberFormatException e) {
-            sender.sendMessage(Component.text("Invalid coordinate - use a number or ~ (optionally ~offset)."));
+            sender.sendMessage(Component.text("Invalid coordinate, use a number or ~ (optionally ~offset)."));
             return true;
         }
 
@@ -566,7 +582,7 @@ public final class NilumCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2) {
             return switch (args[0].toLowerCase(Locale.ROOT)) {
                 case "reload" -> filterByPrefix(
-                        List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "tcp", "config", "ui"), args[1]);
+                        List.of("models", "icons", "hud", "items", "blocks", "shaderpacks", "fonts", "font_icons", "tcp", "config", "ui", "worldgen"), args[1]);
                 case "placemodel", "givemodel", "giveskeleton" -> filterByPrefix(plugin.models().modelIds(), args[1]);
                 case "placeblock" -> filterByPrefix(plugin.blockDefinitions().blockIds(), args[1]);
                 case "playanim", "stopanim" -> filterByPrefix(List.of("self"), args[1]);

@@ -43,33 +43,29 @@ public abstract class ItemInHandRendererMixin {
     private static final float ITEM_POS_Y = -0.52F;
     private static final float ITEM_POS_Z = -0.72F;
 
-    // PlayerModel's own right_arm/left_arm box (width, height, depth), Blockbench-unit scale.
-    // Uses the normal (non-slim) 4-wide variant as the reference regardless of the player's
-    // actual skin type; slim arms are 3 wide, a difference too small to bother distinguishing.
+    // PlayerModel's right_arm/left_arm box (width, height, depth), Blockbench-unit scale, always
+    // the normal 4-wide variant regardless of skin type; slim's 3-wide arms aren't worth distinguishing.
     private static final float VANILLA_ARM_WIDTH = 4.0F;
     private static final float VANILLA_ARM_HEIGHT = 12.0F;
     private static final float VANILLA_ARM_DEPTH = 4.0F;
 
-    // Where PlayerModel's own pivot sits within its arm box, as a fraction from the box's own
-    // "from" corner (right_arm local box is (-3,-2,-2) to (1,10,2), pivot at local (0,0,0), so
-    // 3/4 across width, 2/12 down height, 2/4 across depth). Not centered on any axis, closest to
-    // the shoulder end along height. Mirrored across width for the left arm.
+    // PlayerModel's own pivot as a fraction from the arm box's "from" corner (right_arm box
+    // (-3,-2,-2) to (1,10,2), pivot at local (0,0,0): 3/4 width, 2/12 height, 2/4 depth). Off-center
+    // on every axis, closest to the shoulder along height. Mirrored across width for the left arm.
     private static final float VANILLA_PIVOT_FRACTION_WIDTH_RIGHT = 0.75F;
     private static final float VANILLA_PIVOT_FRACTION_WIDTH_LEFT = 0.25F;
     private static final float VANILLA_PIVOT_FRACTION_HEIGHT = 2.0F / 12.0F;
     private static final float VANILLA_PIVOT_FRACTION_DEPTH = 0.5F;
 
-    // Each arm box's own geometric center relative to its pivot at local (0,0,0) (right_arm box
-    // (-3,-2,-2) to (1,10,2); left_arm mirrored across width to (-1,-2,-2)-(3,10,2)): used to
-    // re-center the "Left arm" role's 180-degree Z correction below on whichever mesh is actually
-    // being drawn, rather than on the pivot, which sits at a box corner.
+    // Each arm box's geometric center relative to its pivot at local (0,0,0) (right_arm box
+    // (-3,-2,-2) to (1,10,2); left_arm mirrored to (-1,-2,-2)-(3,10,2)): re-centers the "Left arm"
+    // role's 180-degree Z correction below on whichever mesh is actually drawn, not on the pivot, which sits at a box corner.
     private static final float VANILLA_ARM_CENTER_X_RIGHT = -1.0F;
     private static final float VANILLA_ARM_CENTER_X_LEFT = 1.0F;
     private static final float VANILLA_ARM_CENTER_Y = 4.0F;
 
     // Conjugating a rotation by this (Sx * R * Sx) mirrors its apparent direction while staying a
-    // proper rotation (determinant +1), so it reorients rather than flips the chirality of
-    // whatever fixed mesh gets drawn through it afterward.
+    // proper rotation (determinant +1): reorients the mesh drawn through it afterward instead of flipping its chirality.
     private static final BbMatrix4 MIRROR_X = BbMatrix4.scale(-1, 1, 1);
 
     @Inject(method = "renderArmWithItem(Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;"
@@ -82,22 +78,17 @@ public abstract class ItemInHandRendererMixin {
             return;
         }
 
-        // A marker like "Left arm" can represent the player's own arm (or whatever it's holding)
-        // moving into frame as part of an animation playing on the OTHER hand's item (e.g. a
-        // scanner in the right hand "scanning" the left arm), not just a substitute grip for an
-        // item actually held in this hand. Try this hand's own item first; if it isn't a Nilum
-        // item, or its model has no marker for this hand's role, fall back to borrowing the other
-        // hand's item/animation for the model+pose, but still render only the arm here, never a
-        // second copy of that item.
+        // A marker like "Left arm" can mean the player's own arm moving into frame as part of an
+        // animation on the OTHER hand's item (e.g. a scanner "scanning" the left arm), not just a
+        // substitute grip. Try this hand's own item first; if it's not a Nilum item or has no
+        // marker for this role, fall back to the other hand's item/animation for model+pose, but still render only the arm, never a second copy of that item.
         ItemStack drivingStack = itemStack;
         InteractionHand drivingHand = hand;
         boolean rendersItem = !itemStack.isEmpty();
 
         BbModel model = resolveModel(drivingStack);
-        // Marker choice is a fixed ROLE relative to this item ("Right arm" = the hand actually
-        // gripping it, "Left arm" = the other one), not tied to handedness/visual side. A
-        // left-handed player's main hand still grips with "Right arm"; it just renders on the
-        // visual left.
+        // Marker choice is a fixed ROLE relative to this item ("Right arm" grips it, "Left arm" is
+        // the other one), not tied to handedness/visual side; a left-handed player's main hand still grips with "Right arm", it just renders on the visual left.
         String markerGroupName = "Right arm";
         Optional<BbOutlinerGroup> armBone = model == null ? Optional.empty() : model.findGroup(markerGroupName);
 
@@ -112,9 +103,8 @@ public abstract class ItemInHandRendererMixin {
             }
         }
 
-        // Visual side (which physical screen-side this hand renders on) drives the vanilla-mesh
-        // mirroring math below (anchor, pivot fraction, which ModelPart to draw); it must follow
-        // handedness so the correct arm mesh lands on the correct side.
+        // Visual side (which screen-side this hand renders on) drives the vanilla-mesh mirroring
+        // math below (anchor, pivot fraction, ModelPart choice); must follow handedness so the correct arm mesh lands on the correct side.
         boolean rightArm = (hand == InteractionHand.MAIN_HAND ? player.getMainArm() : player.getMainArm().getOpposite()) == HumanoidArm.RIGHT;
 
         List<BbElement> armElements = model.resolveElements(armBone.get());
@@ -145,11 +135,9 @@ public abstract class ItemInHandRendererMixin {
             return;
         }
 
-        // The marker's own "origin" is a Blockbench rotation pivot, not necessarily where the
-        // hand should attach. Use the point within the marker's own box that sits at the same
-        // fractional position vanilla's own pivot sits within its arm box instead (not the
-        // center; vanilla's pivot is off-center on every axis), rotated around the marker's own
-        // pivot by the marker's own rotation, matching how Blockbench itself places the cube.
+        // The marker's "origin" is a Blockbench rotation pivot, not necessarily the attach point.
+        // Use the point in the marker's box at vanilla's own pivot fraction within its arm box
+        // instead (not the center, vanilla's pivot is off-center on every axis), rotated around the marker's own pivot by its own rotation, matching how Blockbench places the cube.
         BbMatrix4 pivotRotation = BbMatrix4.translation(
                         (float) (markerOrigin.x() / 16.0), (float) (markerOrigin.y() / 16.0), (float) (markerOrigin.z() / 16.0))
                 .multiply(BbMatrix4.rotationXYZDegrees(
@@ -162,10 +150,8 @@ public abstract class ItemInHandRendererMixin {
         float[] attachPoint = boneWorld.transformPoint(localAttach[0], localAttach[1], localAttach[2]);
         BbMatrix4 rotationSource = boneWorld;
         if (!drivingRightHand) {
-            // A world-space position from an unmirrored transform mirrors correctly by simply
-            // negating X afterward. Orientation needs the opposite treatment: negating X here too
-            // would double-mirror it back to the original direction, since rotation direction
-            // already flips correctly when the transform itself is conjugated (Sx * M * Sx) below.
+            // A world-space position mirrors correctly by simply negating X afterward. Orientation
+            // needs the opposite treatment: negating X here too would double-mirror it back, since rotation direction already flips correctly once the transform is conjugated (Sx * M * Sx) below.
             attachPoint[0] = -attachPoint[0];
             rotationSource = MIRROR_X.multiply(boneWorld).multiply(MIRROR_X);
         }
@@ -176,19 +162,16 @@ public abstract class ItemInHandRendererMixin {
 
         ci.cancel();
 
-        // Anchored on the driving hand's screen side, not this render call's own hand: the arm
-        // marker is a bone within the driving item's own model, animated in that model's local
-        // space, so it must share the driving item's on-screen anchor. For a hand actually
-        // holding its own item, drivingRightHand == rightArm, so this doesn't change that path.
+        // Anchored on the driving hand's screen side, not this call's own hand: the arm marker is
+        // a bone in the driving item's model, animated in that model's local space, so it must
+        // share the driving item's on-screen anchor. For a hand holding its own item, drivingRightHand == rightArm, so this path is unchanged.
         ItemDisplayContext displayContext = drivingRightHand ? ItemDisplayContext.FIRST_PERSON_RIGHT_HAND : ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
         float anchorX = drivingRightHand ? ITEM_POS_X : -ITEM_POS_X;
         float sign = drivingRightHand ? 1.0F : -1.0F;
 
-        // Item: same resting anchor vanilla's own applyItemArmTransform uses, plus the same swing
-        // vanilla's own swingArm applies on attack. Its own first-person display transform is
-        // applied again automatically inside renderItem's normal per-item pipeline, so it must not
-        // be applied here too, or the item would be double-transformed. Skipped entirely when this
-        // hand is empty and only borrowing the other hand's item for the arm marker below.
+        // Item: same resting anchor and swing vanilla's applyItemArmTransform/swingArm use. Its
+        // first-person display transform gets applied again automatically inside renderItem's own
+        // pipeline, so it must not be applied here too or the item double-transforms. Skipped entirely when this hand is empty and only borrowing the other hand's item for the arm marker below.
         if (rendersItem) {
             poseStack.pushPose();
             poseStack.translate(anchorX, ITEM_POS_Y, ITEM_POS_Z);
@@ -198,8 +181,7 @@ public abstract class ItemInHandRendererMixin {
         }
 
         // Arm: same anchor and swing, then the item's display transform, then seated at the
-        // marker's animated world position, oriented by the bone's rotation composed with the
-        // marker's own authored rotation. No hidden vanilla "natural hand" correction.
+        // marker's animated world position, oriented by the bone's rotation composed with the marker's own authored rotation. No hidden vanilla "natural hand" correction.
         poseStack.pushPose();
         poseStack.translate(anchorX, ITEM_POS_Y, ITEM_POS_Z);
         applySwing(poseStack, attackAnim, sign);
@@ -210,42 +192,35 @@ public abstract class ItemInHandRendererMixin {
         poseStack.mulPose(attachRotation);
         poseStack.mulPose(markerRotationJoml);
         if (markerGroupName.equals("Left arm")) {
-            // The "Left arm" role's rotation data reads 180 degrees off on Z unless corrected -
-            // this is tied to the ROLE, not which visual side/mesh it ends up rendering through:
-            // for a left-handed player, "Right arm" (the driving hand) can end up on the left
-            // mesh and "Left arm" on the right mesh, but the correction still only ever applies
-            // to "Left arm". The pivot point for it does depend on the actual mesh being drawn
-            // (each arm box has a different center), so that part still follows rightArm.
+            // The "Left arm" role's rotation data reads 180 degrees off on Z unless corrected, and
+            // that's tied to the ROLE, not the visual side/mesh: for a left-handed player, "Right
+            // arm" (the driving hand) can end up on the left mesh and "Left arm" on the right, but
+            // the correction still only ever applies to "Left arm". Its pivot point does depend on the actual mesh drawn (each arm box has a different center), so that part still follows rightArm.
             float centerX = rightArm ? VANILLA_ARM_CENTER_X_RIGHT : VANILLA_ARM_CENTER_X_LEFT;
             poseStack.translate(centerX / 16.0F, VANILLA_ARM_CENTER_Y / 16.0F, 0.0F);
             poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
             poseStack.translate(-centerX / 16.0F, -VANILLA_ARM_CENTER_Y / 16.0F, 0.0F);
         }
 
-        // Scales the vanilla hand mesh to match the marker's own bounding size instead of
-        // always rendering at vanilla's fixed proportions, so a marker drawn bigger or smaller
-        // than a normal arm actually looks bigger or smaller in-game.
+        // Scales the vanilla hand mesh to the marker's own bounding size instead of vanilla's
+        // fixed proportions, so a bigger or smaller marker actually looks bigger or smaller in-game.
         poseStack.scale((float) (markerSize.x() / VANILLA_ARM_WIDTH),
                 (float) (markerSize.y() / VANILLA_ARM_HEIGHT),
                 (float) (markerSize.z() / VANILLA_ARM_DEPTH));
 
-        // Corrects the marker's own rotation to match vanilla's first-person hand exactly,
-        // tuned via NilumHandTuneScreen against a neutral origin-0,0 test rig. Still
-        // live-adjustable via HandTuneKeybind if a future model needs a different fit.
-        // Rotation MUST come before the position translate below, or it pivots around
-        // (attach point + position offset) instead of the attach point itself, which makes the
-        // sliders behave completely differently from one model's marker origin to another's.
+        // Corrects the marker's rotation to match vanilla's first-person hand exactly, tuned via
+        // NilumHandTuneScreen against a neutral origin-0,0 rig; still live-adjustable via
+        // HandTuneKeybind for a future model needing a different fit. MUST come before the position
+        // translate below, or it pivots around (attach point + offset) instead of the attach point, making the sliders behave differently per model's marker origin.
         poseStack.mulPose(Axis.XP.rotationDegrees(HandTuneCorrection.rotX));
         poseStack.mulPose(Axis.YP.rotationDegrees(HandTuneCorrection.rotY));
         poseStack.mulPose(Axis.ZP.rotationDegrees(HandTuneCorrection.rotZ));
         poseStack.translate(HandTuneCorrection.posX, HandTuneCorrection.posY, HandTuneCorrection.posZ);
 
-        // AvatarRenderer.renderRightHand/renderLeftHand draws playerModel.rightArm/leftArm at
-        // its own baked-in vanilla pivot (PartPose.offset(-5, 2, 0) for the right arm, mirrored
-        // for the left, in HumanoidModel/PlayerModel), not wherever our poseStack currently is.
-        // We've never accounted for that pivot, so the mesh always rendered offset from our
-        // attach point by that amount. Counter-translate here so vanilla's own re-application
-        // of it cancels out, landing the ModelPart's origin exactly at our attach point instead.
+        // AvatarRenderer.renderRightHand/renderLeftHand draws playerModel.rightArm/leftArm at its
+        // own baked-in vanilla pivot (PartPose.offset(-5, 2, 0) for the right arm, mirrored for the
+        // left, in HumanoidModel/PlayerModel), not wherever our poseStack sits. Counter-translate
+        // here so vanilla's own re-application of it cancels out, landing the ModelPart's origin exactly at our attach point.
         float vanillaPivotX = rightArm ? -5.0F : 5.0F;
         poseStack.translate(-vanillaPivotX / 16.0F, -2.0F / 16.0F, 0.0F);
 

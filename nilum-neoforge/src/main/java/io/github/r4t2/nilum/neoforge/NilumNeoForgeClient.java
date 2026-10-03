@@ -34,9 +34,12 @@ import io.github.r4t2.nilum.common.protocol.OpenUiPacket;
 import io.github.r4t2.nilum.common.protocol.SetHudAtlasVisibilityPacket;
 import io.github.r4t2.nilum.common.protocol.SetHudElementVisibilityPacket;
 import io.github.r4t2.nilum.common.protocol.SetHudTextPacket;
+import io.github.r4t2.nilum.common.protocol.SetUiElementVisibilityPacket;
+import io.github.r4t2.nilum.common.protocol.SetUiTextPacket;
 import io.github.r4t2.nilum.common.protocol.TcpOfferPacket;
 import io.github.r4t2.nilum.common.protocol.TcpUnavailablePacket;
 import io.github.r4t2.nilum.common.tcp.NilumTcpClient;
+import io.github.r4t2.nilum.common.trust.TrustStore;
 import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.common.util.ServerCacheId;
 import io.github.r4t2.nilum.neoforge.block.ClientBlockRegistry;
@@ -49,6 +52,7 @@ import io.github.r4t2.nilum.neoforge.creativetab.NilumCreativeTabs;
 import io.github.r4t2.nilum.neoforge.font.ClientFontStore;
 import io.github.r4t2.nilum.neoforge.font.FontInstaller;
 import io.github.r4t2.nilum.neoforge.hud.ClientHudAtlasStore;
+import io.github.r4t2.nilum.neoforge.network.NilumOpenChestUiPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumOpenUiPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudAtlasVisibilityPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudElementVisibilityPayload;
@@ -80,8 +84,11 @@ import io.github.r4t2.nilum.neoforge.network.NilumModelSpawnPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumRegisterClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetClientVarPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumSetHudTextPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetUiElementVisibilityPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumSetUiTextPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpUnavailablePayload;
+import io.github.r4t2.nilum.neoforge.network.NilumTrustPendingPayload;
 import io.github.r4t2.nilum.neoforge.render.IconAtlas;
 import io.github.r4t2.nilum.neoforge.render.NilumGlintSpecialRenderer;
 import io.github.r4t2.nilum.neoforge.render.NilumIconItemModel;
@@ -91,6 +98,7 @@ import io.github.r4t2.nilum.neoforge.render.NilumItemDisplayRenderer;
 import io.github.r4t2.nilum.neoforge.render.NilumModelItemModel;
 import io.github.r4t2.nilum.neoforge.render.NilumModelItemSpecialRenderer;
 import io.github.r4t2.nilum.neoforge.render.ShaderCapability;
+import io.github.r4t2.nilum.neoforge.trust.NilumTrustPromptScreen;
 import io.github.r4t2.nilum.neoforge.render.TextureUploader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.item.ItemModel;
@@ -130,6 +138,7 @@ final class NilumNeoForgeClient {
     static void register(IEventBus modEventBus, NilumLogger logger, String modVersion) {
         Path assetCacheRoot = FMLPaths.CONFIGDIR.get().resolve("nilum-cache");
         AssetCache assetCache = new AssetCache(assetCacheRoot);
+        TrustStore trustStore = new TrustStore(FMLPaths.CONFIGDIR.get().resolve("nilum").resolve("trusted_servers.txt"));
         ClientModelStore modelStore = new ClientModelStore();
         ClientModelPlacements placements = new ClientModelPlacements();
         ClientHeldItemAnimationStates heldItemAnimations = new ClientHeldItemAnimationStates();
@@ -174,8 +183,16 @@ final class NilumNeoForgeClient {
             fontStore.install(fontId, data);
         };
 
+        // No NeoForge glyph-provider integration yet (see nilum-fabric's font_icons pipeline), so
+        // streamed icons are cached but not rendered on this loader for now.
+        BiConsumer<String, byte[]> fontIconSink = (iconId, data) -> { };
+
+        // No NeoForge mixin infrastructure (see nilum-fabric's ContainerScreenMixin), so a chest
+        // UI's real inventory/items/click actions all work, but its custom background texture doesn't.
+        BiConsumer<String, byte[]> chestUiSink = (uiId, data) -> { };
+
         AssetSyncSession assetSync = new AssetSyncSession(assetCache, modelStore, iconAtlas::add, hudAtlases::add,
-                shaderPackSink, fontSink, customUiStore::add, logger,
+                shaderPackSink, fontSink, fontIconSink, customUiStore::add, chestUiSink, logger,
                 runnable -> Minecraft.getInstance().execute(runnable));
         TextureUploader textureUploader = new TextureUploader();
         // A model reloading with new bytes under the same id (e.g. a default-retexture block
@@ -187,12 +204,12 @@ final class NilumNeoForgeClient {
         NilumModelItemSpecialRenderer modelRenderer = new NilumModelItemSpecialRenderer(modelStore, textureUploader);
         NilumGlintSpecialRenderer glintRenderer = new NilumGlintSpecialRenderer(iconAtlas);
 
-        // Real blocks on a NeoForge-hosted server (Tier-3): tracked on their own NilumBlockEntity,
-        // rendered via a genuine BlockEntityRenderer. Wire-block overlay blocks from a Paper server
-        // (Tier-1, no registry access there so it proxies a real vanilla material) are tracked here
-        // instead and rendered by NilumBlockRenderer/suppressed by NilumBlockStateModel below;
-        // both loaders' clients must support connecting to Paper, so this path stays even though a
-        // NeoForge-hosted server itself never needs it.
+        // Real blocks on a NeoForge-hosted server (Tier-3) are tracked on their own NilumBlockEntity
+        // and rendered via a genuine BlockEntityRenderer. Wire-block overlay blocks from a Paper
+        // server (Tier-1, no registry access there, so it proxies a real vanilla material) are
+        // tracked here instead, rendered by NilumBlockRenderer and suppressed by
+        // NilumBlockStateModel below. Both loaders' clients must support connecting to Paper, so
+        // this path stays even though a NeoForge-hosted server itself never needs it.
         ClientBlockRegistry blockRegistry = new ClientBlockRegistry();
         NilumBlockRenderer blockRenderer = new NilumBlockRenderer(modelStore, blockRegistry, textureUploader);
 
@@ -227,7 +244,7 @@ final class NilumNeoForgeClient {
 
         modEventBus.addListener((RegisterClientPayloadHandlersEvent event) -> {
             event.register(NilumHelloPayload.TYPE, (payload, context) ->
-                    handleHello(payload, context, logger, modVersion, assetCache, assetCacheRoot));
+                    handleHello(payload, context, logger, modVersion, assetCache, assetCacheRoot, trustStore));
             event.register(NilumTcpOfferPayload.TYPE, (payload, context) -> handleTcpOffer(payload, logger, assetSync));
             event.register(NilumAssetManifestPayload.TYPE, (payload, context) -> {
                 List<AssetManifestEntry> entries = AssetManifestPacket.decode(payload.data()).entries();
@@ -279,10 +296,13 @@ final class NilumNeoForgeClient {
             event.register(NilumOpenUiPayload.TYPE, (payload, context) -> {
                 OpenUiPacket packet = OpenUiPacket.decode(payload.data());
                 customUiStore.get(packet.uiId()).ifPresentOrElse(
-                        ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui, logger, fontStore)),
+                        ui -> Minecraft.getInstance().setScreen(new NilumCustomUiScreen(packet.uiId(), ui, logger, fontStore, clientVars)),
                         () -> logger.warn("Server opened custom UI '" + packet.uiId()
                                 + "' but it isn't cached on this client yet."));
             });
+            // No background texture swap on NeoForge (see chestUiSink above); the real
+            // inventory/items/click actions still work via vanilla's own container protocol.
+            event.register(NilumOpenChestUiPayload.TYPE, (payload, context) -> { });
             event.register(NilumSetHudAtlasVisibilityPayload.TYPE, (payload, context) -> {
                 SetHudAtlasVisibilityPacket packet = SetHudAtlasVisibilityPacket.decode(payload.data());
                 hudAtlases.setAtlasVisible(packet.atlasId(), packet.visible());
@@ -290,6 +310,18 @@ final class NilumNeoForgeClient {
             event.register(NilumSetHudElementVisibilityPayload.TYPE, (payload, context) -> {
                 SetHudElementVisibilityPacket packet = SetHudElementVisibilityPacket.decode(payload.data());
                 hudAtlases.setElementVisible(packet.atlasId(), packet.elementId(), packet.visible());
+            });
+            event.register(NilumSetUiTextPayload.TYPE, (payload, context) -> {
+                SetUiTextPacket packet = SetUiTextPacket.decode(payload.data());
+                if (Minecraft.getInstance().screen instanceof NilumCustomUiScreen screen && screen.uiId().equals(packet.uiId())) {
+                    screen.updateElementText(packet.elementId(), packet.text());
+                }
+            });
+            event.register(NilumSetUiElementVisibilityPayload.TYPE, (payload, context) -> {
+                SetUiElementVisibilityPacket packet = SetUiElementVisibilityPacket.decode(payload.data());
+                if (Minecraft.getInstance().screen instanceof NilumCustomUiScreen screen && screen.uiId().equals(packet.uiId())) {
+                    screen.setElementVisible(packet.elementId(), packet.visible());
+                }
             });
             event.register(NilumEntityAnimationPlayPayload.TYPE, (payload, context) -> {
                 EntityAnimationPlayPacket packet = EntityAnimationPlayPacket.decode(payload.data());
@@ -327,8 +359,9 @@ final class NilumNeoForgeClient {
                 String modelId = heldItemAnimations.currentModelId(packet.holderId(), packet.rightHand());
                 BbModel model = modelId == null ? null : modelStore.model(modelId).orElse(null);
                 if (model != null) {
+                    String loopModeOverride = packet.loopModeOverride().isBlank() ? null : packet.loopModeOverride();
                     heldItemAnimations.get(packet.holderId(), packet.rightHand(), model)
-                            .play(model, packet.animationName(), packet.startTimeMillis(), System.currentTimeMillis());
+                            .play(model, packet.animationName(), packet.startTimeMillis(), System.currentTimeMillis(), loopModeOverride);
                 }
             });
             event.register(NilumItemAnimationStopPayload.TYPE, (payload, context) -> {
@@ -367,13 +400,37 @@ final class NilumNeoForgeClient {
     }
 
     private static void handleHello(NilumHelloPayload payload, IPayloadContext context, NilumLogger logger, String modVersion,
-                                     AssetCache assetCache, Path assetCacheRoot) {
+                                     AssetCache assetCache, Path assetCacheRoot, TrustStore trustStore) {
         HelloPacket hello = HelloPacket.decode(payload.data());
 
-        String serverId = ServerCacheId.sanitize(Minecraft.getInstance().getCurrentServer() == null
-                ? null : Minecraft.getInstance().getCurrentServer().ip);
+        String currentServerIp = Minecraft.getInstance().getCurrentServer() == null
+                ? null : Minecraft.getInstance().getCurrentServer().ip;
+        String serverId = ServerCacheId.sanitize(currentServerIp);
         assetCache.rebase(assetCacheRoot.resolve(serverId));
 
+        // context is captured and reply()'d later, once the player answers the trust prompt; this
+        // only works because reply() resolves the connection at call time rather than freezing it
+        // to this specific packet-handling frame.
+        Runnable sendAck = () -> sendHelloAck(hello, context, logger, modVersion);
+
+        if (trustStore.isTrusted(serverId)) {
+            sendAck.run();
+            return;
+        }
+
+        // Tell the server a real Nilum client is here before the player has answered the prompt,
+        // so its join-time kick timer doesn't fire while they're still looking at the dialog.
+        context.reply(new NilumTrustPendingPayload(new byte[0]));
+        String displayAddress = currentServerIp == null ? "this server" : currentServerIp;
+        Minecraft.getInstance().setScreen(new NilumTrustPromptScreen(displayAddress,
+                () -> {
+                    trustStore.trust(serverId);
+                    sendAck.run();
+                },
+                () -> logger.info("Declined the Nilum trust prompt for " + displayAddress + ".")));
+    }
+
+    private static void sendHelloAck(HelloPacket hello, IPayloadContext context, NilumLogger logger, String modVersion) {
         if (SemanticVersions.isNewer(modVersion, hello.serverModVersion())) {
             logger.warn("This Nilum client (" + modVersion + ") is newer than the server ("
                     + hello.serverModVersion() + "), some features may not be available.");

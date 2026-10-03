@@ -1,5 +1,7 @@
 package io.github.r4t2.nilum.common.hud;
 
+import io.github.r4t2.nilum.common.util.ScreenValue;
+
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -98,10 +100,13 @@ public final class HudAtlasParser {
         }
 
         int staticFrame = fields.containsKey("static_frame") ? Integer.parseInt(fields.get("static_frame")) : 0;
-        int[] screenPosition = parseScreenPosition(fields);
+        ScreenValue[] screenPosition = parseScreenPosition(fields);
+        HudElementAnchor anchor = parseAnchor(fields);
+        ScreenSize screenSize = parseScreenSize(fields);
 
         return new HudAtlasElement.Sprite(origin[0], origin[1], frameSize[0], frameSize[1], frameCount,
-                layout, type, clientConnector, staticFrame, screenPosition[0], screenPosition[1]);
+                layout, type, clientConnector, staticFrame, screenPosition[0], screenPosition[1], anchor,
+                screenSize.width(), screenSize.height());
     }
 
     private static HudAtlasElement.Duplicate parseDuplicateElement(String id, Map<String, String> fields) {
@@ -121,7 +126,7 @@ public final class HudAtlasParser {
 
         int imageFrame = fields.containsKey("image_frame") ? Integer.parseInt(fields.get("image_frame")) : 0;
         int[] offset = requireIntArray(fields, "duplicate_offset", "Element '" + id + "'");
-        int[] screenPosition = parseScreenPosition(fields);
+        ScreenValue[] screenPosition = parseScreenPosition(fields);
 
         return new HudAtlasElement.Duplicate(origin[0], origin[1], frameSize[0], frameSize[1], frameCount,
                 layout, type, clientConnector, staticCount, imageFrame, offset[0], offset[1],
@@ -147,9 +152,12 @@ public final class HudAtlasParser {
                 : fields.containsKey("static_frame") ? HudElementType.STATIC
                 : HudElementType.SERVER;
 
-        int[] screenPosition = parseScreenPosition(fields);
+        ScreenValue[] screenPosition = parseScreenPosition(fields);
+        HudElementAnchor anchor = parseAnchor(fields);
+        ScreenSize screenSize = parseScreenSize(fields);
         return new HudAtlasElement.Image(textureFile, origin[0], origin[1], frameSize[0], frameSize[1], frameCount,
-                layout, type, clientConnector, staticFrame, screenPosition[0], screenPosition[1]);
+                layout, type, clientConnector, staticFrame, screenPosition[0], screenPosition[1], anchor,
+                screenSize.width(), screenSize.height());
     }
 
     private static HudAtlasElement.Text parseTextElement(String id, Map<String, String> fields) {
@@ -163,12 +171,45 @@ public final class HudAtlasParser {
                     + "' is type 'render_text' but has neither 'client_connector' nor 'server_connector'");
         }
 
-        int[] screenPosition = parseScreenPosition(fields);
-        return new HudAtlasElement.Text(font, clientConnector, serverConnector, format, screenPosition[0], screenPosition[1]);
+        ScreenValue[] screenPosition = parseScreenPosition(fields);
+        HudElementAnchor anchor = parseAnchor(fields);
+        return new HudAtlasElement.Text(font, clientConnector, serverConnector, format, screenPosition[0], screenPosition[1], anchor);
     }
 
-    private static int[] parseScreenPosition(Map<String, String> fields) {
-        return fields.containsKey("screen_position") ? parseIntArray(fields.get("screen_position")) : new int[] {0, 0};
+    private record ScreenSize(Optional<ScreenValue> width, Optional<ScreenValue> height) {
+    }
+
+    private static ScreenValue[] parseScreenPosition(Map<String, String> fields) {
+        if (!fields.containsKey("screen_position")) {
+            return new ScreenValue[] {new ScreenValue.Pixels(0), new ScreenValue.Pixels(0)};
+        }
+        return parseScreenValueArray(fields.get("screen_position"));
+    }
+
+    /** Independent on-screen draw size for Sprite/Image, defaulting to frame_size (today's 1:1 behavior) when absent. */
+    private static ScreenSize parseScreenSize(Map<String, String> fields) {
+        if (!fields.containsKey("screen_size")) {
+            return new ScreenSize(Optional.empty(), Optional.empty());
+        }
+        ScreenValue[] parsed = parseScreenValueArray(fields.get("screen_size"));
+        return new ScreenSize(Optional.of(parsed[0]), Optional.of(parsed[1]));
+    }
+
+    private static ScreenValue[] parseScreenValueArray(String raw) {
+        String trimmed = raw.trim();
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            trimmed = trimmed.substring(1, trimmed.length() - 1);
+        }
+        String[] parts = trimmed.split(",");
+        ScreenValue[] values = new ScreenValue[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            values[i] = ScreenValue.parse(parts[i]);
+        }
+        return values;
+    }
+
+    private static HudElementAnchor parseAnchor(Map<String, String> fields) {
+        return fields.containsKey("anchor") ? HudElementAnchor.parse(fields.get("anchor")) : HudElementAnchor.TOP_LEFT;
     }
 
     private static String require(Map<String, String> fields, String id, String field) {

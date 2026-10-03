@@ -121,9 +121,9 @@ public final class NilumBlockRenderer {
                 if (face != null && isFlushWithBoundary(quad, face) && level.getBlockState(pos.relative(face)).isSolidRender()) {
                     continue;
                 }
-                // Light comes from whatever this face is actually exposed to: the block
-                // it's touching in that direction, not one flat value for the whole model.
-                // Non-axis-aligned/non-flush faces fall back to the block's own position.
+                // Light comes from whatever this face is exposed to, the block it's touching in
+                // that direction, not one flat value for the whole model; non-axis-aligned or
+                // non-flush faces fall back to the block's own position.
                 BlockPos lightPos = face != null ? pos.relative(face) : pos;
                 int light = LevelRenderer.getLightColor(level, lightPos);
                 NilumModelGeometry.emitQuad(vertexConsumer, pose, quad, light, OverlayTexture.NO_OVERLAY);

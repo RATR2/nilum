@@ -55,16 +55,15 @@ public final class NilumBlockRenderer {
 
         Camera camera = client.gameRenderer.getMainCamera();
         Vec3 cameraPos = camera.position();
-        // context.matrices() is NOT reliably the camera's own view rotation at this point in the
-        // frame (it's whatever the world-render pass has pushed/popped by the time AFTER_ENTITIES
-        // fires); using it produced a frustum facing a fixed direction instead of wherever the
-        // camera actually looks, which showed up as the whole model vanishing at certain view
-        // angles. Build the view matrix directly from the camera's own rotation instead, the same
-        // way GameRenderer.projectPointToScreen does it.
+        // context.matrices() isn't reliably the camera's own view rotation here, it's whatever the
+        // world-render pass has pushed/popped by the time AFTER_ENTITIES fires; using it produced a
+        // frustum facing a fixed direction, causing the model to vanish at certain view angles.
+        // Build the view matrix directly from the camera's own rotation instead, the same way
+        // GameRenderer.projectPointToScreen does it.
         Matrix4f viewMatrix = new Matrix4f().rotation(camera.rotation().conjugate(new Quaternionf()));
-        // GameRenderer's own culling-fov computation is private; approximate it with the
-        // configured FOV plus a safety margin, biasing toward including slightly more than
-        // strictly necessary rather than risking visible pop-in right at the screen edge.
+        // GameRenderer's own culling-fov computation is private; approximate it with the configured
+        // FOV plus a safety margin, erring toward including too much rather than risking pop-in at
+        // the screen edge.
         float fov = client.options.fov().get() + 10.0f;
         Matrix4f projectionMatrix = client.gameRenderer.getProjectionMatrix(fov);
         Frustum frustum = new Frustum(viewMatrix, projectionMatrix);
@@ -126,9 +125,9 @@ public final class NilumBlockRenderer {
                     if (face != null && isFlushWithBoundary(quad, face) && level.getBlockState(pos.relative(face)).isSolidRender()) {
                         continue;
                     }
-                    // Light comes from whatever this face is actually exposed to: the block
-                    // it's touching in that direction, not one flat value for the whole model.
-                    // Non-axis-aligned/non-flush faces fall back to the block's own position.
+                    // Light comes from whatever this face is exposed to, the block it's touching in
+                    // that direction, not one flat value for the whole model; non-axis-aligned or
+                    // non-flush faces fall back to the block's own position.
                     BlockPos lightPos = face != null ? pos.relative(face) : pos;
                     int light = LevelRenderer.getLightColor(level, lightPos);
                     NilumModelGeometry.emitQuad(vertexConsumer, pose, quad, light, OverlayTexture.NO_OVERLAY);

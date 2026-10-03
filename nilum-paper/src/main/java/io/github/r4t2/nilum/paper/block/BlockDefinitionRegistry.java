@@ -110,12 +110,11 @@ public final class BlockDefinitionRegistry {
             }
             case "custom" -> {
                 String wireBlockName = proxySection.getString("wire_block");
-                // Default to glass, not a fully-opaque block: the wire block's real occlusion
-                // shape drives vanilla's neighbor face culling regardless of our own render pass
-                // suppressing its visual, and most custom models don't fill the full 1x1x1 voxel.
-                // An opaque default would silently punch "see-through" holes in the world wherever
-                // the model doesn't cover the culled faces. Admins whose model IS a full cube can
-                // still opt into an opaque wire block explicitly.
+                // Default to glass, not opaque: the wire block's real occlusion shape drives vanilla's
+                // neighbor face culling regardless of our own render pass suppressing its visual, and
+                // most custom models don't fill the full 1x1x1 voxel. An opaque default would silently
+                // punch see-through holes wherever the model doesn't cover the culled faces; admins
+                // whose model is a full cube can still opt into an opaque wire block explicitly.
                 Material wireBlock = wireBlockName != null ? Material.matchMaterial(wireBlockName) : Material.GLASS;
                 if (wireBlock == null) {
                     throw new IllegalArgumentException("block definition '" + id
@@ -128,7 +127,8 @@ public final class BlockDefinitionRegistry {
                 }
                 yield new BlockProxy.Custom(wireBlock,
                         proxySection.getDouble("break_time_seconds", 1.0),
-                        proxySection.getBoolean("explosion_resistant", false));
+                        proxySection.getBoolean("explosion_resistant", false),
+                        proxySection.getInt("xp", 0));
             }
             default -> throw new IllegalArgumentException("block definition '" + id
                     + "' has unknown proxy.mode '" + mode + "' (expected 'vanilla' or 'custom')");

@@ -19,7 +19,7 @@ import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 
 @Name("Open Nilum UI")
-@Description("Opens a Nilum custom UI for a player.")
+@Description("Opens a Nilum custom or chest UI for a player.")
 @Example("open nilum ui \"main_menu\" for player")
 @Since("1.0")
 public class EffOpenNilumUi extends Effect {
@@ -55,7 +55,7 @@ public class EffOpenNilumUi extends Effect {
         }
         if (!api.openCustomUi(target, id)) {
             JavaPlugin.getPlugin(NilumPlugin.class).logger().warn("open nilum ui '" + id + "' for " + target.getName()
-                    + " failed: either '" + id + "' isn't a loaded custom UI (check it's in the ui folder and "
+                    + " failed: either '" + id + "' isn't a loaded custom or chest UI (check it's in the ui folder and "
                     + "loaded with no missing-texture warnings) or " + target.getName() + " hasn't completed the Nilum handshake yet.");
         }
     }

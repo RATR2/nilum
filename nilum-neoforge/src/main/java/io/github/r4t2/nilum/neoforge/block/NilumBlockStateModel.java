@@ -26,9 +26,8 @@ public final class NilumBlockStateModel implements BlockStateModel {
 
     @Override
     public void collectParts(RandomSource random, List<BlockModelPart> parts) {
-        // No BlockPos available here (vanilla's legacy interface is position-independent); only
-        // reached for non-terrain uses (item frames, etc.), not the real per-position terrain
-        // path below. Pass through untouched.
+        // No BlockPos here (vanilla's legacy interface is position-independent); only used for
+        // non-terrain cases like item frames, not the real per-position path below. Pass through untouched.
         original.collectParts(random, parts);
     }
 

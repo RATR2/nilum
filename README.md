@@ -42,7 +42,7 @@ None of that is "we do the same thing but nicer." It is a different category of 
 | `nilum-common` | Shared, loader-agnostic logic: wire protocol, a custom config system and logger, the TCP side-channel plus hash-based asset transfer, and the `.bbmodel` parser (geometry, textures, collision groups) |
 | `nilum-neoforge` | NeoForge mod: handshake (server and client roles), TCP side-channel and asset sync. In-world model rendering isn't built yet |
 | `nilum-fabric` | Fabric mod: handshake (server and client roles), TCP side-channel and asset sync, and a client-side renderer for in-world Nilum models |
-| `nilum-paper` | Paper/Bukkit server plugin: handshake, TCP asset server, model registry and in-world placement, collision group resolution. Skript and Denizen integrations will live here as addon packages, not separate modules |
+| `nilum-paper` | Paper/Bukkit server plugin: handshake, TCP asset server, model registry and in-world placement, collision group resolution. The Skript integration lives here as an addon package, not a separate module |
 
 Group ID: `io.github.r4t2.nilum`. Targets Minecraft 1.21.11. Classic Forge is legacy from 1.20.2 onward and isn't binary-compatible with mods from this era, so NeoForge is the tier-3 loader here instead.
 
@@ -50,7 +50,7 @@ Group ID: `io.github.r4t2.nilum`. Targets Minecraft 1.21.11. Classic Forge is le
 
 ## Roadmap
 
-Foundation is done: the handshake protocol, the TCP side-channel, and hash-based asset transfer all work end to end. The Blockbench model pipeline is in progress: the `.bbmodel` parser, in-world placement, and collision group parsing all work, and Fabric has a working client-side renderer for placed models (not yet checked against a live client). Still to come: NeoForge's renderer, proxy-block material classification, anti-cheat exemption, the HUD system, shaders, and the Skript/Denizen integrations. Watch the [releases](https://github.com/RATR2/nilum/releases) page for progress.
+Foundation is done: the handshake protocol, the TCP side-channel, and hash-based asset transfer all work end to end. The Blockbench model pipeline is in progress: the `.bbmodel` parser, in-world placement, and collision group parsing all work, and Fabric has a working client-side renderer for placed models (not yet checked against a live client). Still to come: NeoForge's renderer, proxy-block material classification, anti-cheat exemption, the HUD system, shaders, and the Skript integration. Watch the [releases](https://github.com/RATR2/nilum/releases) page for progress.
 
 ## License
 

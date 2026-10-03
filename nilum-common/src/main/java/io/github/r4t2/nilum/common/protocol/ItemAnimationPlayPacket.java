@@ -8,8 +8,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.UUID;
 
-/** Tells a held item in a player's visual left/right hand to start playing a named animation. */
-public record ItemAnimationPlayPacket(UUID holderId, boolean rightHand, String animationName, long startTimeMillis) {
+/**
+ * Tells a held item in a player's visual left/right hand to start playing a named animation.
+ *
+ * @param loopModeOverride "once", "hold", or "loop" to force a mode instead of the animation's own authored one; blank for no override
+ */
+public record ItemAnimationPlayPacket(UUID holderId, boolean rightHand, String animationName, long startTimeMillis, String loopModeOverride) {
 
     public byte[] encode() {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -19,6 +23,7 @@ public record ItemAnimationPlayPacket(UUID holderId, boolean rightHand, String a
             out.writeBoolean(rightHand);
             out.writeUTF(animationName);
             out.writeLong(startTimeMillis);
+            out.writeUTF(loopModeOverride);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -31,7 +36,8 @@ public record ItemAnimationPlayPacket(UUID holderId, boolean rightHand, String a
             boolean rightHand = in.readBoolean();
             String animationName = in.readUTF();
             long startTimeMillis = in.readLong();
-            return new ItemAnimationPlayPacket(holderId, rightHand, animationName, startTimeMillis);
+            String loopModeOverride = in.readUTF();
+            return new ItemAnimationPlayPacket(holderId, rightHand, animationName, startTimeMillis, loopModeOverride);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

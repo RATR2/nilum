@@ -1,6 +1,6 @@
 // Paper/Bukkit server plugin: plugin channel messaging, TCP asset server, custom block registry,
-// anti-cheat integration, Open API. Also hosts the Skript and Denizen integrations as addon
-// packages rather than separate modules. Targets Minecraft 1.21.11 (see README).
+// anti-cheat integration, Open API. Also hosts the Skript integration as an addon package
+// rather than a separate module. Targets Minecraft 1.21.11 (see README).
 
 plugins {
     id("com.gradleup.shadow") version "9.6.0"

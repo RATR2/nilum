@@ -11,6 +11,7 @@ import io.github.r4t2.nilum.common.protocol.UiClosedPacket;
 import io.github.r4t2.nilum.common.ui.UiAnchor;
 import io.github.r4t2.nilum.common.ui.UiDescriptor;
 import io.github.r4t2.nilum.common.ui.UiElement;
+import io.github.r4t2.nilum.common.util.ScreenValue;
 import io.github.r4t2.nilum.neoforge.font.ClientFontStore;
 import io.github.r4t2.nilum.neoforge.hud.ClientVarStore;
 import io.github.r4t2.nilum.neoforge.hud.HudHeadText;
@@ -30,10 +31,13 @@ import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
-/** Renders a Custom UI's layers by z-order and handles button clicks. Requirement-based visibility isn't wired up yet. */
+/** Renders a Custom UI's layers by z-order and handles button clicks. */
 public final class NilumCustomUiScreen extends Screen {
 
     private sealed interface RenderableLayer {
@@ -69,23 +73,31 @@ public final class NilumCustomUiScreen extends Screen {
     private final CustomUi customUi;
     private final NilumLogger logger;
     private final ClientFontStore fontStore;
+    private final ClientVarStore clientVars;
     private final List<RenderableLayer> layers = new ArrayList<>();
+    private final Set<String> hiddenElementIds = new HashSet<>();
     private String pressedElementId;
 
-    public NilumCustomUiScreen(String uiId, CustomUi customUi, NilumLogger logger, ClientFontStore fontStore) {
+    public NilumCustomUiScreen(String uiId, CustomUi customUi, NilumLogger logger, ClientFontStore fontStore, ClientVarStore clientVars) {
         super(Component.literal("Nilum UI: " + uiId));
         this.uiId = uiId;
         this.customUi = customUi;
         this.logger = logger;
         this.fontStore = fontStore;
+        this.clientVars = clientVars;
+    }
+
+    public String uiId() {
+        return uiId;
     }
 
     @Override
     protected void init() {
         layers.clear();
+        hiddenElementIds.clear();
         UiDescriptor descriptor = customUi.descriptor();
         LocalPlayer player = Minecraft.getInstance().player;
-        ValueSource valueSource = player == null ? null : new NilumHudValueSource(player, new ClientVarStore(), logger);
+        ValueSource valueSource = player == null ? null : new NilumHudValueSource(player, clientVars, logger);
         TextValueSource textSource = player == null ? null : new NilumHudTextValueSource(player, logger);
 
         for (Map.Entry<String, UiElement> entry : descriptor.elements().entrySet()) {
@@ -104,12 +116,27 @@ public final class NilumCustomUiScreen extends Screen {
                 case UiElement.Text ignored -> throw new IllegalStateException("handled above");
                 case UiElement.Head ignored -> throw new IllegalStateException("handled above");
             };
+            Optional<ScreenValue> widthOverride = switch (element) {
+                case UiElement.Image image -> image.width();
+                case UiElement.Button button -> button.width();
+                default -> Optional.empty();
+            };
+            Optional<ScreenValue> heightOverride = switch (element) {
+                case UiElement.Image image -> image.height();
+                case UiElement.Button button -> button.height();
+                default -> Optional.empty();
+            };
             CustomUi.TextureRef pressedTexture = element instanceof UiElement.Button button
                     ? customUi.textureFor(button.pressedImageFile()).orElse(null)
                     : null;
             customUi.textureFor(imageFile).ifPresentOrElse(
-                    texture -> layers.add(new RenderableLayer.Sprite(entry.getKey(), element.x(), element.y(),
-                            element.layer(), texture.width(), texture.height(), texture, pressedTexture)),
+                    texture -> {
+                        int drawWidth = widthOverride.map(v -> v.resolve(width)).orElse(texture.width());
+                        int drawHeight = heightOverride.map(v -> v.resolve(height)).orElse(texture.height());
+                        layers.add(new RenderableLayer.Sprite(entry.getKey(),
+                                element.x().resolve(width), element.y().resolve(height),
+                                element.layer(), drawWidth, drawHeight, texture, pressedTexture));
+                    },
                     () -> logger.warn("Custom UI '" + uiId + "' element '" + entry.getKey()
                             + "' references image '" + imageFile + "', which the server never sent; "
                             + "check the server console for a missing-texture warning when it loaded this UI."));
@@ -129,6 +156,9 @@ public final class NilumCustomUiScreen extends Screen {
         String raw;
         if (text.text().isPresent()) {
             raw = text.text().get();
+        } else if (text.serverConnector().isPresent()) {
+            // Populated live once the server's first UiStateService push arrives; see updateElementText.
+            raw = "";
         } else if (valueSource == null || textSource == null) {
             raw = "";
         } else {
@@ -138,14 +168,14 @@ public final class NilumCustomUiScreen extends Screen {
         Component value = HudHeadText.containsHeadTag(raw) ? HudHeadText.parse(raw) : Component.literal(raw);
 
         Font font = resolveFont(text.font());
-        layers.add(new RenderableLayer.TextLayer(elementId, text.x(), text.y(), text.layer(),
+        layers.add(new RenderableLayer.TextLayer(elementId, text.x().resolve(width), text.y().resolve(height), text.layer(),
                 font.width(value), font.lineHeight, font, value, text.color()));
     }
 
     private void addHeadLayer(String elementId, UiElement.Head head) {
         Component value = HudHeadText.parse("<head:" + head.player() + ">");
         Font font = resolveFont("default");
-        layers.add(new RenderableLayer.TextLayer(elementId, head.x(), head.y(), head.layer(),
+        layers.add(new RenderableLayer.TextLayer(elementId, head.x().resolve(width), head.y().resolve(height), head.layer(),
                 font.width(value), font.lineHeight, font, value, 0xFFFFFFFF));
     }
 
@@ -154,6 +184,27 @@ public final class NilumCustomUiScreen extends Screen {
             return Minecraft.getInstance().font;
         }
         return fontStore.get(fontId).orElseGet(() -> Minecraft.getInstance().font);
+    }
+
+    /** Updates one text element's live-pushed server_connector value in place, without re-opening the screen. */
+    public void updateElementText(String elementId, String text) {
+        Component value = HudHeadText.containsHeadTag(text) ? HudHeadText.parse(text) : Component.literal(text);
+        for (int i = 0; i < layers.size(); i++) {
+            if (layers.get(i) instanceof RenderableLayer.TextLayer existing && existing.elementId().equals(elementId)) {
+                layers.set(i, new RenderableLayer.TextLayer(elementId, existing.x(), existing.y(), existing.layer(),
+                        existing.font().width(value), existing.font().lineHeight, existing.font(), value, existing.color()));
+                return;
+            }
+        }
+    }
+
+    /** Shows or hides one element per its live-pushed requirement result, without re-opening the screen. */
+    public void setElementVisible(String elementId, boolean visible) {
+        if (visible) {
+            hiddenElementIds.remove(elementId);
+        } else {
+            hiddenElementIds.add(elementId);
+        }
     }
 
     /** Shifts every layer by the same offset so the bounding box of all of them, keeping their authored
@@ -195,12 +246,15 @@ public final class NilumCustomUiScreen extends Screen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         for (RenderableLayer layer : layers) {
+            if (hiddenElementIds.contains(layer.elementId())) {
+                continue;
+            }
             switch (layer) {
                 case RenderableLayer.Sprite sprite -> {
                     CustomUi.TextureRef texture = sprite.isButton() && sprite.elementId().equals(pressedElementId)
                             ? sprite.pressedTexture() : sprite.texture();
                     graphics.blit(RenderPipelines.GUI_TEXTURED, texture.id(), sprite.x(), sprite.y(),
-                            0, 0, texture.width(), texture.height(), texture.width(), texture.height());
+                            0, 0, sprite.width(), sprite.height(), texture.width(), texture.height(), texture.width(), texture.height());
                 }
                 case RenderableLayer.TextLayer text ->
                         graphics.drawString(text.font(), text.value(), text.x(), text.y(), text.color());
@@ -210,7 +264,8 @@ public final class NilumCustomUiScreen extends Screen {
 
     private RenderableLayer.Sprite topButtonAt(double mouseX, double mouseY) {
         for (int i = layers.size() - 1; i >= 0; i--) {
-            if (layers.get(i) instanceof RenderableLayer.Sprite sprite && sprite.isButton() && sprite.contains(mouseX, mouseY)) {
+            if (layers.get(i) instanceof RenderableLayer.Sprite sprite && sprite.isButton() && sprite.contains(mouseX, mouseY)
+                    && !hiddenElementIds.contains(sprite.elementId())) {
                 return sprite;
             }
         }

@@ -15,6 +15,7 @@ import io.github.r4t2.nilum.common.util.SemanticVersions;
 import io.github.r4t2.nilum.neoforge.network.NilumAssetManifestPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumHelloAckPayload;
 import io.github.r4t2.nilum.neoforge.network.NilumTcpOfferPayload;
+import io.github.r4t2.nilum.neoforge.network.NilumTrustPendingPayload;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -88,7 +89,8 @@ public final class NeoForgeServerHandshake {
     }
 
     /**
-     * Restarts the TCP side-channel to match the current config. Leaves it
+     * Restarts the TCP side-channel to match the current config. Leaves it disabled if
+     * tcp.advertised-host is blank.
      */
     public synchronized void applyTcpConfig() {
         if (tcpServer != null) {
@@ -151,6 +153,20 @@ public final class NeoForgeServerHandshake {
                 + ", version=" + ack.modVersion() + ").");
 
         context.finishCurrentTask(NilumHandshakeTask.TYPE);
+    }
+
+    /**
+     * The client is showing a trust prompt and sends hello_ack once answered. Refreshes the
+     * configuration-task deadline instead of clearing it, so a slow decision doesn't get the
+     * player kicked for not responding while the dialog is up, but denying it or closing it
+     * without answering still eventually times out and disconnects them rather than leaving
+     * them stuck in configuration forever.
+     */
+    public void onTrustPending(NilumTrustPendingPayload payload, IPayloadContext context) {
+        if (!(context.listener() instanceof ServerConfigurationPacketListenerImpl listener)) {
+            return;
+        }
+        pendingHandshakes.put(listener.getOwner().id(), new PendingHandshake(listener, currentTick + TIMEOUT_TICKS));
     }
 
     public void onTcpUnavailable(ServerPlayer player) {

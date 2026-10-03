@@ -24,11 +24,11 @@ public final class NilumDisplayTransforms {
         BbVector3 scale = fieldOrElse(authored == null ? null : authored.scale(), new BbVector3(1, 1, 1));
 
         if (isLeftHand(context)) {
-            // Vanilla's own ItemStackRenderState.LayerRenderState.submit() always calls
-            // ItemTransform.apply(displayContext.leftHand(), pose) on whatever we return here,
-            // negating translation.x/rotation.y/rotation.z again for left-hand contexts. Since we
-            // already resolved this context's own authored data, pre-negate the same fields so
-            // that second mirror cancels out and the authored values render unchanged.
+            // Vanilla's ItemStackRenderState.LayerRenderState.submit() always negates
+            // translation.x/rotation.y/rotation.z again for left-hand contexts via
+            // ItemTransform.apply(displayContext.leftHand(), pose). Since we already resolved this
+            // context's authored data, pre-negate those same fields so the second mirror cancels
+            // out and the authored values render unchanged.
             translation = new BbVector3(-translation.x(), translation.y(), translation.z());
             rotation = new BbVector3(rotation.x(), -rotation.y(), -rotation.z());
         }
