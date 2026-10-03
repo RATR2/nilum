@@ -33,4 +33,10 @@ public final class ClientHeldItemAnimationStates {
     public String currentModelId(UUID holderId, boolean rightHand) {
         return currentModelIds.get(new Key(holderId, rightHand));
     }
+
+    /** Drops every tracked holder; called on disconnect since holder/model ids from one server mean nothing on another. */
+    public void clear() {
+        states.clear();
+        currentModelIds.clear();
+    }
 }

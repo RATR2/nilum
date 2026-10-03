@@ -26,4 +26,9 @@ public final class ClientCustomUiStore {
     public Optional<CustomUi> get(String uiId) {
         return Optional.ofNullable(uisById.get(uiId));
     }
+
+    /** Drops every loaded UI; called on disconnect so a stale UI from a previous server can't be opened on a new one. */
+    public void clear() {
+        uisById.clear();
+    }
 }

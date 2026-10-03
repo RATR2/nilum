@@ -26,4 +26,9 @@ public final class ClientChestUiStore {
     public Optional<ChestUiClientAsset> get(String uiId) {
         return Optional.ofNullable(assetsById.get(uiId));
     }
+
+    /** Drops every loaded chest UI asset; called on disconnect so a stale background can't be opened on a new server. */
+    public void clear() {
+        assetsById.clear();
+    }
 }
