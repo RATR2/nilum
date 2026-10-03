@@ -26,4 +26,10 @@ public final class ClientModelPlacements {
     public AnimationPlaybackState animationState(UUID entityId) {
         return animationByEntity.computeIfAbsent(entityId, id -> new AnimationPlaybackState());
     }
+
+    /** Drops every tracked entity; called on disconnect since entity ids from one server mean nothing on another. */
+    public void clear() {
+        modelIdsByEntity.clear();
+        animationByEntity.clear();
+    }
 }

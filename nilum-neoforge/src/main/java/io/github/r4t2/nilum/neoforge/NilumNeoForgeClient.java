@@ -108,6 +108,7 @@ import net.minecraft.world.entity.EntityType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
@@ -376,6 +377,19 @@ final class NilumNeoForgeClient {
                 ChunkBlocksPacket packet = ChunkBlocksPacket.decode(payload.data());
                 blockRegistry.apply(packet.entries());
             });
+        });
+
+        // Every store above is populated purely from server-pushed packets and never otherwise
+        // trimmed: without this, leaving one Nilum server for another leaves its HUDs, client
+        // vars, custom UIs, and entity/block placements all still in memory and visible, no
+        // matter which server you're actually on.
+        NeoForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut event) -> {
+            hudAtlases.clear();
+            clientVars.clear();
+            customUiStore.clear();
+            placements.clear();
+            heldItemAnimations.clear();
+            blockRegistry.clear();
         });
     }
 

@@ -74,4 +74,10 @@ public final class ClientHudAtlasStore {
     public void setElementVisible(String atlasId, String elementId, boolean visible) {
         get(atlasId).ifPresent(atlas -> atlas.setElementVisible(elementId, visible));
     }
+
+    /** Drops every atlas and visibility override; called on disconnect so a new server starts from a clean HUD. */
+    public void clear() {
+        atlasesById.clear();
+        hiddenAtlasIds.clear();
+    }
 }

@@ -109,6 +109,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
@@ -428,6 +429,20 @@ public final class NilumFabricClient implements ClientModInitializer {
             if (model != null) {
                 HELD_ITEM_ANIMATIONS.get(packet.holderId(), packet.rightHand(), model).stop(model, System.currentTimeMillis());
             }
+        });
+
+        // Every store above is populated purely from server-pushed packets and never otherwise
+        // trimmed: without this, leaving one Nilum server for another leaves its HUDs, client
+        // vars, custom/chest UIs, and entity/block placements all still in memory and visible,
+        // no matter which server you're actually on.
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            hudAtlases.clear();
+            clientVars.clear();
+            customUiStore.clear();
+            chestUiStore.clear();
+            placements.clear();
+            HELD_ITEM_ANIMATIONS.clear();
+            blockRegistry.clear();
         });
     }
 

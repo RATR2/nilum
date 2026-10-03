@@ -22,4 +22,9 @@ public final class ClientVarStore {
     public double get(String name) {
         return valuesByName.getOrDefault(name, 0.0);
     }
+
+    /** Drops every named variable; called on disconnect so a new server's register() calls aren't no-ops against stale values. */
+    public void clear() {
+        valuesByName.clear();
+    }
 }

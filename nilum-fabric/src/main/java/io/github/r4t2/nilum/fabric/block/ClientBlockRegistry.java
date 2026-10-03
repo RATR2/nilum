@@ -46,4 +46,10 @@ public final class ClientBlockRegistry {
         modelIdByPosition.keySet().removeIf(pos -> (pos.getX() >> 4) == chunkX && (pos.getZ() >> 4) == chunkZ);
         animationByPosition.keySet().removeIf(pos -> (pos.getX() >> 4) == chunkX && (pos.getZ() >> 4) == chunkZ);
     }
+
+    /** Drops every tracked position outright; called on disconnect as a backstop for any chunk CHUNK_UNLOAD missed. */
+    public void clear() {
+        modelIdByPosition.clear();
+        animationByPosition.clear();
+    }
 }
